@@ -203,12 +203,14 @@ function updateHeader(currentUser) {
   const unreadNotifs = db.getNotifications(currentUser.id).filter(n => !n.isRead).length;
 
   headerActions.innerHTML = `
-    <!-- User Badge & Role -->
-    <div style="display:flex; align-items:center; gap:6px;">
+    <!-- User Badge & Name -->
+    <div style="display:flex; align-items:center; gap:8px;">
       <span style="font-size:11px; background:${roleBg}; color:${roleColor}; padding:3px 8px; border-radius:var(--radius-full); font-weight:800; white-space:nowrap;">
         ${roleLabel}
       </span>
-      <select id="userSwitcher" class="user-select-box" style="font-size:11.5px; padding:3px 6px;" title="Cambia account demo"></select>
+      <span style="font-weight:700; font-size:12.5px; color:var(--text-main); white-space:nowrap;">
+        👤 ${escapeHtml(currentUser.fullName)}
+      </span>
     </div>
 
     <!-- Notifiche Button -->
@@ -224,16 +226,14 @@ function updateHeader(currentUser) {
       <a href="#admin" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Pannello Admin">
         ⚙️ Admin
       </a>
+      <button id="btnOpenGatewayConfigHeader" class="btn btn-sm" style="font-size:11px; padding:4px 8px; background:#f0fdf4; border:1px solid #86efac; color:#166534; font-weight:700;" title="Configura PayPal Sandbox Client ID">
+        🅿️ Config PayPal
+      </button>
     ` : ''}
 
     <!-- Payment and Payout Settings Button -->
     <button id="btnOpenPaymentSettingsHeader" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Gestione IBAN e Metodi di Pagamento">
       💳 Pagamenti & IBAN
-    </button>
-
-    <!-- Gateway Config Button -->
-    <button id="btnOpenGatewayConfigHeader" class="btn btn-sm" style="font-size:11px; padding:4px 8px; background:#f0fdf4; border:1px solid #86efac; color:#166534; font-weight:700;" title="Configura PayPal Sandbox Client ID">
-      🅿️ Config PayPal
     </button>
 
     <!-- Logout Button -->
@@ -242,30 +242,13 @@ function updateHeader(currentUser) {
     </button>
   `;
 
-  // Bind Switcher
-  const selectEl = document.getElementById('userSwitcher');
-  if (selectEl) {
-    const allUsers = authService.getAllUsers();
-    selectEl.innerHTML = allUsers.map(u => `
-      <option value="${u.id}" ${u.id === currentUser.id ? 'selected' : ''}>
-        👤 ${u.fullName} (${u.role === 'admin' ? 'Admin' : u.id.includes('owner') ? 'Capogruppo' : 'Membro'})
-      </option>
-    `).join('');
-
-    selectEl.onchange = (e) => {
-      authService.switchUser(e.target.value);
-      showToast(`Accesso eseguito come ${authService.getCurrentUser().fullName}`);
-      renderApp();
-    };
-  }
-
   // Bind Payment Modal
   const btnPayment = document.getElementById('btnOpenPaymentSettingsHeader');
   if (btnPayment) {
     btnPayment.onclick = () => openPaymentAndPayoutSettingsModal(currentUser, 'payout');
   }
 
-  // Bind Gateway Config
+  // Bind Gateway Config (Admin only)
   const btnGateway = document.getElementById('btnOpenGatewayConfigHeader');
   if (btnGateway) {
     btnGateway.onclick = () => openGatewayConfigModal();
@@ -392,39 +375,20 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
             <form id="loginForm">
               <div class="form-group" style="margin-bottom:14px;">
                 <label class="form-label" style="font-size:12.5px; font-weight:700;">Indirizzo Email</label>
-                <input type="email" id="loginEmail" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(emailPrefill || 'marco.rossi@example.com')}" required autofocus style="font-size:13.5px; padding:10px 12px;">
+                <input type="email" id="loginEmail" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(emailPrefill || '')}" required autofocus style="font-size:13.5px; padding:10px 12px;">
               </div>
 
               <div class="form-group" style="margin-bottom:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                   <label class="form-label" style="font-size:12.5px; font-weight:700; margin-bottom:0;">Password</label>
-                  <span style="font-size:11px; color:var(--text-muted);">Default: Password123!</span>
                 </div>
-                <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" value="Password123!" required style="font-size:13.5px; padding:10px 12px;">
+                <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" value="" required style="font-size:13.5px; padding:10px 12px;">
               </div>
 
               <button type="submit" id="btnSubmitLogin" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px; margin-top:6px;">
                 🔐 Accedi al tuo Account
               </button>
             </form>
-
-            <!-- Box Demo 1-Click Fast Login -->
-            <div style="margin-top:22px; padding-top:16px; border-top:1px solid #f1f5f9;">
-              <span style="font-size:11px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:10px;">
-                🧪 Accesso Rapido Demo (1-Click)
-              </span>
-              <div style="display:grid; grid-template-columns:1fr; gap:6px;">
-                <button type="button" class="btn btn-secondary btn-sm btn-demo-quick" data-id="usr-owner-1" style="font-size:12px; font-weight:700; text-align:left; justify-content:flex-start; padding:8px 12px;">
-                  👑 <strong>Marco Rossi</strong> (Capogruppo Spotify)
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm btn-demo-quick" data-id="usr-member-1" style="font-size:12px; font-weight:700; text-align:left; justify-content:flex-start; padding:8px 12px;">
-                  👤 <strong>Elena Conti</strong> (Membro Partecipante)
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm btn-demo-quick" data-id="usr-admin" style="font-size:12px; font-weight:700; text-align:left; justify-content:flex-start; padding:8px 12px;">
-                  ⚙️ <strong>Admin</strong> (Gestione Piattaforma & Audit Ledger)
-                </button>
-              </div>
-            </div>
           ` : `
             <!-- TAB 2: REGISTER -->
             <form id="registerForm">
@@ -494,16 +458,6 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         renderForm();
       };
     }
-
-    // Demo quick login triggers
-    container.querySelectorAll('.btn-demo-quick').forEach(btn => {
-      btn.onclick = () => {
-        const u = authService.switchUser(btn.dataset.id);
-        showToast(`✅ Accesso eseguito come ${u.fullName}!`);
-        navigateTo('#home');
-        renderApp();
-      };
-    });
 
     // Submit Login Form
     const loginForm = container.querySelector('#loginForm');
