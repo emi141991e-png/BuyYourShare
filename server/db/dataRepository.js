@@ -59,14 +59,63 @@ class DataRepository {
           this.data = JSON.parse(raw);
           console.log(`[DB] Database inizializzato sul Volume Persistente da: ${bundledDb}`);
           this.saveSync();
-          return;
         } catch (copyErr) {
           console.warn('[DB] Fallita copia da bundledDb, uso defaultState:', copyErr.message);
+          this.data = this.createDefaultState();
+          this.saveSync();
         }
+      } else {
+        this.data = this.createDefaultState();
+        this.saveSync();
       }
+    }
 
-      this.data = this.createDefaultState();
-      this.saveSync();
+    // MIGRAZIONE DI PRODUZIONE: Pulizia definitiva da qualsiasi vecchio gruppo demo legacy
+    if (this.data && Array.isArray(this.data.groups)) {
+      const beforeCount = this.data.groups.length;
+      this.data.groups = this.data.groups.filter(g => 
+        g.id !== 'grp-1042' && 
+        g.id !== 'grp-1089' && 
+        g.id !== 'grp-1120' && 
+        g.planName !== 'Canva for Teams' && 
+        g.planName !== 'YouTube Famiglia'
+      );
+      if (this.data.groups.length !== beforeCount) {
+        console.log(`[DB] Migrazione: rimossi ${beforeCount - this.data.groups.length} gruppi demo legacy dal database persistente.`);
+        this.saveSync();
+      }
+    }
+
+    // Assicura che il gruppo reale di Marco Rossi sia presente e pubblicato
+    if (this.data && Array.isArray(this.data.groups)) {
+      const hasMarco = this.data.groups.some(g => g.id === 'grp-1787066374922');
+      if (!hasMarco) {
+        this.data.groups.push({
+          id: 'grp-1787066374922',
+          ownerId: 'usr-owner-1',
+          serviceId: 'srv-spotify',
+          customServiceName: 'Spotify',
+          planName: 'Spotify Family (6 Account)',
+          realSubscriptionCostCents: 2099,
+          totalSlots: 6,
+          ownerSlots: 1,
+          availableSlots: 5,
+          occupiedMemberSlots: 0,
+          baseMemberShareCents: 350,
+          platformFeeCents: 149,
+          memberTotalCents: 499,
+          groupType: 'public',
+          status: 'PUBLISHED',
+          isPublished: true,
+          publishedAt: '2026-08-18T15:19:34.946Z',
+          inviteCode: 'BYS-7127',
+          rulesAndRequirements: 'Invito ufficiale Spotify Family tramite email.',
+          description: 'Gruppo Spotify Family gestito da Marco Rossi con rinnovo puntuale.',
+          createdAt: '2026-08-18T15:19:34.922Z',
+          updatedAt: '2026-08-18T15:19:34.922Z'
+        });
+        this.saveSync();
+      }
     }
   }
 
