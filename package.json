@@ -1,6 +1,6 @@
 {
   "name": "buyyourshare-backend",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "BuyYourShare - Real Backend Server with Webhooks, Stripe Connect & PayPal Sandbox",
   "type": "module",
   "main": "server/index.js",
