@@ -1,0 +1,107 @@
+/* ==========================================================================
+   BUYYOURSHARE - DESIGN SYSTEM
+   Palette Indigo & Emerald Moderna, Tipografia Crisp, Mobile-First
+   ========================================================================== */
+
+:root {
+  /* Brand Theme (BuyYourShare) */
+  --primary-h: 226;
+  --primary-s: 70%;
+  --primary-l: 55%;
+  --primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
+  --primary-hover: hsl(var(--primary-h), var(--primary-s), 46%);
+  --primary-light: hsl(var(--primary-h), 90%, 96%);
+  --primary-glow: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.16);
+
+  /* Accent Emerald (Risparmio & Sicurezza) */
+  --accent-h: 158;
+  --accent-s: 72%;
+  --accent-l: 40%;
+  --accent: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+  --accent-hover: hsl(var(--accent-h), var(--accent-s), 34%);
+  --accent-light: hsl(var(--accent-h), 80%, 95%);
+
+  /* Neutrals */
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-input: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-focus: #4f46e5;
+  --border-strong: #cbd5e1;
+
+  /* Text */
+  --text-main: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-inverse: #ffffff;
+  --text-accent: #059669;
+
+  /* Badges */
+  --badge-success-bg: #ecfdf5;
+  --badge-success-text: #059669;
+  --badge-warning-bg: #fffbeb;
+  --badge-warning-text: #d97706;
+  --badge-danger-bg: #fef2f2;
+  --badge-danger-text: #dc2626;
+  --badge-info-bg: #eff6ff;
+  --badge-info-text: #2563eb;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 10px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.1);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 95px; /* Spazio per bottom nav mobile */
+}
+
+.container {
+  width: 100%;
+  max-width: 768px; /* Ottimizzato mobile-first e tablet */
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: all var(--transition-fast);
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.hidden { display: none !important; }

@@ -1,0 +1,3582 @@
+/**
+ * BuyYourShare - Standalone Marketplace Controller & SPA Router
+ * Modello P2P con Quote Mensili, Commissione 0,99€, Chat Privata Nativa e Accesso Automatico
+ */
+
+import { db } from './db/database.js';
+import { authService } from './services/authService.js';
+import { eurosToCents, centsToEuros, formatCents } from './engine/MoneyEngine.js';
+import { calculatePricingBreakdown } from './engine/FeeEngine.js';
+import { formatDateIT, formatDateShort } from './engine/DateEngine.js';
+import { stripeCheckoutService } from './services/stripeCheckoutService.js';
+import { stripeConnectService } from './services/stripeConnectService.js';
+import { financialAuditService } from './services/financialAuditService.js';
+
+// =========================================================================
+// GLOBAL STATE & ROUTING
+// =========================================================================
+let currentRoute = window.location.hash || '#home';
+let selectedCategoryFilter = 'ALL';
+let searchKeyword = '';
+let wizardState = {
+  serviceId: 'srv-spotify',
+  customServiceName: 'Spotify',
+  planName: 'Piano Standard',
+  realCostEuros: '20.99',
+  totalSlots: 6,
+  ownerSlots: 1,
+  accessUrl: 'https://spotify.com/family/join/invite/demo',
+  instructions: '1. Clicca sul link di invito\n2. Accedi con il tuo account Spotify personale\n3. Conferma l\'ingresso nel piano Famiglia.',
+  additionalInfo: 'Il tuo account e le tue playlist rimangono 100% personali e privati.',
+  accessCode: 'SPOTIFY-8492'
+};
+
+export function showToast(message) {
+  let toast = document.getElementById('appToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'appToast';
+    toast.className = 'toast-msg';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+export function copyToClipboard(text, successMsg = 'Copiato negli appunti!') {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast(successMsg)).catch(() => promptCopy(text));
+  } else {
+    promptCopy(text);
+  }
+}
+
+function promptCopy(text) {
+  prompt('Copia il link:', text);
+}
+
+// =========================================================================
+// ROUTER & NAVIGATION
+// =========================================================================
+function navigateTo(hash) {
+  window.location.hash = hash;
+}
+
+window.addEventListener('hashchange', () => {
+  currentRoute = window.location.hash || '#home';
+  renderApp();
+});
+
+// =========================================================================
+// MAIN RENDER DISPATCHER CON ROUTE GUARDS & RBAC
+// =========================================================================
+export function renderApp() {
+  const container = document.getElementById('mainAppContainer');
+  if (!container) return;
+
+  try {
+    const isAuth = authService.isAuthenticated();
+    const currentUser = authService.getCurrentUser();
+    updateHeader(currentUser);
+    updateBottomNav();
+
+    // Rotte pubbliche esplicite di login / registrazione
+    if (currentRoute === '#login') {
+      renderAuthLandingView(container, 'login');
+      return;
+    }
+    if (currentRoute === '#register') {
+      renderAuthLandingView(container, 'register');
+      return;
+    }
+
+    // Se l'utente non è autenticato, proteggi tutte le aree private
+    const protectedRoutes = ['#crea', '#miei-abbonamenti', '#miei-gruppi', '#admin', '#notifiche'];
+    const isChatRoute = currentRoute.startsWith('#chat-');
+    const isProtected = protectedRoutes.includes(currentRoute) || isChatRoute;
+
+    if (!isAuth && isProtected) {
+      renderAuthLandingView(container, 'login');
+      return;
+    }
+
+    if (currentRoute === '#home' || currentRoute === '') {
+      renderHomeView(container, currentUser);
+    } else if (currentRoute === '#cerca') {
+      renderMarketplaceView(container, currentUser);
+    } else if (currentRoute.startsWith('#gruppo-')) {
+      const groupId = currentRoute.replace('#gruppo-', '');
+      renderGroupDetailView(container, groupId, currentUser);
+    } else if (currentRoute === '#crea') {
+      renderWizardView(container, currentUser);
+    } else if (currentRoute === '#miei-abbonamenti') {
+      renderMySubscriptionsView(container, currentUser);
+    } else if (currentRoute === '#miei-gruppi') {
+      renderMyGroupsView(container, currentUser);
+    } else if (currentRoute.startsWith('#chat-')) {
+      const groupId = currentRoute.replace('#chat-', '');
+      renderChatView(container, groupId, currentUser);
+    } else if (currentRoute === '#admin') {
+      if (!currentUser || currentUser.role !== 'admin') {
+        renderForbiddenAdminView(container, currentUser);
+      } else {
+        renderAdminView(container, currentUser);
+      }
+    } else if (currentRoute === '#notifiche') {
+      renderNotificationsView(container, currentUser);
+    } else {
+      renderHomeView(container, currentUser);
+    }
+  } catch (err) {
+    console.error('Fatal renderApp error:', err);
+    container.innerHTML = `
+      <div style="padding:40px 20px; text-align:center; max-width:640px; margin:0 auto;">
+        <div style="background:#fef2f2; border:1px solid #f87171; border-radius:var(--radius-lg); padding:20px; text-align:left;">
+          <h3 style="font-size:16px; font-weight:800; color:#991b1b; margin-bottom:8px;">⚠️ Errore di Caricamento Vista</h3>
+          <p style="font-size:12px; color:#7f1d1d; margin-bottom:12px;">Si è verificato un errore durante la renderizzazione della schermata.</p>
+          <pre style="font-size:11px; background:#fff; border:1px solid #fca5a5; padding:10px; border-radius:6px; overflow:auto; color:#991b1b;">${escapeHtml(err.stack || err.message)}</pre>
+          <div style="margin-top:14px; display:flex; gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="location.hash='#home'; location.reload();">Torna alla Home</button>
+            <button class="btn btn-secondary btn-sm" onclick="localStorage.removeItem('buyyourshare_db_v5'); location.reload();">Ripristina Dati Iniziali</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function renderForbiddenAdminView(container, currentUser) {
+  container.innerHTML = `
+    <div class="page-view" style="max-width:540px; margin:40px auto; padding:0 16px;">
+      <div style="background:white; border:2px solid #ef4444; border-radius:var(--radius-lg); padding:32px 24px; text-align:center; box-shadow:0 10px 25px -5px rgba(239, 68, 68, 0.15);">
+        <div style="width:56px; height:56px; background:#fee2e2; color:#dc2626; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 16px;">
+          🚫
+        </div>
+        <h2 style="font-size:18px; font-weight:900; color:#991b1b; margin-bottom:8px;">Accesso Riservato agli Amministratori (403 Forbidden)</h2>
+        <p style="font-size:13px; color:#7f1d1d; margin-bottom:18px; line-height:1.5;">
+          L'account attuale (<strong>${escapeHtml(currentUser?.fullName || 'Utente')}</strong>) ha il ruolo di <em>${currentUser?.role === 'owner' || currentUser?.id?.includes('owner') ? 'Capogruppo' : 'Membro'}</em> e non dispone delle autorizzazioni per accedere all'Audit Ledger e alla gestione globale.
+        </p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <a href="#home" class="btn btn-primary btn-sm" style="font-size:12.5px;">🏠 Torna alla Home</a>
+          <button class="btn btn-secondary btn-sm" id="btnSwitchAdminQuick" style="font-size:12.5px;">🔑 Accedi come Admin</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const btnSw = container.querySelector('#btnSwitchAdminQuick');
+  if (btnSw) {
+    btnSw.onclick = () => {
+      authService.switchUser('usr-admin');
+      showToast('Accesso eseguito come Amministratore.');
+      navigateTo('#admin');
+      renderApp();
+    };
+  }
+}
+
+function updateHeader(currentUser) {
+  const isAuth = authService.isAuthenticated();
+  const headerActions = document.querySelector('.header-actions');
+  if (!headerActions) return;
+
+  if (!isAuth || !currentUser) {
+    headerActions.innerHTML = `
+      <a href="#login" class="btn btn-secondary btn-sm" style="font-size:12px; font-weight:700; padding:6px 12px;">
+        🔐 Accedi
+      </a>
+      <a href="#register" class="btn btn-primary btn-sm" style="font-size:12px; font-weight:800; padding:6px 14px; background:#003087;">
+        ✨ Registrati
+      </a>
+    `;
+    return;
+  }
+
+  const roleLabel = currentUser.role === 'admin' ? '⚙️ Admin' : (currentUser.id.includes('owner') || db.getMyCreatedGroups(currentUser.id, currentUser).length > 0 ? '👑 Capogruppo' : '👤 Membro');
+  const roleBg = currentUser.role === 'admin' ? '#f3e8ff' : (roleLabel.includes('Capogruppo') ? '#fef3c7' : '#e0f2fe');
+  const roleColor = currentUser.role === 'admin' ? '#6b21a8' : (roleLabel.includes('Capogruppo') ? '#92400e' : '#0369a1');
+
+  const unreadNotifs = db.getNotifications(currentUser.id).filter(n => !n.isRead).length;
+
+  headerActions.innerHTML = `
+    <!-- User Badge & Role -->
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span style="font-size:11px; background:${roleBg}; color:${roleColor}; padding:3px 8px; border-radius:var(--radius-full); font-weight:800; white-space:nowrap;">
+        ${roleLabel}
+      </span>
+      <select id="userSwitcher" class="user-select-box" style="font-size:11.5px; padding:3px 6px;" title="Cambia account demo"></select>
+    </div>
+
+    <!-- Notifiche Button -->
+    <a href="#notifiche" class="notif-btn" title="Notifiche">
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+      </svg>
+      <span id="headerNotifBadge" class="notif-badge ${unreadNotifs > 0 ? '' : 'hidden'}">${unreadNotifs}</span>
+    </a>
+
+    <!-- Admin Link (Only for Admin) -->
+    ${currentUser.role === 'admin' ? `
+      <a href="#admin" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Pannello Admin">
+        ⚙️ Admin
+      </a>
+    ` : ''}
+
+    <!-- Payment and Payout Settings Button -->
+    <button id="btnOpenPaymentSettingsHeader" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Gestione IBAN e Metodi di Pagamento">
+      💳 Pagamenti & IBAN
+    </button>
+
+    <!-- Gateway Config Button -->
+    <button id="btnOpenGatewayConfigHeader" class="btn btn-sm" style="font-size:11px; padding:4px 8px; background:#f0fdf4; border:1px solid #86efac; color:#166534; font-weight:700;" title="Configura PayPal Sandbox Client ID">
+      🅿️ Config PayPal
+    </button>
+
+    <!-- Logout Button -->
+    <button id="btnLogoutHeader" class="btn btn-secondary btn-sm" style="font-size:11.5px; padding:4px 8px; color:#dc2626; border-color:#fca5a5;" title="Disconnetti account">
+      🚪 Esci
+    </button>
+  `;
+
+  // Bind Switcher
+  const selectEl = document.getElementById('userSwitcher');
+  if (selectEl) {
+    const allUsers = authService.getAllUsers();
+    selectEl.innerHTML = allUsers.map(u => `
+      <option value="${u.id}" ${u.id === currentUser.id ? 'selected' : ''}>
+        👤 ${u.fullName} (${u.role === 'admin' ? 'Admin' : u.id.includes('owner') ? 'Capogruppo' : 'Membro'})
+      </option>
+    `).join('');
+
+    selectEl.onchange = (e) => {
+      authService.switchUser(e.target.value);
+      showToast(`Accesso eseguito come ${authService.getCurrentUser().fullName}`);
+      renderApp();
+    };
+  }
+
+  // Bind Payment Modal
+  const btnPayment = document.getElementById('btnOpenPaymentSettingsHeader');
+  if (btnPayment) {
+    btnPayment.onclick = () => openPaymentAndPayoutSettingsModal(currentUser, 'payout');
+  }
+
+  // Bind Gateway Config
+  const btnGateway = document.getElementById('btnOpenGatewayConfigHeader');
+  if (btnGateway) {
+    btnGateway.onclick = () => openGatewayConfigModal();
+  }
+
+  // Bind Logout
+  const btnLogout = document.getElementById('btnLogoutHeader');
+  if (btnLogout) {
+    btnLogout.onclick = () => {
+      authService.logout();
+      showToast('Disconnessione effettuata.');
+      navigateTo('#login');
+      renderApp();
+    };
+  }
+}
+
+function updateBottomNav() {
+  const isAuth = authService.isAuthenticated();
+  const bottomNav = document.querySelector('.bottom-nav');
+  if (!bottomNav) return;
+
+  if (!isAuth) {
+    bottomNav.innerHTML = `
+      <a href="#home" class="nav-item ${currentRoute === '#home' || currentRoute === '' ? 'active' : ''}">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+        </svg>
+        <span>Home</span>
+      </a>
+      <a href="#cerca" class="nav-item ${currentRoute === '#cerca' ? 'active' : ''}">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        <span>Cerca</span>
+      </a>
+      <a href="#login" class="nav-item ${currentRoute === '#login' ? 'active' : ''}">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+        </svg>
+        <span>Accedi</span>
+      </a>
+      <a href="#register" class="nav-item ${currentRoute === '#register' ? 'active' : ''}">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+        </svg>
+        <span>Registrati</span>
+      </a>
+    `;
+    return;
+  }
+
+  bottomNav.innerHTML = `
+    <a href="#home" class="nav-item ${currentRoute === '#home' || currentRoute === '' ? 'active' : ''}">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+      </svg>
+      <span>Home</span>
+    </a>
+    <a href="#cerca" class="nav-item ${currentRoute === '#cerca' ? 'active' : ''}">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+      </svg>
+      <span>Cerca</span>
+    </a>
+    <a href="#crea" class="nav-item nav-item-highlight ${currentRoute === '#crea' ? 'active' : ''}">
+      <div class="nav-create-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+        </svg>
+      </div>
+      <span>Crea</span>
+    </a>
+    <a href="#miei-gruppi" class="nav-item ${currentRoute === '#miei-gruppi' ? 'active' : ''}">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+      </svg>
+      <span>I Miei Gruppi</span>
+    </a>
+    <a href="#miei-abbonamenti" class="nav-item ${currentRoute === '#miei-abbonamenti' ? 'active' : ''}">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+      </svg>
+      <span>Abbonamenti</span>
+    </a>
+  `;
+}
+
+// =========================================================================
+// 0. AUTHENTICATION & REGISTRATION LANDING VIEW (CON VERIFICA EMAIL OTP & DEMO)
+// =========================================================================
+function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '') {
+  let activeTab = initialTab;
+
+  function renderForm() {
+    container.innerHTML = `
+      <div class="page-view" style="max-width:520px; margin:28px auto; padding:0 16px;">
+        <!-- Header Brand & Tagline -->
+        <div style="text-align:center; margin-bottom:24px;">
+          <div style="display:inline-flex; align-items:center; justify-content:center; width:54px; height:54px; background:linear-gradient(135deg, #003087, #0070ba); color:white; border-radius:16px; font-size:26px; font-weight:900; box-shadow:0 6px 16px rgba(0,48,135,0.25); margin-bottom:12px;">
+            B
+          </div>
+          <h1 style="font-size:24px; font-weight:900; color:var(--text-main); margin-bottom:6px;">Benvenuto su BuyYourShare</h1>
+          <p style="font-size:13.5px; color:var(--text-secondary); max-width:420px; margin:0 auto; line-height:1.4;">
+            La piattaforma sicura per condividere abbonamenti digitali legittimamente con MoneySplit e ricezione quote su IBAN.
+          </p>
+        </div>
+
+        <!-- Auth Card Container -->
+        <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-xl); padding:26px 28px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.06);">
+          
+          <!-- Tabs Switcher -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; background:#f1f5f9; border-radius:var(--radius-md); padding:4px; margin-bottom:22px;">
+            <button type="button" id="tabBtnLogin" class="btn ${activeTab === 'login' ? 'btn-primary' : 'btn-ghost'}" style="font-size:13px; font-weight:800; padding:8px; border-radius:var(--radius-sm); border:none; ${activeTab === 'login' ? 'background:#003087; color:white;' : 'color:var(--text-secondary);'}">
+              🔐 Accedi
+            </button>
+            <button type="button" id="tabBtnRegister" class="btn ${activeTab === 'register' ? 'btn-primary' : 'btn-ghost'}" style="font-size:13px; font-weight:800; padding:8px; border-radius:var(--radius-sm); border:none; ${activeTab === 'register' ? 'background:#003087; color:white;' : 'color:var(--text-secondary);'}">
+              ✨ Registrati
+            </button>
+          </div>
+
+          <!-- TAB 1: LOGIN -->
+          ${activeTab === 'login' ? `
+            <form id="loginForm">
+              <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label" style="font-size:12.5px; font-weight:700;">Indirizzo Email</label>
+                <input type="email" id="loginEmail" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(emailPrefill || 'marco.rossi@example.com')}" required autofocus style="font-size:13.5px; padding:10px 12px;">
+              </div>
+
+              <div class="form-group" style="margin-bottom:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <label class="form-label" style="font-size:12.5px; font-weight:700; margin-bottom:0;">Password</label>
+                  <span style="font-size:11px; color:var(--text-muted);">Default: Password123!</span>
+                </div>
+                <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" value="Password123!" required style="font-size:13.5px; padding:10px 12px;">
+              </div>
+
+              <button type="submit" id="btnSubmitLogin" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px; margin-top:6px;">
+                🔐 Accedi al tuo Account
+              </button>
+            </form>
+
+            <!-- Box Demo 1-Click Fast Login -->
+            <div style="margin-top:22px; padding-top:16px; border-top:1px solid #f1f5f9;">
+              <span style="font-size:11px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:10px;">
+                🧪 Accesso Rapido Demo (1-Click)
+              </span>
+              <div style="display:grid; grid-template-columns:1fr; gap:6px;">
+                <button type="button" class="btn btn-secondary btn-sm btn-demo-quick" data-id="usr-owner-1" style="font-size:12px; font-weight:700; text-align:left; justify-content:flex-start; padding:8px 12px;">
+                  👑 <strong>Marco Rossi</strong> (Capogruppo Spotify)
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm btn-demo-quick" data-id="usr-member-1" style="font-size:12px; font-weight:700; text-align:left; justify-content:flex-start; padding:8px 12px;">
+                  👤 <strong>Elena Conti</strong> (Membro Partecipante)
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm btn-demo-quick" data-id="usr-admin" style="font-size:12px; font-weight:700; text-align:left; justify-content:flex-start; padding:8px 12px;">
+                  ⚙️ <strong>Admin</strong> (Gestione Piattaforma & Audit Ledger)
+                </button>
+              </div>
+            </div>
+          ` : `
+            <!-- TAB 2: REGISTER -->
+            <form id="registerForm">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-size:12px; font-weight:700;">Nome *</label>
+                  <input type="text" id="regFirstName" class="form-input" placeholder="es. Mario" required style="font-size:13px; padding:9px 11px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-size:12px; font-weight:700;">Cognome *</label>
+                  <input type="text" id="regLastName" class="form-input" placeholder="es. Rossi" required style="font-size:13px; padding:9px 11px;">
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" style="font-size:12px; font-weight:700;">Indirizzo Email *</label>
+                <input type="email" id="regEmail" class="form-input" placeholder="es. mario.rossi@email.com" required style="font-size:13px; padding:9px 11px;">
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-size:12px; font-weight:700;">Password *</label>
+                  <input type="password" id="regPassword" class="form-input" placeholder="Min. 8 caratteri" minlength="8" required style="font-size:13px; padding:9px 11px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-size:12px; font-weight:700;">Conferma Password *</label>
+                  <input type="password" id="regConfirmPassword" class="form-input" placeholder="Ripeti password" minlength="8" required style="font-size:13px; padding:9px 11px;">
+                </div>
+              </div>
+
+              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:12px; margin-bottom:16px;">
+                <label style="display:flex; align-items:flex-start; gap:8px; font-size:11.5px; color:var(--text-secondary); cursor:pointer; margin-bottom:8px;">
+                  <input type="checkbox" id="regTerms" required style="margin-top:2px;">
+                  <span>Accetto i <strong>Termini e Condizioni di Servizio</strong> di BuyYourShare. *</span>
+                </label>
+                <label style="display:flex; align-items:flex-start; gap:8px; font-size:11.5px; color:var(--text-secondary); cursor:pointer; margin-bottom:0;">
+                  <input type="checkbox" id="regPrivacy" required style="margin-top:2px;">
+                  <span>Dichiaro di aver preso visione dell'<strong>Informativa Privacy (GDPR)</strong> e di essere maggiorenne. *</span>
+                </label>
+              </div>
+
+              <button type="submit" id="btnSubmitRegister" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px;">
+                ✨ Crea Account ed Entra Subito
+              </button>
+            </form>
+          `}
+        </div>
+
+        <p style="text-align:center; font-size:11.5px; color:var(--text-muted); margin-top:20px;">
+          🔒 Connessione cifrata TLS 256-bit • Pagamenti protetti con Stripe Connect & PayPal Sandbox
+        </p>
+      </div>
+    `;
+
+    // Tab switch triggers
+    const tabLogin = container.querySelector('#tabBtnLogin');
+    if (tabLogin) {
+      tabLogin.onclick = () => {
+        activeTab = 'login';
+        renderForm();
+      };
+    }
+    const tabRegister = container.querySelector('#tabBtnRegister');
+    if (tabRegister) {
+      tabRegister.onclick = () => {
+        activeTab = 'register';
+        renderForm();
+      };
+    }
+
+    // Demo quick login triggers
+    container.querySelectorAll('.btn-demo-quick').forEach(btn => {
+      btn.onclick = () => {
+        const u = authService.switchUser(btn.dataset.id);
+        showToast(`✅ Accesso eseguito come ${u.fullName}!`);
+        navigateTo('#home');
+        renderApp();
+      };
+    });
+
+    // Submit Login Form
+    const loginForm = container.querySelector('#loginForm');
+    if (loginForm) {
+      loginForm.onsubmit = (e) => {
+        e.preventDefault();
+        const email = container.querySelector('#loginEmail').value;
+        const password = container.querySelector('#loginPassword').value;
+        try {
+          const u = authService.login(email, password);
+          showToast(`🎉 Bentornato/a, ${u.fullName}!`);
+          navigateTo('#home');
+          renderApp();
+        } catch (err) {
+          alert('❌ ' + err.message);
+        }
+      };
+    }
+
+    // Submit Register Form (Accesso Diretto Immediato)
+    const registerForm = container.querySelector('#registerForm');
+    if (registerForm) {
+      registerForm.onsubmit = (e) => {
+        e.preventDefault();
+        const firstName = container.querySelector('#regFirstName').value;
+        const lastName = container.querySelector('#regLastName').value;
+        const email = container.querySelector('#regEmail').value;
+        const password = container.querySelector('#regPassword').value;
+        const confirmPassword = container.querySelector('#regConfirmPassword').value;
+        const termsConsent = container.querySelector('#regTerms').checked;
+        const privacyConsent = container.querySelector('#regPrivacy').checked;
+
+        try {
+          const newUser = authService.register({
+            firstName,
+            lastName,
+            email,
+            password,
+            confirmPassword,
+            termsConsent,
+            privacyConsent
+          });
+
+          showToast(`🎉 Account creato con successo! Benvenuto/a ${newUser.fullName}!`);
+          navigateTo('#home');
+          renderApp();
+        } catch (err) {
+          alert('❌ ' + err.message);
+        }
+      };
+    }
+  }
+
+  renderForm();
+}
+
+function openEmailVerificationModal(email, generatedCode = '123456') {
+  let modal = document.getElementById('emailVerificationModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'emailVerificationModal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-dialog" style="max-width:440px; padding:28px;">
+      <div style="text-align:center; margin-bottom:18px;">
+        <div style="width:52px; height:52px; background:#eff6ff; color:#1d4ed8; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px;">
+          ✉️
+        </div>
+        <h2 style="font-size:18px; font-weight:900; color:var(--text-main);">Verifica il tuo Indirizzo Email</h2>
+        <p style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+          Abbiamo inviato un codice di sicurezza OTP a 6 cifre a:<br>
+          <strong style="color:var(--text-main);">${escapeHtml(email)}</strong>
+        </p>
+      </div>
+
+      <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:10px 14px; text-align:center; margin-bottom:16px;">
+        <span style="font-size:11.5px; color:#166534; display:block;">
+          🔑 Codice OTP generato per la verifica:
+        </span>
+        <strong style="font-family:var(--font-mono); font-size:18px; letter-spacing:2px; color:#166534;">
+          ${escapeHtml(generatedCode || '123456')}
+        </strong>
+      </div>
+
+      <form id="otpVerifyForm">
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label" style="font-size:12px; font-weight:700; text-align:center; display:block;">Inserisci il Codice a 6 Cifre</label>
+          <input type="text" id="inputOtpCode" class="form-input" placeholder="es. 123456" maxlength="6" value="${escapeHtml(generatedCode || '')}" required autofocus style="font-size:20px; font-weight:900; letter-spacing:6px; text-align:center; padding:10px; font-family:var(--font-mono);">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="background:#003087; font-size:13.5px; font-weight:800; padding:12px;">
+          ✅ Conferma & Accedi Subito
+        </button>
+      </form>
+
+      <div style="text-align:center; margin-top:14px;">
+        <button type="button" id="btnCloseOtpModal" class="btn btn-ghost btn-sm" style="font-size:11.5px; color:var(--text-muted);">
+          Annulla
+        </button>
+      </div>
+    </div>
+  `;
+
+  const otpForm = modal.querySelector('#otpVerifyForm');
+  if (otpForm) {
+    otpForm.onsubmit = (e) => {
+      e.preventDefault();
+      const code = modal.querySelector('#inputOtpCode').value.trim();
+      try {
+        const u = authService.verifyEmail(email, code);
+        modal.classList.remove('active');
+        showToast(`🎉 Email verificata con successo! Benvenuto/a ${u.fullName}`);
+        navigateTo('#home');
+        renderApp();
+      } catch (err) {
+        alert('❌ ' + err.message);
+      }
+    };
+  }
+
+  const btnClose = modal.querySelector('#btnCloseOtpModal');
+  if (btnClose) {
+    btnClose.onclick = () => {
+      modal.classList.remove('active');
+    };
+  }
+
+  modal.classList.add('active');
+}
+
+// =========================================================================
+// 1. HOME VIEW (DINAMICA IN BASE ALLA PRESENZA REALE DI POSTI DISPONIBILI)
+// =========================================================================
+function renderHomeView(container, currentUser) {
+  const availableGroups = db.getGroups({ onlyAvailable: true });
+  const hasAvailableGroups = availableGroups.length > 0;
+  const previewGroups = availableGroups.slice(0, 3);
+
+  container.innerHTML = `
+    <div class="page-view">
+      
+      <!-- Hero Home Card Dinamica -->
+      <section class="hero-home">
+        <span class="hero-tag">
+          ${hasAvailableGroups ? `🟢 ${availableGroups.length} GRUPPI CON POSTI LIBERI` : `⚡ CONDIVISIONE P2P`}
+        </span>
+        
+        <h1 class="hero-title">Condividi i costi.<br>Paga meno.</h1>
+        <p class="hero-subtitle">
+          ${hasAvailableGroups 
+            ? 'Trova un posto disponibile tra i gruppi attivi oppure condividi il tuo abbonamento azzerando le spese.' 
+            : 'Non ci sono ancora posti disponibili nella tua area. Sii il primo a creare un gruppo per condividere il tuo abbonamento!'}
+        </p>
+
+        <div class="hero-actions-two">
+          ${hasAvailableGroups ? `
+            <a href="#cerca" class="btn-hero-primary">
+              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              CERCA UN ABBONAMENTO (${availableGroups.length})
+            </a>
+            <a href="#crea" class="btn-hero-secondary">
+              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+              </svg>
+              CREA UN GRUPPO
+            </a>
+          ` : `
+            <a href="#crea" class="btn-hero-primary" style="font-size:16px; padding:16px 24px;">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+              </svg>
+              ➕ CREA IL PRIMO GRUPPO
+            </a>
+          `}
+        </div>
+      </section>
+
+      <!-- Come Funziona Box (3 Step Semplici) -->
+      <div class="how-it-works-box">
+        <h3 class="how-title">
+          <span>💡</span> Come Funziona BuyYourShare
+        </h3>
+        <div class="steps-row">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-text">
+              <h4>${hasAvailableGroups ? 'Scegli o Crea' : 'Crea il tuo Gruppo'}</h4>
+              <p>${hasAvailableGroups ? 'Trova un posto aperto o condividi il tuo abbonamento.' : 'Metti a disposizione i posti liberi del tuo abbonamento in pochi secondi.'}</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-text">
+              <h4>Costo Reale</h4>
+              <p>Quota proporzionale reale. Commissione BYS di 1,49€ solo per i membri (Capogruppo esente).</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-text">
+              <h4>Accesso & Chat</h4>
+              <p>Dati di accesso sbloccati istantaneamente e chat privata automatica 1:1.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sezione Gruppi Reali Disponibili (Appare solo se ci sono gruppi attivi) -->
+      ${hasAvailableGroups ? `
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 style="font-size:16px; font-weight:800;">Posti Disponibili Subito (${availableGroups.length})</h2>
+          <a href="#cerca" style="font-size:13px; font-weight:700; color:var(--primary); text-decoration:none;">Vedi tutti →</a>
+        </div>
+
+        <div class="groups-grid">
+          ${renderGroupCardsHTML(previewGroups)}
+        </div>
+      ` : `
+        <div style="background:white; border:1px dashed var(--border-strong); border-radius:var(--radius-lg); padding:28px 20px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:8px;">🚀</div>
+          <h3 style="font-size:16px; font-weight:800; margin-bottom:4px;">Nessun gruppo attivo al momento</h3>
+          <p style="font-size:13px; color:var(--text-secondary); max-width:380px; margin:0 auto 16px auto;">
+            Appena creerai un gruppo o altri utenti pubblicheranno abbonamenti, apparirà qui il pulsante per cercare e accedere ai posti liberi.
+          </p>
+          <a href="#crea" class="btn btn-primary btn-sm">➕ Crea un Gruppo Adesso</a>
+        </div>
+      `}
+
+    </div>
+  `;
+}
+
+// =========================================================================
+// 2. MARKETPLACE VIEW
+// =========================================================================
+function renderMarketplaceView(container, currentUser) {
+  const services = db.getServices();
+  const groups = db.getGroups({
+    serviceId: selectedCategoryFilter === 'ALL' ? null : selectedCategoryFilter,
+    search: searchKeyword
+  });
+
+  container.innerHTML = `
+    <div class="page-view">
+      <div class="section-header" style="margin-bottom:16px;">
+        <h1 style="font-size:22px; font-weight:900;">Marketplace Abbonamenti</h1>
+        <p style="font-size:13px; color:var(--text-secondary);">Quote trasparenti su base mensile con rinnovo automatico.</p>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="search-bar-wrap">
+        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        <input type="text" id="marketSearchInput" class="search-input" placeholder="Cerca Spotify, Canva, YouTube, Adobe..." value="${escapeHtml(searchKeyword)}">
+      </div>
+
+      <!-- Filter Chips -->
+      <div class="chips-row">
+        <button class="filter-chip ${selectedCategoryFilter === 'ALL' ? 'active' : ''}" data-id="ALL">Tutti</button>
+        ${services.map(s => `
+          <button class="filter-chip ${selectedCategoryFilter === s.id ? 'active' : ''}" data-id="${s.id}">
+            ${escapeHtml(s.name)}
+          </button>
+        `).join('')}
+      </div>
+
+      <!-- Results Count -->
+      <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:12px;">
+        ${groups.length} GRUPPI TROVATI
+      </div>
+
+      <!-- Groups List -->
+      <div class="groups-grid">
+        ${groups.length > 0 ? renderGroupCardsHTML(groups) : `
+          <div style="text-align:center; padding:40px 20px; background:white; border-radius:var(--radius-lg); border:1px dashed var(--border-strong);">
+            <p style="font-size:15px; font-weight:700; color:var(--text-main); margin-bottom:6px;">Nessun gruppo trovato</p>
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Vuoi essere il primo a condividere questo abbonamento?</p>
+            <a href="#crea" class="btn btn-primary btn-sm">➕ Crea Gruppo</a>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+
+  // Search input event
+  const searchInput = document.getElementById('marketSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchKeyword = e.target.value;
+      const filtered = db.getGroups({
+        serviceId: selectedCategoryFilter === 'ALL' ? null : selectedCategoryFilter,
+        search: searchKeyword
+      });
+      const grid = container.querySelector('.groups-grid');
+      if (grid) grid.innerHTML = filtered.length > 0 ? renderGroupCardsHTML(filtered) : '<p style="padding:20px; text-align:center;">Nessun gruppo trovato.</p>';
+    });
+  }
+
+  // Filter chips click
+  container.querySelectorAll('.filter-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedCategoryFilter = btn.dataset.id;
+      renderMarketplaceView(container, currentUser);
+    });
+  });
+}
+
+function renderGroupCardsHTML(groups) {
+  return groups.map(g => {
+    const slotsInfo = db.getGroupSlotsBreakdown(g);
+    const freeSlots = slotsInfo.availableSlotsCount;
+    const isAvailable = freeSlots > 0 && g.status === 'active';
+    const letter = g.customServiceName.substring(0, 2).toUpperCase();
+    const nextSlot = slotsInfo.nextAvailableSlot;
+
+    const isPriceRange = slotsInfo.minBaseShareCents !== slotsInfo.maxBaseShareCents;
+    const quotaDisplay = isPriceRange 
+      ? `${formatCents(slotsInfo.minBaseShareCents)} – ${formatCents(slotsInfo.maxBaseShareCents)}`
+      : `${formatCents(g.baseMemberShareCents)}`;
+
+    const totalDisplay = isPriceRange
+      ? `${formatCents(slotsInfo.minMemberTotalCents)} – ${formatCents(slotsInfo.maxMemberTotalCents)}`
+      : `${formatCents(g.memberTotalCents)}`;
+
+    return `
+      <div class="group-card">
+        <div class="group-card-top">
+          <div class="group-brand">
+            <div class="group-icon" style="background: ${g.serviceId?.includes('spotify') ? '#1DB954' : g.serviceId?.includes('canva') ? '#7D2AE8' : g.serviceId?.includes('youtube') ? '#FF0000' : '#4F46E5'}">
+              ${letter}
+            </div>
+            <div class="group-name-box">
+              <h3>${escapeHtml(g.customServiceName)}</h3>
+              <p>${escapeHtml(g.planName)}</p>
+            </div>
+          </div>
+          <span class="slots-pill ${isAvailable ? 'available' : 'full'}">
+            ${isAvailable ? `🟢 ${freeSlots} posti liberi` : `🔴 Completo`}
+          </span>
+        </div>
+
+        <!-- Trasparenza Prezzo con MoneySplit (Intervallo o Prezzo Esatto) -->
+        <div class="price-breakdown-card">
+          <div class="price-row">
+            <span>Quota base abbonamento:</span>
+            <strong>${quotaDisplay} / mese</strong>
+          </div>
+          <div class="price-row">
+            <span>Commissione BuyYourShare:</span>
+            <span>+ ${formatCents(g.platformFeeCents)} / mese</span>
+          </div>
+          <div class="price-row total-row">
+            <span>Totale a tuo carico:</span>
+            <span class="total-amount">${totalDisplay} / mese</span>
+          </div>
+          ${isAvailable && nextSlot ? `
+            <div style="font-size:11px; color:#166534; background:#f0fdf4; padding:4px 8px; border-radius:var(--radius-sm); margin-top:6px;">
+              👉 Prossimo posto libero (#${nextSlot.slotNumber}): <strong>${formatCents(nextSlot.memberTotalCents)} / mese</strong> (${formatCents(nextSlot.baseShareCents)} quota + 1,49€ fee)
+            </div>
+          ` : ''}
+        </div>
+
+        <a href="#gruppo-${g.id}" class="btn-view-group">
+          VEDI DETTAGLI & PARTECIPA →
+        </a>
+      </div>
+    `;
+  }).join('');
+}
+
+// =========================================================================
+// 3. GROUP DETAIL VIEW (PRECISIONE SINGOLO SLOT & CHECKOUT ESATTO)
+// =========================================================================
+let selectedSlotForCheckout = null;
+
+function renderGroupDetailView(container, groupId, currentUser) {
+  const group = db.getGroupById(groupId);
+  if (!group) {
+    container.innerHTML = `<div class="page-view"><p>Gruppo non trovato.</p><a href="#cerca" class="btn btn-secondary">Torna alla ricerca</a></div>`;
+    return;
+  }
+
+  const isOwner = group.ownerId === currentUser.id;
+  const isMember = db.data.memberships.some(m => m.groupId === groupId && m.userId === currentUser.id && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED'));
+  
+  const slotsInfo = group.slotsInfo;
+  const freeSlots = slotsInfo.availableSlotsCount;
+  
+  // Default selected slot for checkout
+  if (!selectedSlotForCheckout || selectedSlotForCheckout.groupId !== groupId || selectedSlotForCheckout.isOccupied) {
+    selectedSlotForCheckout = slotsInfo.nextAvailableSlot ? { ...slotsInfo.nextAvailableSlot, groupId } : null;
+  }
+
+  const activeSlot = selectedSlotForCheckout;
+
+  container.innerHTML = `
+    <div class="page-view">
+      <div style="margin-bottom:12px;">
+        <a href="#cerca" style="font-size:13px; font-weight:700; color:var(--text-secondary); text-decoration:none;">← Torna al Marketplace</a>
+      </div>
+
+      <div class="group-card" style="padding:22px; margin-bottom:20px;">
+        <div class="group-card-top" style="margin-bottom:16px;">
+          <div>
+            <h1 style="font-size:22px; font-weight:900;">${escapeHtml(group.customServiceName)}</h1>
+            <p style="font-size:14px; color:var(--text-secondary);">${escapeHtml(group.planName)}</p>
+          </div>
+          <span class="slots-pill ${freeSlots > 0 ? 'available' : 'full'}" style="font-size:12px; padding:4px 10px;">
+            ${freeSlots > 0 ? `🟢 ${freeSlots} posti liberi su ${group.availableSlots}` : `🔴 Al completo`}
+          </span>
+        </div>
+
+        <!-- Scomposizione Costo Reale -->
+        <div style="background:#f1f5f9; border-radius:var(--radius-md); padding:12px 16px; margin-bottom:16px; font-size:12.5px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span>Costo Reale Totale Ufficiale:</span>
+            <strong>${formatCents(group.realSubscriptionCostCents)} / mese</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span>Posti totali del piano:</span>
+            <strong>${group.totalSlots} account</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Capogruppo:</span>
+            <strong>${escapeHtml(group.owner?.fullName || 'Capogruppo')} 🛡️</strong>
+          </div>
+        </div>
+
+        <!-- Mappa Visuale dei Posti (Slot Precision) -->
+        <div style="margin-bottom:18px;">
+          <h4 style="font-size:13px; font-weight:800; color:var(--text-main); margin-bottom:8px;">
+            MAPPA DEI POSTI E QUOTE ESATTE (${group.totalSlots} Posti):
+          </h4>
+          
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            ${slotsInfo.slots.map(s => {
+              const isSelected = activeSlot && activeSlot.slotNumber === s.slotNumber && !s.isOccupied && !s.isOwnerSlot;
+              
+              return `
+                <div class="slot-item-row" data-slot="${s.slotNumber}" style="
+                  display:flex; justify-content:space-between; align-items:center; 
+                  padding:8px 12px; border-radius:var(--radius-sm); font-size:12.5px;
+                  background: ${s.isOwnerSlot ? '#eff6ff' : s.isOccupied ? '#f8fafc' : isSelected ? '#f0fdf4' : 'white'};
+                  border: 1px solid ${s.isOwnerSlot ? '#bfdbfe' : isSelected ? '#86efac' : '#e2e8f0'};
+                  ${!s.isOccupied && !s.isOwnerSlot ? 'cursor:pointer;' : ''}
+                ">
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span>${s.isOwnerSlot ? '👑' : s.isOccupied ? '👤' : '🟢'}</span>
+                    <strong>Posto #${s.slotNumber} ${s.isOwnerSlot ? '(Capogruppo)' : ''}</strong>
+                    ${s.isOccupied && s.assignedUser ? `<span style="font-size:11px; color:var(--text-muted);">- ${escapeHtml(s.assignedUser.fullName)}</span>` : ''}
+                  </div>
+                  
+                  <div style="text-align:right;">
+                    ${s.isOwnerSlot ? `
+                      <span style="font-size:11.5px; color:#1e40af;">Quota: ${formatCents(s.baseShareCents)} (0€ fee)</span>
+                    ` : s.isOccupied ? `
+                      <span style="font-size:11px; color:var(--text-muted);">Occupato (${formatCents(s.memberTotalCents)}/m)</span>
+                    ` : `
+                      <span style="font-weight:800; color:#166534;">
+                        ${formatCents(s.baseShareCents)} <span style="font-size:11px; font-weight:normal; color:var(--text-secondary);">+ 1,49€ =</span> ${formatCents(s.memberTotalCents)}/m
+                      </span>
+                    `}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+            * La somma esatta di tutte le quote base corrisponde a ${formatCents(group.realSubscriptionCostCents)}.
+          </p>
+        </div>
+
+        <!-- Dettaglio Quota Trasparente per lo Slot Selezionato -->
+        ${activeSlot ? `
+          <div class="price-breakdown-card" style="padding:14px 16px; border:2px solid #86efac; background:#f0fdf4;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <h4 style="font-size:13px; font-weight:800; color:#166534;">DETTAGLIO POSTO SELEZIONATO (#${activeSlot.slotNumber})</h4>
+              <span style="font-size:11px; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">PREZZO ESATTO</span>
+            </div>
+            
+            <div class="price-row" style="color:#15803d;">
+              <span>Quota base calcolata per questo posto:</span>
+              <strong>${formatCents(activeSlot.baseShareCents)} / mese</strong>
+            </div>
+            <div class="price-row" style="color:#15803d;">
+              <span>Commissione di gestione BuyYourShare:</span>
+              <span>+ ${formatCents(activeSlot.platformFeeCents)} / mese</span>
+            </div>
+            <div class="price-row total-row" style="font-size:15px; border-color:#86efac;">
+              <span style="color:#166534;">TOTALE MENSILE DA PAGARE:</span>
+              <span class="total-amount" style="font-size:22px; color:#15803d;">${formatCents(activeSlot.memberTotalCents)} / mese</span>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Regole e Note -->
+        <div style="margin:16px 0;">
+          <h4 style="font-size:13px; font-weight:800; margin-bottom:4px;">Regole del Gruppo:</h4>
+          <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">${escapeHtml(group.rulesAndRequirements)}</p>
+        </div>
+
+        <!-- Se Capogruppo / Se lo Slot Selezionato è già dell'utente / o Azione Acquisto Posto -->
+        ${isOwner ? `
+          <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:14px; border-radius:var(--radius-md); text-align:center;">
+            <p style="font-size:13px; font-weight:700; color:#166534; margin-bottom:10px;">👑 Sei il Capogruppo di questo gruppo.</p>
+            <div style="display:flex; gap:8px;">
+              <a href="#chat-${group.id}" class="btn btn-primary btn-sm" style="flex:1;">💬 Apri Chat</a>
+              <a href="#miei-gruppi" class="btn btn-secondary btn-sm" style="flex:1;">⚙️ Gestisci</a>
+            </div>
+          </div>
+        ` : activeSlot && activeSlot.isOccupied && activeSlot.assignedUser && activeSlot.assignedUser.id === currentUser.id ? `
+          <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:14px; border-radius:var(--radius-md); text-align:center;">
+            <p style="font-size:13px; font-weight:700; color:#166534; margin-bottom:10px;">✅ Questo Posto (#${activeSlot.slotNumber}) è attualmente occupato da te.</p>
+            <div style="display:flex; gap:8px;">
+              <a href="#miei-abbonamenti" class="btn btn-primary btn-sm" style="flex:1;">🔑 Il Tuo Accesso</a>
+              <a href="#chat-${group.id}" class="btn btn-secondary btn-sm" style="flex:1;">💬 Apri Chat</a>
+            </div>
+          </div>
+        ` : freeSlots > 0 && activeSlot && !activeSlot.isOccupied ? `
+          <button id="btnOpenCheckout" class="btn btn-accent btn-block" style="padding:15px; font-size:16px; font-weight:800;" data-slot="${activeSlot.slotNumber}">
+            💳 ACQUISTA POSTO #${activeSlot.slotNumber} (${formatCents(activeSlot.memberTotalCents)} / Mese)
+          </button>
+          <p style="font-size:11.5px; text-align:center; color:var(--text-muted); margin-top:8px;">
+            🔒 Pagamento sicuro tramite <strong>Stripe Connect</strong> • Rinnovo mensile automatico • Fee lorda 1,49 €/mese
+          </p>
+        ` : `
+          <button class="btn btn-secondary btn-block" disabled style="opacity:0.6;">
+            Gruppo al completo o posto occupato
+          </button>
+        `}
+
+        <!-- Segnala Gruppo -->
+        <div style="margin-top:18px; text-align:center;">
+          <button id="btnReportGroup" style="font-size:11.5px; color:var(--text-muted); text-decoration:underline;">
+            ⚠️ Segnala questo gruppo all'amministrazione
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Slot click to choose specific slot
+  container.querySelectorAll('.slot-item-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const slotNum = parseInt(row.dataset.slot, 10);
+      const slotObj = slotsInfo.slots.find(s => s.slotNumber === slotNum);
+      if (slotObj && !slotObj.isOccupied && !slotObj.isOwnerSlot) {
+        selectedSlotForCheckout = { ...slotObj, groupId };
+        renderGroupDetailView(container, groupId, currentUser);
+      }
+    });
+  });
+
+  // Open Stripe / PayPal Checkout Modal
+  const checkoutBtn = document.getElementById('btnOpenCheckout');
+  if (checkoutBtn) {
+    checkoutBtn.addEventListener('click', () => {
+      if (!currentUser) {
+        showToast('🔐 Accedi o registrati per partecipare a questo gruppo.');
+        navigateTo('#login');
+        return;
+      }
+      openStripeCheckoutModal(group, activeSlot, currentUser);
+    });
+  }
+
+  // Report click
+  const reportBtn = document.getElementById('btnReportGroup');
+  if (reportBtn) {
+    reportBtn.addEventListener('click', () => {
+      const reason = prompt('Motivo della segnalazione (es. Prezzo non conforme, servizio non funzionante):');
+      if (reason) {
+        db.createReport({ targetType: 'group', targetId: groupId, reason }, currentUser);
+        showToast('Segnalazione inviata all\'amministrazione.');
+      }
+    });
+  }
+}
+
+// =========================================================================
+// 4. WIZARD CREAZIONE GRUPPO (100% Mensile Fisso con MoneySplit Engine)
+// =========================================================================
+function renderWizardView(container, currentUser) {
+  const services = db.getServices();
+  const feeCents = db.getPlatformFeeCents();
+
+  // Calcolo quote live con MoneySplit
+  const realCents = eurosToCents(wizardState.realCostEuros || 0);
+  const totalSlots = parseInt(wizardState.totalSlots, 10) || 6;
+  const pricing = calculatePricingBreakdown(realCents, totalSlots, feeCents);
+
+  const isCustomSelected = wizardState.serviceId === 'srv-custom';
+
+  container.innerHTML = `
+    <div class="page-view">
+      <div class="wizard-container">
+        
+        <div class="wizard-progress">
+          <span class="wizard-step-pill">Creazione Gruppo</span>
+          <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">100% Mensile</span>
+        </div>
+
+        <h1 class="wizard-title">Crea il tuo gruppo di condivisione</h1>
+        <p class="wizard-desc">Inserisci i dati reali del tuo abbonamento. La quota verrà calcolata matematicamente senza ricarichi.</p>
+
+        <form id="createGroupForm">
+          
+          <!-- STEP 1: Scelta Servizio o Personalizzato -->
+          <div class="form-group">
+            <label class="form-label">1. Che abbonamento vuoi condividere? *</label>
+            <div class="service-pick-grid">
+              ${services.map(s => `
+                <div class="service-card-select ${wizardState.serviceId === s.id ? 'selected' : ''}" data-id="${s.id}" data-name="${escapeHtml(s.name)}">
+                  <div class="service-card-icon" style="background:${s.brandColor};">${s.iconLetter}</div>
+                  <span class="service-card-name">${escapeHtml(s.name)}</span>
+                </div>
+              `).join('')}
+              
+              <!-- Opzione Inserisci un altro servizio -->
+              <div class="service-card-select ${isCustomSelected ? 'selected' : ''}" data-id="srv-custom" data-name="" style="border-style:dashed; background:#f1f5f9;">
+                <div class="service-card-icon" style="background:#0f172a; font-size:18px;">➕</div>
+                <span class="service-card-name" style="color:var(--primary);">+ Altro Servizio</span>
+              </div>
+            </div>
+            
+            <div id="customServiceWrap" style="${isCustomSelected ? '' : 'display:none;'} margin-top:10px;">
+              <label class="form-label" style="font-size:12px; color:var(--primary);">Nome del Servizio Personalizzato *</label>
+              <input type="text" id="wizCustomName" class="form-input" placeholder="es. Netflix, Notion, ChatGPT, Microsoft 365, Amazon Prime..." value="${escapeHtml(wizardState.customServiceName)}" required>
+            </div>
+          </div>
+
+          <!-- STEP 2: Costo Reale & Posti -->
+          <div class="form-group">
+            <label class="form-label">2. Nome del Piano (es. Family, Team, Duo, Premium) *</label>
+            <input type="text" id="wizPlanName" class="form-input" placeholder="es. Spotify Family, Canva for Teams, Notion Plus..." value="${escapeHtml(wizardState.planName)}" required>
+          </div>
+
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label class="form-label">Costo Reale Totale (€) *</label>
+              <input type="number" step="0.01" min="0.50" id="wizRealCost" class="form-input" value="${wizardState.realCostEuros}" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Frequenza di Pagamento</label>
+              <div class="fixed-frequency-badge">
+                📅 MENSILE (Fisso)
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label class="form-label">Posti Totali del Piano *</label>
+              <input type="number" min="2" max="20" id="wizTotalSlots" class="form-input" value="${wizardState.totalSlots}" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Posti per te (Capogruppo) *</label>
+              <input type="number" min="1" max="5" id="wizOwnerSlots" class="form-input" value="${wizardState.ownerSlots}" required>
+            </div>
+          </div>
+
+          <!-- STEP 3: Trasparenza Economica con MoneySplit -->
+          <div class="wizard-calc-box">
+            <div class="wizard-calc-header">
+              <span>📊</span> Calcolo Trasparente MoneySplit:
+            </div>
+            <div class="wizard-calc-row">
+              <span>Costo reale abbonamento dichiarato:</span>
+              <strong>${formatCents(pricing.realCostCents)} / mese</strong>
+            </div>
+            <div class="wizard-calc-row">
+              <span>Quota base complessiva (Somma esatta quote):</span>
+              <strong>${formatCents(pricing.sumExactSharesCents)} / mese (100% Esatta)</strong>
+            </div>
+            <div class="wizard-calc-row">
+              <span>Quota base per membro (${pricing.realCostCents > 0 ? `${formatCents(pricing.realCostCents)} ÷ ${pricing.totalSlots}` : '0,00 €'}):</span>
+              <strong>${pricing.displayShareText} / mese</strong>
+            </div>
+            <div class="wizard-calc-row">
+              <span>Commissione BuyYourShare (a carico membro):</span>
+              <span>+ ${formatCents(pricing.platformFeeCents)} / mese</span>
+            </div>
+            <div class="wizard-calc-row highlight">
+              <span>Totale mensile a carico del membro:</span>
+              <span>${formatCents(pricing.memberTotalCents)} / mese</span>
+            </div>
+            <div class="wizard-owner-exemption-note">
+              🛡️ <strong>Esenzione Capogruppo:</strong> Tu paghi solo la tua quota reale (${formatCents(pricing.ownerShareCents)}). <strong>Nessuna commissione applicata al Capogruppo.</strong>
+            </div>
+          </div>
+
+          <!-- STEP 4: Informazioni di Accesso (Una sola volta) -->
+          <div style="border-top:1px solid var(--border-subtle); padding-top:18px; margin-top:18px;">
+            <h3 style="font-size:15px; font-weight:800; margin-bottom:4px;">🔒 Informazioni per l'Accesso</h3>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">
+              Inserisci i dati una sola volta. Il sistema li consegnerà automaticamente a ogni nuovo membro autorizzato.
+            </p>
+
+            <div class="form-group">
+              <label class="form-label">Link di Accesso / Invito Diretto *</label>
+              <input type="text" id="wizAccessUrl" class="form-input" placeholder="https://..." value="${escapeHtml(wizardState.accessUrl)}" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Istruzioni per il Membro *</label>
+              <textarea id="wizInstructions" class="form-textarea" rows="3" placeholder="Scrivi come accedere passo dopo passo..." required>${escapeHtml(wizardState.instructions)}</textarea>
+            </div>
+
+            <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label class="form-label">Codice Invito (Opzionale)</label>
+                <input type="text" id="wizAccessCode" class="form-input" placeholder="es. 849204" value="${escapeHtml(wizardState.accessCode)}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Note Aggiuntive (Opzionale)</label>
+                <input type="text" id="wizAdditionalInfo" class="form-input" placeholder="es. Playlist personali protette" value="${escapeHtml(wizardState.additionalInfo)}">
+              </div>
+            </div>
+          <!-- STEP 5: Dati per Ricevere le Quote (Stripe Connect & IBAN) -->
+          <div style="border-top:1px solid var(--border-subtle); padding-top:18px; margin-top:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <h3 style="font-size:15px; font-weight:800;">🏦 5. Dati per Ricevere le Quote & IBAN *</h3>
+              <span style="font-size:11px; background:${stripeConnectService.isPayoutReady(currentUser.id) ? '#dcfce7' : '#fee2e2'}; color:${stripeConnectService.isPayoutReady(currentUser.id) ? '#166534' : '#991b1b'}; padding:3px 8px; border-radius:var(--radius-full); font-weight:800;">
+                ${stripeConnectService.isPayoutReady(currentUser.id) ? '🟢 CONTO ATTIVO & VERIFICATO' : '🔴 CONFIGURAZIONE RICHIESTA'}
+              </span>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+              Per ricevere l'accredito mensile delle quote dei membri (es. 3,50 €), il tuo IBAN e conto di ricezione devono essere configurati tramite Stripe Connect.
+            </p>
+
+            ${(() => {
+              const isReady = stripeConnectService.isPayoutReady(currentUser.id);
+              const pSet = db.getUserPayoutSettings(currentUser.id);
+
+              if (isReady) {
+                return `
+                  <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                      <strong style="color:#166534; font-size:13.5px; display:block;">✅ Conto Stripe Connect & IBAN Attivi</strong>
+                      <span style="font-size:12px; color:var(--text-secondary); display:block; margin-top:2px;">
+                        Intestatario: <strong>${escapeHtml(pSet.legalName)}</strong> • IBAN: <code style="font-family:var(--font-mono); font-weight:700; color:#003087;">${escapeHtml(pSet.iban)}</code>
+                      </span>
+                    </div>
+                    <button type="button" id="btnManageStripeOnboarding" class="btn btn-secondary btn-sm" style="font-size:12px; font-weight:800;">
+                      ✏️ Modifica IBAN / Dati
+                    </button>
+                  </div>
+                `;
+              } else {
+                return `
+                  <div style="background:#fff7ed; border:1px solid #fdba74; border-radius:var(--radius-md); padding:16px; margin-bottom:10px;">
+                    <p style="font-size:13px; color:#9a3412; font-weight:800; margin-bottom:6px;">
+                      ⚠️ Configurazione IBAN di Ricezione Quote Obbligatoria
+                    </p>
+                    <p style="font-size:11.5px; color:#7c2d12; margin-bottom:12px; line-height:1.4;">
+                      Non puoi pubblicare questo abbonamento senza prima impostare il tuo IBAN per ricevere le quote. I dati bancari vengono protetti e gestiti tramite Stripe Connect.
+                    </p>
+                    <button type="button" id="btnStartStripeOnboarding" class="btn btn-primary btn-block" style="background:#0070ba; font-size:13.5px; font-weight:800; padding:11px;">
+                      🏦 CONFIGURA IBAN & ATTIVA RICEZIONE QUOTE
+                    </button>
+                  </div>
+                `;
+              }
+            })()}
+          </div>
+
+          <!-- Submit Button -->
+          ${stripeConnectService.isPayoutReady(currentUser.id) ? `
+            <button type="submit" class="btn btn-primary btn-block" style="padding:14px; font-size:15px; margin-top:14px; font-weight:800;">
+              🎉 PUBBLICA GRUPPO NEL MARKETPLACE
+            </button>
+          ` : `
+            <button type="button" id="btnBlockedPublish" class="btn btn-secondary btn-block" style="padding:14px; font-size:13.5px; margin-top:14px; opacity:0.75; font-weight:700; cursor:not-allowed;">
+              🔒 Completa prima i "Dati per Ricevere le Quote" per pubblicare
+            </button>
+          `}
+        </form>
+
+      </div>
+    </div>
+  `;
+
+  // Event handlers for wizard inputs (live price updates)
+  const form = document.getElementById('createGroupForm');
+  const costInput = document.getElementById('wizRealCost');
+  const totalSlotsInput = document.getElementById('wizTotalSlots');
+  const ownerSlotsInput = document.getElementById('wizOwnerSlots');
+  const customNameInput = document.getElementById('wizCustomName');
+  const planNameInput = document.getElementById('wizPlanName');
+  const customWrap = document.getElementById('customServiceWrap');
+
+  const updateStateAndRerender = () => {
+    wizardState.realCostEuros = costInput.value;
+    wizardState.totalSlots = totalSlotsInput.value;
+    wizardState.ownerSlots = ownerSlotsInput.value;
+    wizardState.customServiceName = customNameInput.value;
+    wizardState.planName = planNameInput.value;
+    wizardState.accessUrl = document.getElementById('wizAccessUrl').value;
+    wizardState.instructions = document.getElementById('wizInstructions').value;
+    wizardState.accessCode = document.getElementById('wizAccessCode').value;
+    wizardState.additionalInfo = document.getElementById('wizAdditionalInfo').value;
+  };
+
+  const updateCalcBoxLive = () => {
+    const rCents = eurosToCents(costInput.value || 0);
+    const tSlots = parseInt(totalSlotsInput.value, 10) || 6;
+    const pr = calculatePricingBreakdown(rCents, tSlots, feeCents);
+    const calcBox = container.querySelector('.wizard-calc-box');
+    if (calcBox) {
+      const rows = calcBox.querySelectorAll('.wizard-calc-row strong, .wizard-calc-row span:last-child');
+      if (rows[0]) rows[0].textContent = `${formatCents(pr.realCostCents)} / mese`;
+      if (rows[1]) rows[1].textContent = `${formatCents(pr.sumExactSharesCents)} / mese (100% Esatta)`;
+      if (rows[2]) rows[2].textContent = `${pr.displayShareText} / mese`;
+      if (rows[4]) rows[4].textContent = `${formatCents(pr.memberTotalCents)} / mese`;
+
+      // Controllo Economico Live Guardrail (9,42 €)
+      let warnEl = calcBox.querySelector('.wizard-margin-warning');
+      const margin = validateGroupEconomicMargin(pr.baseMemberShareCents);
+      if (!margin.isValid) {
+        if (!warnEl) {
+          warnEl = document.createElement('div');
+          warnEl.className = 'wizard-margin-warning';
+          warnEl.style.cssText = 'background:#fef2f2; border:1px solid #f87171; border-radius:var(--radius-sm); padding:10px; margin-top:10px; font-size:12px; color:#991b1b;';
+          calcBox.appendChild(warnEl);
+        }
+        warnEl.innerHTML = `⚠️ <strong>Attenzione Economica:</strong> La quota base per membro (${formatCents(pr.baseMemberShareCents)}) supera la soglia di 9,42 €/mese. Per garantire la sostenibilità a 1,49 € fissi, aumenta il numero di posti del piano.`;
+      } else if (warnEl) {
+        warnEl.remove();
+      }
+    }
+  };
+
+  [costInput, totalSlotsInput, ownerSlotsInput].forEach(inp => {
+    if (inp) {
+      inp.addEventListener('input', () => {
+        updateStateAndRerender();
+        updateCalcBoxLive();
+      });
+    }
+  });
+
+  // Service selector chips
+  container.querySelectorAll('.service-card-select').forEach(card => {
+    card.addEventListener('click', () => {
+      const sId = card.dataset.id;
+      wizardState.serviceId = sId;
+      
+      container.querySelectorAll('.service-card-select').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+
+      if (sId === 'srv-custom') {
+        customWrap.style.display = 'block';
+        customNameInput.value = '';
+        wizardState.customServiceName = '';
+        customNameInput.focus();
+      } else {
+        customWrap.style.display = 'none';
+        wizardState.customServiceName = card.dataset.name;
+        customNameInput.value = card.dataset.name;
+      }
+    });
+  });
+
+  // Onboarding modal triggers
+  const btnStartOnboarding = container.querySelector('#btnStartStripeOnboarding');
+  if (btnStartOnboarding) {
+    btnStartOnboarding.onclick = (e) => {
+      e.preventDefault();
+      openStripeOnboardingModal(currentUser);
+    };
+  }
+
+  const btnManageOnboarding = container.querySelector('#btnManageStripeOnboarding');
+  if (btnManageOnboarding) {
+    btnManageOnboarding.onclick = (e) => {
+      e.preventDefault();
+      openStripeOnboardingModal(currentUser);
+    };
+  }
+
+  const btnBlocked = container.querySelector('#btnBlockedPublish');
+  if (btnBlocked) {
+    btnBlocked.onclick = (e) => {
+      e.preventDefault();
+      openStripeOnboardingModal(currentUser);
+    };
+  }
+
+  // Form Submit
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    updateStateAndRerender();
+
+    if (!stripeConnectService.isPayoutReady(currentUser.id)) {
+      alert('Non puoi pubblicare questo gruppo senza prima aver configurato il tuo conto per ricevere le quote (Stripe Connect).');
+      openStripeOnboardingModal(currentUser);
+      return;
+    }
+
+    const realCostCents = eurosToCents(wizardState.realCostEuros);
+    const totalSlots = parseInt(wizardState.totalSlots, 10);
+    const ownerSlots = parseInt(wizardState.ownerSlots, 10);
+
+    if (isNaN(realCostCents) || realCostCents <= 0) {
+      alert('Inserisci un costo valido maggiore di zero');
+      return;
+    }
+    if (ownerSlots >= totalSlots) {
+      alert('I posti totali devono essere superiori ai posti riservati per te.');
+      return;
+    }
+    if (!wizardState.customServiceName.trim()) {
+      alert('Inserisci il nome del servizio.');
+      return;
+    }
+
+    const groupInput = {
+      serviceId: wizardState.serviceId,
+      customServiceName: wizardState.customServiceName.trim(),
+      planName: wizardState.planName.trim(),
+      realSubscriptionCostCents: realCostCents,
+      totalSlots: totalSlots,
+      ownerSlots: ownerSlots
+    };
+
+    let finalUrl = (wizardState.accessUrl || '').trim();
+    if (finalUrl && !finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
+    }
+
+    const accessInput = {
+      accessUrl: finalUrl,
+      instructions: (wizardState.instructions || '').trim(),
+      additionalInfo: (wizardState.additionalInfo || '').trim(),
+      accessCode: (wizardState.accessCode || '').trim()
+    };
+
+    try {
+      const createdGroup = db.createGroup(groupInput, accessInput, currentUser);
+      showToast('🎉 Gruppo creato e pubblicato con successo!');
+      navigateTo(`#gruppo-${createdGroup.id}`);
+    } catch (err) {
+      alert('Errore durante la creazione del gruppo: ' + err.message);
+    }
+  });
+}
+
+// =========================================================================
+// 5. I MIEI ABBONAMENTI VIEW (MEMBRO - SOLO DOPO PAGAMENTO VERIFICATO)
+// =========================================================================
+function renderMySubscriptionsView(container, currentUser) {
+  const subscriptions = db.getMySubscriptions(currentUser.id);
+  const pendingVerif = window.__pendingPaymentVerification;
+  const payoutSettings = db.getUserPayoutSettings(currentUser.id);
+  const paymentMethod = db.getUserPaymentMethod(currentUser.id);
+
+  container.innerHTML = `
+    <div class="page-view">
+      <div class="section-header" style="margin-bottom:16px;">
+        <h1 style="font-size:22px; font-weight:900;">I Miei Abbonamenti</h1>
+        <p style="font-size:13px; color:var(--text-secondary);">I gruppi a cui partecipi con pagamento verificato, accesso e chat dedicati.</p>
+      </div>
+
+      <!-- BOX GESTIONE METODI DI PAGAMENTO E IBAN MEMBRO -->
+      <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-lg); padding:16px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h2 style="font-size:15px; font-weight:800; color:var(--text-main);">💳 Metodo di Pagamento & Ricezione Quote</h2>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+              <span>Rinnovo Predefinito: <strong style="color:var(--primary);">${paymentMethod.type === 'PAYPAL' ? '🅿️ PayPal (' + escapeHtml(paymentMethod.paypalEmail || currentUser.email) + ')' : '💳 Carta (' + escapeHtml(paymentMethod.cardBrand || 'Visa') + ' •••• ' + escapeHtml(paymentMethod.cardLast4 || '4242') + ')'}</strong></span>
+              <span style="margin:0 8px;">•</span>
+              <span>IBAN Personale: <strong style="font-family:var(--font-mono); color:#003087;">${escapeHtml(payoutSettings.iban)}</strong></span>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button id="btnMemberEditPayment" class="btn btn-secondary btn-sm" style="font-size:11.5px; font-weight:700;">
+              💳 Cambia Carta / PayPal
+            </button>
+            <button id="btnMemberEditIban" class="btn btn-secondary btn-sm" style="font-size:11.5px; font-weight:700;">
+              🏦 Modifica IBAN
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATO 1: VERIFICA PAGAMENTO STRIPE IN CORSO -->
+      ${pendingVerif && pendingVerif.status === 'verifying' ? `
+        <div class="verifying-box" style="background:#eff6ff; border:2px solid #3b82f6; border-radius:var(--radius-lg); padding:24px; text-align:center; margin-bottom:24px; box-shadow:0 4px 12px rgba(59,130,246,0.15);">
+          <div style="width:36px; height:36px; border:3px solid #bfdbfe; border-top-color:#1d4ed8; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 12px;"></div>
+          <h3 style="font-size:16px; font-weight:900; color:#1e40af;">⏳ Pagamento ricevuto. Verifica in corso con i server sicuri di Stripe...</h3>
+          <p style="font-size:12.5px; color:#2563eb; margin-top:6px; max-width:480px; margin-left:auto; margin-right:auto;">
+            Stiamo validando la firma crittografica del webhook Stripe, attivando la Subscription mensile e trasferendo la quota base al Capogruppo.
+          </p>
+        </div>
+      ` : ''}
+
+      <!-- STATO 2: PAGAMENTO FALLITO / RIFIUTATO -->
+      ${pendingVerif && pendingVerif.status === 'failed' ? `
+        <div style="background:#fef2f2; border:2px solid #ef4444; border-radius:var(--radius-lg); padding:20px; text-align:center; margin-bottom:24px;">
+          <h3 style="font-size:16px; font-weight:900; color:#991b1b;">❌ Pagamento non riuscito</h3>
+          <p style="font-size:12.5px; color:#b91c1c; margin-top:4px;">${escapeHtml(pendingVerif.error || 'La transazione è stata rifiutata dal circuito bancario.')}</p>
+          <p style="font-size:11.5px; color:#7f1d1d; margin-top:4px;">Nessuna membership è stata attivata. L'accesso al servizio e la chat rimangono bloccati.</p>
+          <button id="btnDismissFail" class="btn btn-secondary btn-sm" style="margin-top:12px;">
+            Riprova con un'altra carta
+          </button>
+        </div>
+      ` : ''}
+
+      <!-- STATO 3: PAGAMENTO CONFERMATO -->
+      ${pendingVerif && pendingVerif.status === 'success' ? `
+        <div style="background:#f0fdf4; border:2px solid #22c55e; border-radius:var(--radius-lg); padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+          <div>
+            <h4 style="font-size:14px; font-weight:800; color:#166534;">🎉 Pagamento Verificato Server-Side!</h4>
+            <p style="font-size:12px; color:#15803d;">Quota trasferita al Capogruppo e 1,49 € di fee lorda registrata. Accesso e chat sbloccati.</p>
+          </div>
+          <button id="btnCloseSuccessBanner" class="btn btn-secondary btn-sm" style="font-size:11px;">OK</button>
+        </div>
+      ` : ''}
+
+      ${subscriptions.length > 0 ? `
+        <div class="groups-grid">
+          ${subscriptions.map(sub => {
+            const grp = sub.group;
+            if (!grp) return '';
+            const isCancellationScheduled = sub.status === 'CANCELLATION_SCHEDULED';
+            const paidShare = sub.paidShareCents || grp.baseMemberShareCents;
+            const paidFee = sub.paidFeeCents !== undefined ? sub.paidFeeCents : grp.platformFeeCents;
+            const totalPaid = sub.memberTotalCents || (paidShare + paidFee);
+            const slotNum = sub.slotNumber || 2;
+            const subLogs = financialAuditService.getSubscriptionLogs(grp.id, currentUser.id, slotNum);
+            const lastLog = subLogs.length > 0 ? subLogs[0] : null;
+            const methodBadge = (lastLog?.paymentMethod?.includes('PAYPAL') || sub.paymentMethod?.includes('PAYPAL')) ? '🅿️ PayPal Sandbox' : (sub.paymentMethod?.includes('APPLE') ? '📱 Apple Pay' : '💳 Carta Stripe');
+            const gatewayTxId = lastLog?.transactionId || lastLog?.invoiceId || sub.paypalSubscriptionId || sub.stripeSubscriptionId || 'N/A';
+
+            return `
+              <div class="group-card" style="border-left: 4px solid var(--primary);">
+                <div class="group-card-top" style="margin-bottom:8px;">
+                  <div>
+                    <h3 style="font-size:16px; font-weight:800;">${escapeHtml(grp.customServiceName)}</h3>
+                    <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(grp.planName)} • <strong style="color:var(--primary);">Posto #${slotNum}</strong></p>
+                  </div>
+                  <span class="slots-pill ${isCancellationScheduled ? 'full' : 'available'}">
+                    ${isCancellationScheduled ? '⏳ Annullamento a Scadenza' : '🟢 Attivo'}
+                  </span>
+                </div>
+
+                <div class="price-breakdown-card">
+                  <div class="price-row">
+                    <span>Quota esatta posto #${slotNum} (${formatCents(paidShare)} + ${formatCents(paidFee)} fee):</span>
+                    <strong>${formatCents(totalPaid)} / mese</strong>
+                  </div>
+                  <div class="price-row">
+                    <span>${isCancellationScheduled ? 'Attivo fino al:' : 'Prossimo rinnovo mensile:'}</span>
+                    <strong>${formatDateIT(sub.currentPeriodEnd)}</strong>
+                  </div>
+                </div>
+
+                <!-- Dettaglio Transazione & Ricevuta Immediata -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:10px 12px; margin-top:10px; font-size:11.5px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <div>
+                      <span style="font-weight:800; color:#166534;">🟢 Pagamento Verificato Server-Side</span>
+                      <span style="color:var(--text-secondary); margin-left:4px;">(${methodBadge})</span>
+                    </div>
+                    <button class="btn btn-secondary btn-sm btn-view-receipt" data-txid="${escapeHtml(gatewayTxId)}" style="font-size:11px; padding:3px 8px; font-weight:700;">
+                      🧾 Ricevuta
+                    </button>
+                  </div>
+                  <div style="color:var(--text-secondary); display:flex; flex-wrap:wrap; gap:8px; font-size:11px;">
+                    <span>ID Transazione: <strong style="font-family:var(--font-mono); color:var(--primary);">${escapeHtml(gatewayTxId)}</strong></span>
+                    <span>Quota Capogruppo: <strong style="color:#1e40af;">${formatCents(paidShare)}</strong></span>
+                    <span>Fee BYS: <strong style="color:var(--accent);">${formatCents(paidFee)}</strong></span>
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
+                  <button class="btn btn-accent btn-open-access" data-id="${grp.id}" style="font-size:12.5px;">
+                    🔑 IL TUO ACCESSO
+                  </button>
+                  <a href="#chat-${grp.id}" class="btn btn-primary" style="font-size:12.5px;">
+                    💬 CHAT DEL GRUPPO
+                  </a>
+                </div>
+
+                <!-- Test Rinnovo Mensile -->
+                <div style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
+                  <button class="btn-renew-simulation" data-id="${sub.id}" style="font-size:11px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:4px 8px; border-radius:var(--radius-sm); font-weight:700; cursor:pointer;">
+                    🔄 Simula Rinnovo Mensile (Mese 2)
+                  </button>
+
+                  ${!isCancellationScheduled ? `
+                    <button class="btn-cancel-membership" data-id="${sub.id}" style="font-size:11px; color:#dc2626; text-decoration:underline; background:none; border:none; cursor:pointer;">
+                      ✕ Annulla rinnovo automatico
+                    </button>
+                  ` : `
+                    <span style="font-size:11px; color:var(--text-muted);">Rinnovo disattivato</span>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : `
+        <div style="text-align:center; padding:40px 20px; background:white; border-radius:var(--radius-lg); border:1px dashed var(--border-strong);">
+          <p style="font-size:15px; font-weight:700; margin-bottom:6px;">Non hai ancora nessun abbonamento attivo</p>
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Sfoglia il marketplace, seleziona uno slot ed effettua il pagamento sicuro per attivare l'accesso.</p>
+          <a href="#cerca" class="btn btn-primary btn-sm">🔎 Cerca un Abbonamento nel Marketplace</a>
+        </div>
+      `}
+
+      <!-- SEZIONE STORICO PAGAMENTI & RICEVUTE UFFICIALI -->
+      ${(() => {
+        const memberLogs = financialAuditService.getMemberLogs(currentUser.id);
+        return `
+          <div style="margin-top:32px; background:white; border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-sm);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <div>
+                <h2 style="font-size:17px; font-weight:900; color:var(--text-main);">🧾 Storico Pagamenti & Ricevute Ufficiali</h2>
+                <p style="font-size:12px; color:var(--text-secondary);">Registro delle transazioni e dei rinnovi elaborati dai gateway di pagamento reali (PayPal Sandbox & Stripe Connect).</p>
+              </div>
+              <span style="font-size:11px; background:#eff6ff; color:#1d4ed8; padding:3px 10px; border-radius:var(--radius-full); font-weight:700; font-family:var(--font-mono);">
+                ${memberLogs.length} ${memberLogs.length === 1 ? 'TRANSAZIONE' : 'TRANSAZIONI'}
+              </span>
+            </div>
+
+            ${memberLogs.length > 0 ? `
+              <div style="overflow-x:auto;">
+                <table style="width:100%; font-size:12px; border-collapse:collapse; text-align:left;">
+                  <thead>
+                    <tr style="border-bottom:2px solid #e2e8f0; color:var(--text-secondary); background:#f8fafc;">
+                      <th style="padding:10px 8px;">Data & Ora</th>
+                      <th style="padding:10px 8px;">Membro</th>
+                      <th style="padding:10px 8px;">Servizio & Posto</th>
+                      <th style="padding:10px 8px;">Totale Pagato</th>
+                      <th style="padding:10px 8px;">Quota Capogruppo</th>
+                      <th style="padding:10px 8px;">Fee BuyYourShare</th>
+                      <th style="padding:10px 8px;">Metodo</th>
+                      <th style="padding:10px 8px;">ID Gateway / Transazione</th>
+                      <th style="padding:10px 8px;">Stato</th>
+                      <th style="padding:10px 8px; text-align:right;">Ricevuta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${memberLogs.map(log => {
+                      const grp = db.getGroupById(log.groupId);
+                      const serviceName = grp ? grp.customServiceName : 'Servizio';
+                      const methodLabel = log.paymentMethod?.includes('PAYPAL') ? '🅿️ PayPal Sandbox' : (log.paymentMethod?.includes('APPLE') ? '📱 Apple Pay' : '💳 Carta (Stripe)');
+                      
+                      return `
+                        <tr style="border-bottom:1px solid #f1f5f9;">
+                          <td style="padding:10px 8px; white-space:nowrap;">
+                            <strong style="color:var(--text-main); font-size:11.5px;">${formatDateIT(log.createdAt, true)}</strong>
+                          </td>
+                          <td style="padding:10px 8px;">
+                            <span style="font-weight:700;">${escapeHtml(currentUser.fullName)}</span>
+                          </td>
+                          <td style="padding:10px 8px;">
+                            <span style="font-weight:800;">${escapeHtml(serviceName)}</span>
+                            <span style="color:var(--text-secondary); font-size:11px; display:block;">Posto #${log.slotNumber} (Mese ${log.cycleNumber})</span>
+                          </td>
+                          <td style="padding:10px 8px; font-weight:800; color:#15803d; font-size:13px;">
+                            ${formatCents(log.totalAmountCents)}
+                          </td>
+                          <td style="padding:10px 8px; color:#1e40af; font-weight:700;">
+                            ${formatCents(log.baseShareCents)}
+                          </td>
+                          <td style="padding:10px 8px; color:var(--accent); font-weight:800;">
+                            ${formatCents(log.buyyourshareFeeCents || 149)}
+                          </td>
+                          <td style="padding:10px 8px;">
+                            <span style="font-size:11px; background:#f1f5f9; padding:2px 8px; border-radius:var(--radius-sm); font-weight:700;">
+                              ${methodLabel}
+                            </span>
+                          </td>
+                          <td style="padding:10px 8px; font-family:var(--font-mono); font-size:11px; color:var(--primary);">
+                            ${escapeHtml(log.transactionId || log.invoiceId || 'N/A')}
+                          </td>
+                          <td style="padding:10px 8px;">
+                            <span style="color:#166534; background:#dcfce7; padding:2px 8px; border-radius:var(--radius-full); font-size:11px; font-weight:800;">
+                              🟢 ${log.paymentStatus}
+                            </span>
+                          </td>
+                          <td style="padding:10px 8px; text-align:right;">
+                            <button class="btn btn-secondary btn-sm btn-view-receipt" data-txid="${escapeHtml(log.transactionId || log.id)}" style="font-size:11px; padding:3px 8px; font-weight:700;">
+                              🧾 Ricevuta
+                            </button>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <div style="text-align:center; padding:24px; color:var(--text-muted); font-size:12.5px; background:#f8fafc; border-radius:var(--radius-md);">
+                Nessun pagamento o rinnovo registrato per questo account.
+              </div>
+            `}
+          </div>
+        `;
+      })()}
+    </div>
+  `;
+
+  // Se siamo in stato di verifica in corso, esegui la chiamata asincrona
+  if (pendingVerif && pendingVerif.status === 'verifying' && !pendingVerif.inFlight) {
+    pendingVerif.inFlight = true;
+    stripeCheckoutService.processTestPayment(pendingVerif.sessionData, pendingVerif.cardType, pendingVerif.paymentMethod)
+      .then(res => {
+        if (res.success) {
+          window.__pendingPaymentVerification = { status: 'success' };
+        } else {
+          window.__pendingPaymentVerification = { status: 'failed', error: res.error };
+        }
+        renderMySubscriptionsView(container, currentUser);
+      })
+      .catch(err => {
+        window.__pendingPaymentVerification = { status: 'failed', error: err.message };
+        renderMySubscriptionsView(container, currentUser);
+      });
+  }
+
+  // Member payment & IBAN settings modal triggers
+  const btnMemPay = container.querySelector('#btnMemberEditPayment');
+  if (btnMemPay) {
+    btnMemPay.onclick = () => openPaymentAndPayoutSettingsModal(currentUser, 'payment');
+  }
+
+  const btnMemIb = container.querySelector('#btnMemberEditIban');
+  if (btnMemIb) {
+    btnMemIb.onclick = () => openPaymentAndPayoutSettingsModal(currentUser, 'payout');
+  }
+
+  // Event handlers
+  const dismissFail = document.getElementById('btnDismissFail');
+  if (dismissFail) {
+    dismissFail.onclick = () => {
+      window.__pendingPaymentVerification = null;
+      navigateTo('#cerca');
+    };
+  }
+
+  const closeSuccess = document.getElementById('btnCloseSuccessBanner');
+  if (closeSuccess) {
+    closeSuccess.onclick = () => {
+      window.__pendingPaymentVerification = null;
+      renderMySubscriptionsView(container, currentUser);
+    };
+  }
+
+  // Access modal triggers
+  container.querySelectorAll('.btn-open-access').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openAccessModal(btn.dataset.id, currentUser);
+    });
+  });
+
+  // Receipt modal triggers
+  container.querySelectorAll('.btn-view-receipt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openTransactionReceiptModal(btn.dataset.txid, currentUser);
+    });
+  });
+
+  // Cancel membership triggers
+  container.querySelectorAll('.btn-cancel-membership').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm('Vuoi annullare il rinnovo automatico? Manterrai l\'accesso e la chat fino alla fine del periodo già pagato.')) {
+        db.cancelMembership(btn.dataset.id, currentUser);
+        showToast('Rinnovo automatico disattivato. Accesso valido fino alla scadenza.');
+        renderMySubscriptionsView(container, currentUser);
+      }
+    });
+  });
+
+  // Renewal simulation trigger
+  container.querySelectorAll('.btn-renew-simulation').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '⏳ Rinnovo in corso...';
+      try {
+        await stripeCheckoutService.simulateMonthlyRenewal(btn.dataset.id, 2);
+        showToast('🔄 Rinnovo mensile confermato da Webhook (1,49€ fee lorda registrata)!');
+        renderMySubscriptionsView(container, currentUser);
+      } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = '🔄 Simula Rinnovo Mensile';
+      }
+    });
+  });
+}
+
+// =========================================================================
+// 6. I MIEI GRUPPI VIEW (CAPOGRUPPO - CON GESTIONE SLOT)
+// =========================================================================
+function renderMyGroupsView(container, currentUser) {
+  const myGroups = db.getMyCreatedGroups(currentUser.id);
+  const payoutSettings = db.getUserPayoutSettings(currentUser.id) || {
+    iban: 'IT60X0542811101000000123456',
+    bankName: 'Intesa Sanpaolo (Conto Corrente)',
+    paypalPayoutEmail: currentUser.email
+  };
+  const ownerPayoutLogs = financialAuditService.getOwnerPayoutLogs(currentUser.id);
+  const totalTransferredCents = ownerPayoutLogs.reduce((acc, l) => acc + (l.baseShareCents || l.transferAmountCents || 0), 0);
+
+  const totalEarnedCents = ownerPayoutLogs.reduce((acc, l) => acc + (l.baseShareCents || 0), 0);
+  const totalPaidCents = ownerPayoutLogs.filter(l => l.payoutStatus === 'PAID' || l.transferStatus === 'TRANSFERRED').reduce((acc, l) => acc + (l.baseShareCents || 0), 0);
+  const totalPendingCents = ownerPayoutLogs.filter(l => l.payoutStatus === 'PENDING').reduce((acc, l) => acc + (l.baseShareCents || 0), 0);
+  const totalFailedCents = ownerPayoutLogs.filter(l => l.payoutStatus === 'FAILED' || l.transferStatus === 'FAILED').reduce((acc, l) => acc + (l.baseShareCents || 0), 0);
+  const conn = db.data.connectedAccounts.find(c => c.userId === currentUser.id);
+
+  container.innerHTML = `
+    <div class="page-view">
+      <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <h1 style="font-size:22px; font-weight:900;">I Miei Gruppi & Ricezione Quote</h1>
+          <p style="font-size:13px; color:var(--text-secondary);">Gestisci i tuoi gruppi, credenziali di accesso e monitora i Payouts delle quote su IBAN.</p>
+        </div>
+        <a href="#crea" class="btn btn-primary btn-sm">➕ Nuovo Gruppo</a>
+      </div>
+
+      <!-- SEZIONE ACCREDITI & BONIFICI IBAN CAPOGRUPPO -->
+      <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-lg); padding:16px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
+          <div>
+            <h2 style="font-size:16px; font-weight:800; color:var(--text-main); margin-bottom:2px;">🏦 Dati per Ricevere le Quote (Stripe Connect & IBAN)</h2>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+              <span>IBAN di Accredito: <strong style="font-family:var(--font-mono); color:#003087;">${escapeHtml(payoutSettings.iban)}</strong> (${escapeHtml(payoutSettings.bankName)})</span>
+              <span style="margin:0 8px;">•</span>
+              <span>Intestatario: <strong>${escapeHtml(payoutSettings.legalName)}</strong></span>
+            </div>
+          </div>
+          <button id="btnOpenEditPayoutModal" class="btn btn-secondary btn-sm" style="font-size:12px; font-weight:800;">
+            ✏️ Modifica IBAN / Dati Ricezione
+          </button>
+        </div>
+
+        <!-- 4 KPI CARDS: MATURATA / PAGATA / IN ATTESA / FALLITA -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:14px;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:10px 12px;">
+            <span style="font-size:11px; color:var(--text-secondary); display:block; font-weight:700;">QUOTA MATURATA TOTALE</span>
+            <strong style="font-size:18px; color:var(--primary);">${formatCents(totalEarnedCents)}</strong>
+            <span style="font-size:10px; color:var(--text-muted); display:block;">Totale storico quote maturate</span>
+          </div>
+
+          <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:10px 12px;">
+            <span style="font-size:11px; color:#166534; display:block; font-weight:700;">QUOTA BONIFICATA (PAGATA)</span>
+            <strong style="font-size:18px; color:#166534;">${formatCents(totalPaidCents)}</strong>
+            <span style="font-size:10px; color:#166534; display:block; font-weight:700;">🟢 Trasferito su IBAN (0€ trattenute)</span>
+          </div>
+
+          <div style="background:#fefce8; border:1px solid #fde047; border-radius:var(--radius-md); padding:10px 12px;">
+            <span style="font-size:11px; color:#854d0e; display:block; font-weight:700;">QUOTA IN ATTESA (PENDING)</span>
+            <strong style="font-size:18px; color:#854d0e;">${formatCents(totalPendingCents)}</strong>
+            <span style="font-size:10px; color:#a16207; display:block;">In elaborazione gateway</span>
+          </div>
+
+          <div style="background:${totalFailedCents > 0 ? '#fef2f2' : '#f8fafc'}; border:1px solid ${totalFailedCents > 0 ? '#f87171' : '#e2e8f0'}; border-radius:var(--radius-md); padding:10px 12px;">
+            <span style="font-size:11px; color:${totalFailedCents > 0 ? '#991b1b' : 'var(--text-secondary)'}; display:block; font-weight:700;">QUOTA FALLITA / DA RISOLVERE</span>
+            <strong style="font-size:18px; color:${totalFailedCents > 0 ? '#dc2626' : 'var(--text-muted)'};">${formatCents(totalFailedCents)}</strong>
+            <span style="font-size:10px; color:${totalFailedCents > 0 ? '#991b1b' : 'var(--text-muted)'}; display:block;">${totalFailedCents > 0 ? '⚠️ Richiede azione su conto' : 'Nessun errore'}</span>
+          </div>
+        </div>
+
+        <!-- Box Trasparenza Economica e Costi Gateway -->
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-md); padding:10px 12px; font-size:11.5px; color:#1e40af; line-height:1.4;">
+          💡 <strong>Ripartizione Economica Trasparente:</strong> Quando un membro acquista un posto a <strong>4,99 €</strong> (3,50 € quota + 1,49 € fee BuyYourShare), l'importo della tua quota di <strong>3,50 €</strong> viene trasferito al 100% sul tuo IBAN/conto. I costi di transazione trattenuti dal gateway (0,52 € su PayPal o 0,36 € su Stripe) sono <strong>sostenuti interamente da BuyYourShare</strong> e non intaccano mai la tua quota.
+        </div>
+
+        ${ownerPayoutLogs.length > 0 ? `
+          <div style="margin-top:16px;">
+            <h3 style="font-size:13.5px; font-weight:800; margin-bottom:8px; color:var(--text-main);">
+              📋 Registro Payouts & Trasferimenti Quote (${ownerPayoutLogs.length})
+            </h3>
+            <div style="overflow-x:auto;">
+              <table style="width:100%; font-size:11.5px; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:2px solid #e2e8f0; color:var(--text-secondary);">
+                    <th style="padding:8px 6px;">Data & Ora</th>
+                    <th style="padding:8px 6px;">Membro Pagante</th>
+                    <th style="padding:8px 6px;">Servizio / Posto</th>
+                    <th style="padding:8px 6px;">Totale Membro</th>
+                    <th style="padding:8px 6px;">Costo Gateway (BYS)</th>
+                    <th style="padding:8px 6px; color:#166534;">Quota Bonificata (Tu)</th>
+                    <th style="padding:8px 6px;">ID Transazione / Payout</th>
+                    <th style="padding:8px 6px;">Stato Payout</th>
+                    <th style="padding:8px 6px; text-align:right;">Distinta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${ownerPayoutLogs.map(l => {
+                    const memberU = db.data.users.find(u => u.id === l.memberId) || { fullName: 'Membro' };
+                    const grp = db.getGroupById(l.groupId);
+                    const isPP = l.paymentMethod?.includes('PAYPAL');
+                    const feeCents = l.paymentProviderFeeCents || (isPP ? 52 : 36);
+                    const isPaid = l.payoutStatus === 'PAID' || l.transferStatus === 'TRANSFERRED';
+                    const isFailed = l.payoutStatus === 'FAILED' || l.transferStatus === 'FAILED';
+
+                    return `
+                      <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:8px 6px; white-space:nowrap; font-weight:700;">${formatDateIT(l.createdAt, true)}</td>
+                        <td style="padding:8px 6px;">${escapeHtml(memberU.fullName)}</td>
+                        <td style="padding:8px 6px; font-weight:700;">${escapeHtml(grp ? grp.customServiceName : 'Servizio')} (#${l.slotNumber})</td>
+                        <td style="padding:8px 6px;">${formatCents(l.totalAmountCents)}</td>
+                        <td style="padding:8px 6px; color:#dc2626;">-${formatCents(feeCents)} <span style="font-size:10px; color:var(--text-muted);">(a carico BYS)</span></td>
+                        <td style="padding:8px 6px; font-weight:800; color:#166534; font-size:12.5px;">${formatCents(l.baseShareCents)}</td>
+                        <td style="padding:8px 6px; font-family:var(--font-mono); font-size:11px;">
+                          <div>Tx: ${escapeHtml(l.transactionId || 'N/A')}</div>
+                          <div style="color:#0070ba;">Po: ${escapeHtml(l.payoutId || l.transferId || 'N/A')}</div>
+                        </td>
+                        <td style="padding:8px 6px;">
+                          ${isPaid ? `
+                            <span style="color:#166534; font-weight:800; font-size:11px; background:#dcfce7; padding:2px 6px; border-radius:4px;">🟢 PAGATO SU IBAN</span>
+                          ` : isFailed ? `
+                            <span style="color:#991b1b; font-weight:800; font-size:11px; background:#fee2e2; padding:2px 6px; border-radius:4px;">🔴 FALLITO</span>
+                            <span style="font-size:10px; color:#991b1b; display:block; margin-top:2px;">${escapeHtml(l.payoutFailureReason || 'Errore elaborazione')}</span>
+                          ` : `
+                            <span style="color:#854d0e; font-weight:800; font-size:11px; background:#fef9c3; padding:2px 6px; border-radius:4px;">⏳ IN ATTESA</span>
+                          `}
+                        </td>
+                        <td style="padding:8px 6px; text-align:right;">
+                          <button class="btn btn-secondary btn-sm btn-view-payout-detail" data-id="${l.id}" style="font-size:11px; padding:3px 8px;">
+                            🧾 Distinta
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
+      ${myGroups.length > 0 ? `
+        <div class="groups-grid">
+          ${myGroups.map(grp => {
+            const isScheduled = grp.status === 'cancellation_scheduled';
+            const slotsInfo = db.getGroupSlotsBreakdown(grp);
+            const isSpotify = grp.serviceId === 'srv-spotify' || grp.customServiceName.toLowerCase().includes('spotify');
+            const instructions = db.getAccessInstructions(grp.id, currentUser.id);
+            
+            // Calcola la somma esatta delle quote dei membri attivi
+            const activeMembersTotalCents = grp.members.reduce((acc, m) => acc + (m.paidShareCents || grp.baseMemberShareCents), 0);
+
+            return `
+              <div class="group-card" style="border-left: 4px solid var(--accent);">
+                <div class="group-card-top" style="margin-bottom:8px;">
+                  <div>
+                    <h3 style="font-size:16px; font-weight:800;">${escapeHtml(grp.customServiceName)}</h3>
+                    <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(grp.planName)}</p>
+                  </div>
+                  <span class="slots-pill ${isScheduled ? 'full' : 'available'}">
+                    ${isScheduled ? '⚠️ Chiusura Programmata' : `🟢 ${grp.occupiedMemberSlots}/${grp.availableSlots} occupati`}
+                  </span>
+                </div>
+
+                <div class="price-breakdown-card">
+                  <div class="price-row">
+                    <span>Costo reale totale del piano:</span>
+                    <strong>${formatCents(grp.realSubscriptionCostCents)} / mese</strong>
+                  </div>
+                  <div class="price-row">
+                    <span>Membri paganti attivi:</span>
+                    <strong>${grp.members.length} partecipanti (${slotsInfo.availableSlotsCount} posti liberi)</strong>
+                  </div>
+                  <div class="price-row total-row">
+                    <span>Totale mensile maturato per te:</span>
+                    <span class="total-amount">${formatCents(activeMembersTotalCents)} / mese</span>
+                  </div>
+                </div>
+
+                ${isSpotify ? `
+                  <!-- Campo Indirizzo Spotify del Capogruppo -->
+                  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:10px 12px; margin-top:10px;">
+                    <label style="font-size:12px; font-weight:800; color:var(--text-main); display:block; margin-bottom:4px;">
+                      📧 Indirizzo Spotify del Capogruppo
+                    </label>
+                    <div style="display:flex; gap:6px;">
+                      <input type="email" class="form-input input-spotify-email" data-id="${grp.id}" value="${escapeHtml(instructions?.ownerSpotifyAccount || '')}" placeholder="email@esempio.com" style="font-size:12px; padding:6px 10px; flex:1;">
+                      <button class="btn btn-secondary btn-save-spotify-email" data-id="${grp.id}" style="font-size:11.5px; padding:6px 12px; white-space:nowrap; font-weight:700;">
+                        Salva indirizzo Spotify
+                      </button>
+                    </div>
+                    <span style="font-size:10.5px; color:var(--text-muted); margin-top:3px; display:block;">
+                      🔒 Visibile esclusivamente ai membri paganti verificati per completare l'invito Family.
+                    </span>
+                  </div>
+                ` : ''}
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
+                  <button class="btn btn-secondary btn-edit-access" data-id="${grp.id}" style="font-size:12px;">
+                    ⚙️ MODIFICA ACCESSO
+                  </button>
+                  <a href="#chat-${grp.id}" class="btn btn-primary" style="font-size:12px;">
+                    💬 CHAT DEL GRUPPO
+                  </a>
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                  <button class="btn btn-secondary btn-copy-invite" data-code="${grp.inviteCode}" style="flex:1; font-size:12px;">
+                    📋 COPIA LINK INVITO
+                  </button>
+                  ${!isScheduled ? `
+                    <button class="btn btn-danger btn-cancel-group" data-id="${grp.id}" style="font-size:12px;">
+                      ✕ Annulla Gruppo
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : `
+        <div style="text-align:center; padding:40px 20px; background:white; border-radius:var(--radius-lg); border:1px dashed var(--border-strong);">
+          <p style="font-size:15px; font-weight:700; margin-bottom:6px;">Non hai ancora creato nessun gruppo</p>
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">Hai un abbonamento con posti liberi? Condividilo e azzera le tue spese mensili.</p>
+          <a href="#crea" class="btn btn-primary btn-sm">➕ Crea il tuo primo Gruppo</a>
+        </div>
+      `}
+    </div>
+  `;
+
+  // Edit Payout Settings Trigger
+  const btnEditPayout = container.querySelector('#btnOpenEditPayoutModal');
+  if (btnEditPayout) {
+    btnEditPayout.onclick = () => openEditPayoutModal(currentUser);
+  }
+
+  // View Payout Detail Triggers
+  container.querySelectorAll('.btn-view-payout-detail').forEach(btn => {
+    btn.onclick = () => openPayoutDetailModal(btn.dataset.id, currentUser);
+  });
+
+  // Save Spotify Email Handler
+  container.querySelectorAll('.btn-save-spotify-email').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const groupId = btn.dataset.id;
+      const input = container.querySelector(`.input-spotify-email[data-id="${groupId}"]`);
+      const emailVal = input ? input.value : '';
+      db.updateSpotifyOwnerAccount(groupId, emailVal, currentUser);
+      showToast('✅ Indirizzo Spotify del Capogruppo salvato con successo!');
+    });
+  });
+
+  // Edit access triggers
+  container.querySelectorAll('.btn-edit-access').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openEditAccessModal(btn.dataset.id, currentUser);
+    });
+  });
+
+  // Copy invite link
+  container.querySelectorAll('.btn-copy-invite').forEach(btn => {
+    btn.addEventListener('click', () => {
+      copyToClipboard(`https://buyyourshare.app/join/${btn.dataset.code}`, 'Link invito copiato!');
+    });
+  });
+
+  // Cancel group
+  container.querySelectorAll('.btn-cancel-group').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm('Vuoi annullare questo gruppo? Non saranno accettati nuovi membri, ma i partecipanti attivi manterranno l\'accesso fino al termine del loro mese già pagato.')) {
+        db.cancelGroup(btn.dataset.id, currentUser);
+        showToast('Chiusura gruppo programmata.');
+        renderMyGroupsView(container, currentUser);
+      }
+    });
+  });
+}
+
+// =========================================================================
+// 7. NATIVE PRIVATE GROUP CHAT VIEW
+// =========================================================================
+function renderChatView(container, groupId, currentUser) {
+  const chatData = db.getGroupChat(groupId, currentUser.id);
+
+  if (!chatData) {
+    container.innerHTML = `
+      <div class="page-view" style="text-align:center; padding:40px;">
+        <h3 style="font-size:18px; font-weight:800; color:#dc2626;">Accesso non autorizzato</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin:12px 0;">Devi essere un partecipante attivo o il Capogruppo per entrare in questa chat.</p>
+        <a href="#miei-abbonamenti" class="btn btn-secondary">I Miei Abbonamenti</a>
+      </div>
+    `;
+    return;
+  }
+
+  const grp = chatData.group;
+  const messages = chatData.messages;
+
+  container.innerHTML = `
+    <div class="page-view">
+      <div class="chat-container">
+        
+        <!-- Header -->
+        <div class="chat-header">
+          <div class="chat-header-info">
+            <a href="#gruppo-${grp.id}" style="font-size:14px; text-decoration:none; color:var(--text-secondary); margin-right:4px;">←</a>
+            <div class="chat-header-title">
+              <h3>💬 Chat: ${escapeHtml(grp.customServiceName)}</h3>
+              <p>🟢 ${chatData.members.length} membri attivi</p>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnChatAccessInfo" style="font-size:11px;">
+            🔑 Info Accesso
+          </button>
+        </div>
+
+        <!-- Messages Feed -->
+        <div class="chat-messages-area" id="chatFeed">
+          ${messages.map(msg => {
+            if (msg.messageType === 'SYSTEM' || msg.messageType === 'ACCESS_UPDATE') {
+              return `
+                <div class="system-msg-wrap">
+                  <div class="system-bubble ${msg.messageType === 'ACCESS_UPDATE' ? 'access-update' : ''}">
+                    <span>${escapeHtml(msg.messageContent)}</span>
+                    ${msg.messageType === 'ACCESS_UPDATE' ? `
+                      <button class="btn-access-link btn-open-access" data-id="${grp.id}">Apri "Il Tuo Accesso"</button>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }
+
+            const isMe = msg.senderId === currentUser.id;
+            return `
+              <div class="message-wrap ${isMe ? 'my-msg' : 'other-msg'}">
+                ${!isMe ? `<span class="sender-name-tag">${escapeHtml(msg.senderName || 'Utente')}</span>` : ''}
+                <div class="message-bubble">
+                  ${escapeHtml(msg.messageContent)}
+                </div>
+                <span class="msg-time">${formatDateShort(msg.createdAt)}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Input Bar -->
+        <form class="chat-input-bar" id="chatForm">
+          <input type="text" id="chatInputText" class="chat-input-field" placeholder="Scrivi un messaggio a tutti i partecipanti..." autocomplete="off" required>
+          <button type="submit" class="btn btn-primary btn-sm" style="padding:10px 16px;">Invia</button>
+        </form>
+
+      </div>
+    </div>
+  `;
+
+  // Auto scroll
+  const feed = container.querySelector('#chatFeed');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+
+  // Submit message
+  const form = container.querySelector('#chatForm');
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const input = document.getElementById('chatInputText');
+    if (!input.value.trim()) return;
+
+    db.sendChatMessage(groupId, currentUser, input.value);
+    input.value = '';
+    renderChatView(container, groupId, currentUser);
+  };
+
+  // Open access modal from chat
+  const btnAccess = container.querySelector('#btnChatAccessInfo');
+  if (btnAccess) {
+    btnAccess.onclick = () => openAccessModal(groupId, currentUser);
+  }
+
+  container.querySelectorAll('.btn-open-access').forEach(b => {
+    b.onclick = () => openAccessModal(b.dataset.id, currentUser);
+  });
+}
+
+// =========================================================================
+// 8. ADMIN VIEW & MODERATION
+// =========================================================================
+function renderAdminView(container, currentUser) {
+  const metrics = db.getAdminMetrics();
+  const services = db.getAllServicesAdmin();
+  const groups = db.getGroups();
+  const auditSummary = financialAuditService.getFinancialSummary();
+  const allLogs = financialAuditService.getAllLogs();
+
+  container.innerHTML = `
+    <div class="page-view">
+      <div class="section-header" style="margin-bottom:16px;">
+        <h1 style="font-size:22px; font-weight:900;">Pannello Amministratore & Audit Finanziario</h1>
+        <p style="font-size:13px; color:var(--text-secondary);">Controllo marketplace, split Stripe Connect e registro contabile immutabile.</p>
+      </div>
+
+      <!-- KPI Metrics con Distinzione Lordo / Netto -->
+      <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; margin-bottom:16px;">
+        <div style="background:white; border:1px solid var(--border-subtle); padding:14px; border-radius:var(--radius-lg);">
+          <div style="font-size:11px; font-weight:700; color:var(--text-secondary);">COMMISSIONI LORDE BUY YOUR SHARE</div>
+          <div style="font-size:22px; font-weight:900; color:var(--accent);">${formatCents(auditSummary.totalGrossFeesCents)}</div>
+          <div style="font-size:11px; color:var(--text-muted);">${auditSummary.totalTransactionsCount} transazioni / rinnovi incassati (1,49 € fissi)</div>
+        </div>
+
+        <div style="background:white; border:1px solid var(--border-subtle); padding:14px; border-radius:var(--radius-lg);">
+          <div style="font-size:11px; font-weight:700; color:var(--text-secondary);">RICAVO NETTO PIATTAFORMA</div>
+          <div style="font-size:22px; font-weight:900; color:#166534;">${formatCents(auditSummary.totalNetPlatformRevenueCents)}</div>
+          <div style="font-size:11px; color:var(--text-muted);">Al netto dei costi Stripe (${formatCents(auditSummary.totalProviderFeesCents)}) • Target &ge; 1,00 €/membro</div>
+        </div>
+      </div>
+
+      <!-- Tabella Audit Ledger Finanziario Immutabile con Catena Completa -->
+      <div style="background:white; border:1px solid var(--border-subtle); padding:16px; border-radius:var(--radius-lg); margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 style="font-size:14px; font-weight:800; color:var(--text-main);">📑 Catena Completa Transazioni & Payouts Stripe Connect (${allLogs.length})</h3>
+          <span style="font-size:11px; background:#f1f5f9; padding:2px 8px; border-radius:var(--radius-full); font-family:var(--font-mono);">END-TO-END AUDIT</span>
+        </div>
+        
+        <p style="font-size:11.5px; color:var(--text-secondary); margin-bottom:12px;">
+          Tracciamento completo di ogni pagamento: <strong>Membro &rarr; Gateway &rarr; Quota &rarr; Connected Account Capogruppo &rarr; Payout &rarr; Stato Finale</strong>.
+        </p>
+
+        ${allLogs.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; font-size:11px; border-collapse:collapse; text-align:left;">
+              <thead>
+                <tr style="border-bottom:2px solid #e2e8f0; color:var(--text-secondary);">
+                  <th style="padding:6px;">Data</th>
+                  <th style="padding:6px;">Membro Pagante</th>
+                  <th style="padding:6px;">Pagato</th>
+                  <th style="padding:6px;">Gateway</th>
+                  <th style="padding:6px; color:#1e40af;">Quota Capogruppo</th>
+                  <th style="padding:6px;">Fee BYS</th>
+                  <th style="padding:6px; color:#166534;">Netto BYS</th>
+                  <th style="padding:6px;">Connected Account</th>
+                  <th style="padding:6px;">Payout ID</th>
+                  <th style="padding:6px;">Stato Payout</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allLogs.map(l => {
+                  const memberU = db.data.users.find(u => u.id === l.memberId) || { fullName: 'Membro' };
+                  const isPaid = l.payoutStatus === 'PAID' || l.transferStatus === 'TRANSFERRED';
+                  const isFailed = l.payoutStatus === 'FAILED' || l.transferStatus === 'FAILED';
+
+                  return `
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                      <td style="padding:6px; white-space:nowrap;">${formatDateIT(l.createdAt, true)}</td>
+                      <td style="padding:6px; font-weight:700;">${escapeHtml(memberU.fullName)}</td>
+                      <td style="padding:6px; font-weight:800;">${formatCents(l.totalAmountCents)}</td>
+                      <td style="padding:6px; font-size:10.5px;">${l.paymentMethod?.includes('PAYPAL') ? '🅿️ PayPal' : '💳 Stripe'}</td>
+                      <td style="padding:6px; font-weight:800; color:#1e40af;">${formatCents(l.baseShareCents)}</td>
+                      <td style="padding:6px; font-weight:700; color:var(--accent);">+${formatCents(l.buyyourshareFeeCents || 149)}</td>
+                      <td style="padding:6px; font-weight:800; color:#166534;">${formatCents(l.netPlatformAmountCents)}</td>
+                      <td style="padding:6px; font-family:var(--font-mono); font-size:10.5px; color:#003087;">${escapeHtml(l.payoutDestination || l.connectedAccountId || 'acct_demo')}</td>
+                      <td style="padding:6px; font-family:var(--font-mono); font-size:10.5px; color:#0070ba;">${escapeHtml(l.payoutId || l.transferId || 'N/A')}</td>
+                      <td style="padding:6px;">
+                        ${isPaid ? `
+                          <span style="color:#166534; font-weight:800; font-size:10.5px; background:#dcfce7; padding:2px 6px; border-radius:4px;">🟢 PAID</span>
+                        ` : isFailed ? `
+                          <span style="color:#991b1b; font-weight:800; font-size:10.5px; background:#fee2e2; padding:2px 6px; border-radius:4px;">🔴 FAILED</span>
+                        ` : `
+                          <span style="color:#854d0e; font-weight:800; font-size:10.5px; background:#fef9c3; padding:2px 6px; border-radius:4px;">⏳ PENDING</span>
+                        `}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : `
+          <p style="text-align:center; padding:20px; color:var(--text-muted); font-size:12px;">Nessuna transazione registrata nel ledger.</p>
+        `}
+      </div>
+
+      <!-- Configurazione Commissione -->
+      <div style="background:white; border:1px solid var(--border-subtle); padding:16px; border-radius:var(--radius-lg); margin-bottom:20px;">
+        <h3 style="font-size:14px; font-weight:800; margin-bottom:6px;">⚙️ Parametro Commerciale Fee Lorda BuyYourShare</h3>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Regola di business approvata: <strong>1,49 € (149 centesimi fissi)</strong> applicata ad ogni ciclo mensile (Garanzia &ge; 1,00 € netto per quota &le; 9,42 €).</p>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input type="number" step="0.01" id="adminFeeInput" class="form-input" style="width:120px;" value="${(metrics.platformFeeCents / 100).toFixed(2)}" disabled>
+          <span style="font-size:11px; color:var(--text-muted);">🔒 Bloccata su 1,49 € (Garanzia &ge; 1,00 € netto)</span>
+        </div>
+      </div>
+
+      <!-- Configurazione Gateway PayPal Sandbox (Merchant App) -->
+      <div style="background:white; border:1px solid #bbf7d0; padding:16px; border-radius:var(--radius-lg); margin-bottom:20px; box-shadow:0 2px 8px rgba(34,197,94,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h3 style="font-size:14px; font-weight:800; color:#003087;">🅿️ Configurazione PayPal Sandbox (App BYS-Platform)</h3>
+          <span style="font-size:11px; background:#f0fdf4; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">MERCHANT GATEWAY</span>
+        </div>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+          Inserisci il <strong>Client ID</strong> della tua App PayPal Sandbox (es. <em>BYS-Platform</em>) generato su <strong>developer.paypal.com</strong> per ricevere gli accrediti reali sul tuo account Business Merchant.
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div>
+            <label style="font-size:11.5px; font-weight:700; display:block; margin-bottom:4px;">PayPal Sandbox Client ID *</label>
+            <input type="text" id="adminPaypalClientId" class="form-input" placeholder="Incolla il Client ID Sandbox dalla tua App (es. AaB1Cc2Dd...)" value="${escapeHtml(localStorage.getItem('paypal_sandbox_client_id') || '')}" style="font-family:var(--font-mono); font-size:12px;">
+          </div>
+          <div style="display:flex; align-items:center;">
+            <button id="btnSaveAdminPaypal" class="btn btn-primary btn-sm" style="font-size:12px; font-weight:700; background:#0070ba;">
+              💾 Salva Client ID PayPal
+            </button>
+            <span id="adminPaypalStatus" style="font-size:11.5px; color:#166534; margin-left:12px; font-weight:700;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Handler salvataggio credenziali PayPal da Admin
+  const saveBtn = container.querySelector('#btnSaveAdminPaypal');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      const input = container.querySelector('#adminPaypalClientId');
+      const val = input ? input.value.trim() : '';
+      if (val) {
+        localStorage.setItem('paypal_sandbox_client_id', val);
+        showToast('✅ Client ID PayPal Sandbox salvato!');
+        const st = container.querySelector('#adminPaypalStatus');
+        if (st) st.textContent = '🟢 Salvato e attivo su tutta la piattaforma!';
+      } else {
+        localStorage.removeItem('paypal_sandbox_client_id');
+        showToast('Client ID reimpostato.');
+      }
+    });
+  }
+}
+
+// =========================================================================
+// 9. NOTIFICATIONS VIEW
+// =========================================================================
+function renderNotificationsView(container, currentUser) {
+  const notifs = db.getNotifications(currentUser.id);
+  db.markNotificationsRead(currentUser.id);
+
+  container.innerHTML = `
+    <div class="page-view">
+      <h1 style="font-size:22px; font-weight:900; margin-bottom:16px;">Notifiche</h1>
+      ${notifs.length > 0 ? `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${notifs.map(n => `
+            <a href="${escapeHtml(n.actionUrl || '#home')}" style="background:white; border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px; text-decoration:none; color:inherit; display:block;">
+              <h4 style="font-size:14px; font-weight:800; margin-bottom:2px;">${escapeHtml(n.title)}</h4>
+              <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.4;">${escapeHtml(n.message)}</p>
+              <span style="font-size:10px; color:var(--text-muted); margin-top:4px; display:inline-block;">${formatDateIT(n.createdAt, true)}</span>
+            </a>
+          `).join('')}
+        </div>
+      ` : `
+        <p style="padding:40px; text-align:center; color:var(--text-muted);">Nessuna notifica presente.</p>
+      `}
+    </div>
+  `;
+}
+
+// =========================================================================
+// MODALS: "IL TUO ACCESSO" & "MODIFICA ACCESSO"
+// =========================================================================
+function openAccessModal(groupId, currentUser) {
+  const instructions = db.getAccessInstructions(groupId, currentUser.id);
+  const group = db.getGroupById(groupId);
+
+  if (!instructions || !group) {
+    alert('Accesso protetto: devi essere un membro attivo o il Capogruppo.');
+    return;
+  }
+
+  const isSpotify = group.serviceId === 'srv-spotify' || group.customServiceName.toLowerCase().includes('spotify');
+
+  let modal = document.getElementById('accessModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'accessModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">🎉 IL TUO ACCESSO È PRONTO</h2>
+          <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(group.customServiceName)} - ${escapeHtml(group.planName)}</p>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('accessModalOverlay').classList.remove('active')">&times;</button>
+      </div>
+
+      <div class="access-display-box">
+        <label class="form-label">🔗 LINK DI ACCESSO / INVITO:</label>
+        <div class="access-url-row">
+          <a href="${escapeHtml(instructions.accessUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="flex:1; font-size:13px;">
+            🚀 APRI LINK SUBITO
+          </a>
+          <button class="btn btn-secondary btn-copy-url" data-url="${escapeHtml(instructions.accessUrl)}" style="font-size:13px;">
+            📋 COPIA
+          </button>
+        </div>
+
+        ${isSpotify ? `
+          <label class="form-label" style="margin-top:14px;">📧 INDIRIZZO SPOTIFY DEL CAPOGRUPPO:</label>
+          ${instructions.ownerSpotifyAccount && instructions.ownerSpotifyAccount.trim() ? `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#f0fdf4; border:1px solid #86efac; padding:10px 14px; border-radius:var(--radius-md); margin-bottom:12px;">
+              <div>
+                <strong style="font-family:var(--font-mono); font-size:14px; color:#166534;">${escapeHtml(instructions.ownerSpotifyAccount)}</strong>
+                <p style="font-size:11px; color:#15803d; margin-top:2px;">Utilizza questo indirizzo/account per convalidare l'accesso all'abbonamento Spotify Family.</p>
+              </div>
+              <button class="btn btn-secondary btn-sm btn-copy-spotify" data-email="${escapeHtml(instructions.ownerSpotifyAccount)}" style="font-size:11.5px; padding:4px 10px; font-weight:700;">
+                COPIA
+              </button>
+            </div>
+          ` : `
+            <div style="background:#fffbeb; border:1px solid #fde68a; padding:10px 14px; border-radius:var(--radius-md); margin-bottom:12px;">
+              <strong style="font-size:12.5px; color:#92400e;">Non ancora inserito dal Capogruppo.</strong>
+              <p style="font-size:11.5px; color:#b45309; margin-top:2px;">Il Capogruppo deve inserire questo dato per completare le istruzioni di accesso.</p>
+            </div>
+          `}
+        ` : ''}
+
+        <label class="form-label">📝 ISTRUZIONI PER L'ACCESSO:</label>
+        <div class="access-instructions-text">${escapeHtml(instructions.instructions || 'Nessuna istruzione inserita.')}</div>
+
+        ${instructions.accessCode ? `
+          <label class="form-label">🔢 CODICE DI INVITO:</label>
+          <div style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid var(--border-subtle); padding:10px 14px; border-radius:var(--radius-md); margin-bottom:12px;">
+            <strong style="font-family:var(--font-mono); font-size:16px; color:var(--primary);">${escapeHtml(instructions.accessCode)}</strong>
+            <button class="btn btn-secondary btn-sm btn-copy-code" data-code="${escapeHtml(instructions.accessCode)}">Copia Codice</button>
+          </div>
+        ` : ''}
+
+        ${instructions.additionalInfo ? `
+          <label class="form-label">ℹ️ NOTE AGGIUNTIVE:</label>
+          <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(instructions.additionalInfo)}</p>
+        ` : ''}
+
+        <p style="font-size:11px; color:var(--text-muted); background:#f8fafc; border:1px dashed #cbd5e1; padding:8px 10px; border-radius:var(--radius-sm); margin-top:10px;">
+          💡 Per completare l'accesso al piano, segui la procedura indicata e utilizza le credenziali o i dati forniti dal Capogruppo.
+        </p>
+      </div>
+
+      <button class="btn btn-secondary btn-block" onclick="document.getElementById('accessModalOverlay').classList.remove('active')">
+        Chiudi
+      </button>
+    </div>
+  `;
+
+  modal.querySelectorAll('.btn-copy-url').forEach(b => {
+    b.onclick = () => copyToClipboard(b.dataset.url, 'Link copiato!');
+  });
+  modal.querySelectorAll('.btn-copy-code').forEach(b => {
+    b.onclick = () => copyToClipboard(b.dataset.code, 'Codice copiato!');
+  });
+  modal.querySelectorAll('.btn-copy-spotify').forEach(b => {
+    b.onclick = () => copyToClipboard(b.dataset.email, 'Indirizzo Spotify copiato!');
+  });
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+function openTransactionReceiptModal(txId, currentUser) {
+  const log = (db.data.financialAuditLogs || []).find(l => 
+    l.transactionId === txId || 
+    l.id === txId || 
+    l.invoiceId === txId || 
+    l.subscriptionId === txId
+  );
+
+  if (!log) {
+    alert('Transazione non trovata nel registro contabile.');
+    return;
+  }
+
+  const group = db.getGroupById(log.groupId);
+  const ownerUser = db.data.users.find(u => u.id === (group ? group.ownerId : log.connectedAccountId));
+  const memberUser = db.data.users.find(u => u.id === log.memberId) || currentUser;
+
+  let modal = document.getElementById('receiptModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'receiptModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  const methodLabel = log.paymentMethod?.includes('PAYPAL') 
+    ? '🅿️ PayPal EEA (Sandbox Vault Recurring)' 
+    : (log.paymentMethod?.includes('APPLE') ? '📱 Apple Pay / Google Pay' : '💳 Carta di Credito/Debito (Stripe Connect)');
+
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:520px; padding:24px;">
+      <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+        <div>
+          <span style="font-size:11px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px;">Ricevuta Ufficiale di Pagamento</span>
+          <h2 class="modal-title" style="font-size:18px; font-weight:900; margin-top:2px;">BuyYourShare P2P Platform</h2>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('receiptModalOverlay').classList.remove('active')">&times;</button>
+      </div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:14px; margin-bottom:16px; font-size:12px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="color:var(--text-secondary);">ID Ricevuta Piattaforma:</span>
+          <strong style="font-family:var(--font-mono); color:var(--primary);">${escapeHtml(log.id)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="color:var(--text-secondary);">ID Transazione Gateway:</span>
+          <strong style="font-family:var(--font-mono); color:var(--text-main);">${escapeHtml(log.transactionId || 'N/A')}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="color:var(--text-secondary);">ID Subscription / Contratto:</span>
+          <strong style="font-family:var(--font-mono); color:var(--text-muted);">${escapeHtml(log.subscriptionId || 'N/A')}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--text-secondary);">Data & Ora Pagamento:</span>
+          <strong>${formatDateIT(log.createdAt, true)}</strong>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px; font-size:12.5px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <div>
+            <span style="font-size:11px; color:var(--text-secondary); display:block;">Membro Acquirente:</span>
+            <strong>${escapeHtml(memberUser.fullName)}</strong>
+            <span style="font-size:11px; color:var(--text-muted); display:block;">${escapeHtml(memberUser.email)}</span>
+          </div>
+          <div>
+            <span style="font-size:11px; color:var(--text-secondary); display:block;">Capogruppo Beneficiario:</span>
+            <strong>${escapeHtml(ownerUser ? ownerUser.fullName : 'Capogruppo')}</strong>
+            <span style="font-size:11px; color:var(--text-muted); display:block;">${escapeHtml(ownerUser ? ownerUser.email : '')}</span>
+          </div>
+        </div>
+
+        <div style="background:#f1f5f9; padding:10px 12px; border-radius:var(--radius-sm); margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between;">
+            <span>Servizio / Gruppo:</span>
+            <strong>${escapeHtml(group ? group.customServiceName : 'Servizio')} (${escapeHtml(group ? group.planName : '')})</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:4px;">
+            <span>Posto Assegnato:</span>
+            <strong>Posto #${log.slotNumber} (Mese ${log.cycleNumber})</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:4px;">
+            <span>Metodo Utilizzato:</span>
+            <strong>${methodLabel}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:4px;">
+            <span>Stato Transazione:</span>
+            <strong style="color:#166534;">🟢 ${escapeHtml(log.paymentStatus)} (Verificato Server-Side)</strong>
+          </div>
+        </div>
+
+        <div style="border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px; color:#1e40af;">
+            <span>Quota Reale Posto (Capogruppo):</span>
+            <strong>${formatCents(log.baseShareCents)}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:var(--accent);">
+            <span>Commissione di Gestione BuyYourShare:</span>
+            <strong>+ ${formatCents(log.buyyourshareFeeCents || 149)}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid #cbd5e1; font-size:14.5px;">
+            <strong style="color:var(--text-main);">TOTALE ADDEBITATO:</strong>
+            <strong style="color:#166534; font-size:18px;">${formatCents(log.totalAmountCents)}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary btn-block" onclick="window.print()" style="font-size:12.5px;">
+          🖨️ Stampa Ricevuta
+        </button>
+        <button class="btn btn-primary btn-block" onclick="document.getElementById('receiptModalOverlay').classList.remove('active')" style="font-size:12.5px;">
+          Chiudi
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+function openPaymentAndPayoutSettingsModal(currentUser, initialTab = 'payout') {
+  const payoutSettings = db.getUserPayoutSettings(currentUser.id);
+  const paymentMethod = db.getUserPaymentMethod(currentUser.id);
+  const conn = db.data.connectedAccounts.find(c => c.userId === currentUser.id) || {};
+  const isReady = stripeConnectService.isPayoutReady(currentUser.id);
+
+  let modal = document.getElementById('paymentSettingsModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'paymentSettingsModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  let activeTab = initialTab;
+
+  const renderModalContent = () => {
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width:560px; padding:24px;">
+        <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span style="font-size:11px; font-weight:800; color:#0070ba; text-transform:uppercase; letter-spacing:0.5px;">Impostazioni Finanziarie</span>
+            <h2 class="modal-title" style="font-size:18px; font-weight:900; margin-top:2px;">💳 Pagamenti, IBAN & Ricezione Quote</h2>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Gestisci l'IBAN per ricevere denaro e il metodo di pagamento per i rinnovi.</p>
+          </div>
+          <button class="btn-close" id="btnClosePaymentModal">&times;</button>
+        </div>
+
+        <!-- Tab Selector -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:16px; background:#f1f5f9; padding:4px; border-radius:var(--radius-md);">
+          <button type="button" id="tabBtnPayout" class="btn btn-sm" style="font-size:12px; font-weight:800; border:none; padding:8px; border-radius:6px; ${activeTab === 'payout' ? 'background:white; color:#003087; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'background:transparent; color:var(--text-secondary);'}">
+            🏦 Ricezione Quote & IBAN
+          </button>
+          <button type="button" id="tabBtnPayment" class="btn btn-sm" style="font-size:12px; font-weight:800; border:none; padding:8px; border-radius:6px; ${activeTab === 'payment' ? 'background:white; color:#003087; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'background:transparent; color:var(--text-secondary);'}">
+            💳 Metodo di Pagamento (Rinnovi)
+          </button>
+        </div>
+
+        ${activeTab === 'payout' ? `
+          <!-- TAB 1: RICEZIONE QUOTE & IBAN -->
+          <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px; font-size:12px; color:#166534;">
+            🛡️ <strong>Regola 100% Esente Commissioni:</strong> Come Capogruppo ricevi sempre il 100% della quota del piano (es. 3,50 € su Spotify) senza alcuna trattenuta.
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:10px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span style="font-size:11px; color:var(--text-muted); display:block;">Stato Conto Stripe Connect</span>
+              <strong style="color:${isReady ? '#166534' : '#c2410c'}; font-size:13px;">
+                ${isReady ? '🟢 Conto Verificato & Abilitato ai Payouts' : '⚠️ Onboarding Incompleto'}
+              </strong>
+            </div>
+            <span style="font-size:11px; font-family:var(--font-mono); background:#e2e8f0; padding:2px 8px; border-radius:4px; color:#334155;">
+              ${escapeHtml(payoutSettings.stripeAccountId)}
+            </span>
+          </div>
+
+          <form id="formSavePayoutIban">
+            <div class="form-group" style="margin-bottom:12px;">
+              <label class="form-label" style="font-size:12px; font-weight:800;">Intestatario del Conto (Nome e Cognome o Ragione Sociale) *</label>
+              <input type="text" id="inputSettingsLegalName" class="form-input" value="${escapeHtml(payoutSettings.legalName || currentUser.fullName)}" style="font-size:12.5px;" required>
+            </div>
+
+            <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+              <div class="form-group">
+                <label class="form-label" style="font-size:12px; font-weight:800;">Tipo Soggetto *</label>
+                <select id="inputSettingsAccountType" class="form-select" style="font-size:12.5px;">
+                  <option value="individual" ${conn.businessType !== 'company' ? 'selected' : ''}>Persona Fisica / Privato</option>
+                  <option value="company" ${conn.businessType === 'company' ? 'selected' : ''}>Azienda / Ditta</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size:12px; font-weight:800;">Codice Fiscale / P.IVA *</label>
+                <input type="text" id="inputSettingsTaxId" class="form-input" value="${escapeHtml(payoutSettings.taxId || 'RSSMRC85M01H501Z')}" style="font-size:12.5px; text-transform:uppercase;" required>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+              <label class="form-label" style="font-size:12px; font-weight:800;">Codice IBAN (SEPA) *</label>
+              <input type="text" id="inputSettingsIban" class="form-input" placeholder="IT00X0000000000000000000000" value="${escapeHtml(payoutSettings.iban)}" style="font-family:var(--font-mono); font-size:13px; text-transform:uppercase; font-weight:700;" required>
+              <span style="font-size:11px; color:var(--text-muted); margin-top:2px; display:block;">I bonifici delle quote vengono erogati su questo IBAN tramite Stripe Connect Express.</span>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px;">
+              <label class="form-label" style="font-size:12px; font-weight:800;">Nome Banca / Istituto Finanziario (Opzionale)</label>
+              <input type="text" id="inputSettingsBankName" class="form-input" placeholder="es. Intesa Sanpaolo, UniCredit, Revolut, BBVA" value="${escapeHtml(payoutSettings.bankName)}" style="font-size:12.5px;">
+            </div>
+
+            <div style="display:flex; gap:10px;">
+              <button type="submit" class="btn btn-primary btn-block" style="font-weight:800; padding:12px; font-size:13.5px;">
+                💾 Salva & Aggiorna IBAN di Ricezione
+              </button>
+              <button type="button" class="btn btn-secondary" id="btnCancelPayoutSettings">
+                Annulla
+              </button>
+            </div>
+          </form>
+        ` : `
+          <!-- TAB 2: METODO DI PAGAMENTO PER I RINNOVI -->
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px; font-size:12px; color:#1e40af;">
+            ℹ️ Questo metodo viene utilizzato per addebitare la quota mensile dell'abbonamento (es. 4,99 €) a ogni rinnovo.
+          </div>
+
+          <form id="formSavePaymentMethod">
+            <div class="form-group" style="margin-bottom:12px;">
+              <label class="form-label" style="font-size:12px; font-weight:800;">Scegli Metodo di Pagamento Predefinito *</label>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <label style="border:1.5px solid ${paymentMethod.type === 'CARD' ? 'var(--primary)' : '#cbd5e1'}; background:${paymentMethod.type === 'CARD' ? '#f0fdf4' : '#fff'}; border-radius:var(--radius-md); padding:10px; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700;">
+                  <input type="radio" name="paymentTypeRadio" value="CARD" ${paymentMethod.type === 'CARD' ? 'checked' : ''}>
+                  💳 Carta di Credito / Debito
+                </label>
+                <label style="border:1.5px solid ${paymentMethod.type === 'PAYPAL' ? '#0070ba' : '#cbd5e1'}; background:${paymentMethod.type === 'PAYPAL' ? '#eff6ff' : '#fff'}; border-radius:var(--radius-md); padding:10px; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700;">
+                  <input type="radio" name="paymentTypeRadio" value="PAYPAL" ${paymentMethod.type === 'PAYPAL' ? 'checked' : ''}>
+                  🅿️ Conto PayPal
+                </label>
+              </div>
+            </div>
+
+            <div id="cardFieldsWrap" style="display:${paymentMethod.type === 'CARD' ? 'block' : 'none'};">
+              <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" style="font-size:12px; font-weight:800;">Numero Carta (16 Cifre) *</label>
+                <input type="text" id="inputCardNumber" class="form-input" placeholder="4242 •••• •••• 4242" value="•••• •••• •••• ${escapeHtml(paymentMethod.cardLast4 || '4242')}" style="font-family:var(--font-mono); font-size:13px;" required>
+              </div>
+
+              <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                <div class="form-group">
+                  <label class="form-label" style="font-size:12px; font-weight:800;">Scadenza (MM/YY) *</label>
+                  <input type="text" id="inputCardExpiry" class="form-input" placeholder="12/28" value="${escapeHtml(paymentMethod.cardExpiry || '12/28')}" style="font-family:var(--font-mono); font-size:12.5px;" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:12px; font-weight:800;">CVC / CVV *</label>
+                  <input type="password" id="inputCardCvc" class="form-input" placeholder="•••" value="123" maxlength="4" style="font-family:var(--font-mono); font-size:12.5px;" required>
+                </div>
+              </div>
+            </div>
+
+            <div id="paypalFieldsWrap" style="display:${paymentMethod.type === 'PAYPAL' ? 'block' : 'none'}; margin-bottom:12px;">
+              <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" style="font-size:12px; font-weight:800;">Email Account PayPal *</label>
+                <input type="email" id="inputPaypalEmail" class="form-input" placeholder="nome@esempio.com" value="${escapeHtml(paymentMethod.paypalEmail || currentUser.email)}" style="font-size:12.5px;">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer;">
+                <input type="checkbox" id="inputAutoRenewCheck" ${paymentMethod.autoRenewEnabled !== false ? 'checked' : ''}>
+                <span>Rinnovo automatico mensile abilitato per i miei abbonamenti attivi</span>
+              </label>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+              <button type="submit" class="btn btn-primary btn-block" style="font-weight:800; padding:12px; font-size:13.5px;">
+                💾 Salva Metodo di Pagamento
+              </button>
+              <button type="button" class="btn btn-secondary" id="btnCancelPaymentSettings">
+                Annulla
+              </button>
+            </div>
+          </form>
+        `}
+      </div>
+    `;
+
+    // Event listeners
+    const closeBtn = modal.querySelector('#btnClosePaymentModal');
+    if (closeBtn) closeBtn.onclick = () => modal.classList.remove('active');
+
+    const cancelPayout = modal.querySelector('#btnCancelPayoutSettings');
+    if (cancelPayout) cancelPayout.onclick = () => modal.classList.remove('active');
+
+    const cancelPayment = modal.querySelector('#btnCancelPaymentSettings');
+    if (cancelPayment) cancelPayment.onclick = () => modal.classList.remove('active');
+
+    const tabPayout = modal.querySelector('#tabBtnPayout');
+    if (tabPayout) tabPayout.onclick = () => { activeTab = 'payout'; renderModalContent(); };
+
+    const tabPayment = modal.querySelector('#tabBtnPayment');
+    if (tabPayment) tabPayment.onclick = () => { activeTab = 'payment'; renderModalContent(); };
+
+    // Radio switcher in payment tab
+    modal.querySelectorAll('input[name="paymentTypeRadio"]').forEach(radio => {
+      radio.onchange = (e) => {
+        const val = e.target.value;
+        const cardWrap = modal.querySelector('#cardFieldsWrap');
+        const ppWrap = modal.querySelector('#paypalFieldsWrap');
+        if (cardWrap) cardWrap.style.display = val === 'CARD' ? 'block' : 'none';
+        if (ppWrap) ppWrap.style.display = val === 'PAYPAL' ? 'block' : 'none';
+      };
+    });
+
+    // Submit Payout Form
+    const formPayout = modal.querySelector('#formSavePayoutIban');
+    if (formPayout) {
+      formPayout.onsubmit = async (e) => {
+        e.preventDefault();
+        const ibanVal = document.getElementById('inputSettingsIban').value;
+        const bankNameVal = document.getElementById('inputSettingsBankName').value;
+        const legalNameVal = document.getElementById('inputSettingsLegalName').value;
+        const taxIdVal = document.getElementById('inputSettingsTaxId').value;
+        const accountTypeVal = document.getElementById('inputSettingsAccountType').value;
+
+        await stripeConnectService.completeOnboarding(currentUser, {
+          legalName: legalNameVal,
+          accountType: accountTypeVal,
+          iban: ibanVal,
+          simulatedStatus: 'success'
+        });
+
+        db.updateUserPayoutSettings(currentUser.id, {
+          iban: ibanVal,
+          bankName: bankNameVal || 'Conto Bancario Principale (SEPA)',
+          legalName: legalNameVal,
+          taxId: taxIdVal
+        }, currentUser);
+
+        modal.classList.remove('active');
+        showToast('✅ Dati bancari e IBAN aggiornati con successo!');
+        renderApp();
+      };
+    }
+
+    // Submit Payment Method Form
+    const formPayment = modal.querySelector('#formSavePaymentMethod');
+    if (formPayment) {
+      formPayment.onsubmit = (e) => {
+        e.preventDefault();
+        const selectedType = modal.querySelector('input[name="paymentTypeRadio"]:checked')?.value || 'CARD';
+        const cardNum = document.getElementById('inputCardNumber')?.value || '';
+        const cardExp = document.getElementById('inputCardExpiry')?.value || '12/28';
+        const ppEmail = document.getElementById('inputPaypalEmail')?.value || currentUser.email;
+        const autoRenew = document.getElementById('inputAutoRenewCheck')?.checked !== false;
+
+        db.updateUserPaymentMethod(currentUser.id, {
+          type: selectedType,
+          cardNumber: cardNum,
+          cardExpiry: cardExp,
+          paypalEmail: ppEmail,
+          autoRenewEnabled: autoRenew
+        }, currentUser);
+
+        modal.classList.remove('active');
+        showToast('✅ Metodo di pagamento aggiornato con successo!');
+        renderApp();
+      };
+    }
+  };
+
+  renderModalContent();
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+function openStripeOnboardingModal(currentUser) {
+  openPaymentAndPayoutSettingsModal(currentUser, 'payout');
+}
+
+function openEditPayoutModal(currentUser) {
+  openPaymentAndPayoutSettingsModal(currentUser, 'payout');
+}
+
+function openPayoutDetailModal(txId, currentUser) {
+  const log = (db.data.financialAuditLogs || []).find(l => l.id === txId || l.transactionId === txId);
+  if (!log) {
+    alert('Dettaglio trasferimento non trovato.');
+    return;
+  }
+
+  const group = db.getGroupById(log.groupId);
+  const memberUser = db.data.users.find(u => u.id === log.memberId) || { fullName: 'Membro', email: '' };
+  const ownerSettings = db.getUserPayoutSettings(currentUser.id) || {};
+
+  let modal = document.getElementById('payoutDetailModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'payoutDetailModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  const isPayPal = log.paymentMethod?.includes('PAYPAL');
+  const providerFeeCents = log.paymentProviderFeeCents || (isPayPal ? 52 : 36);
+  const netMerchantReceivedCents = log.totalAmountCents - providerFeeCents;
+  const netPlatformRevenueCents = (log.buyyourshareFeeCents || 149) - providerFeeCents;
+
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:540px; padding:24px;">
+      <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+        <div>
+          <span style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase; letter-spacing:0.5px;">Distinta Ufficiale di Bonifico / Accredito</span>
+          <h2 class="modal-title" style="font-size:18px; font-weight:900; margin-top:2px;">Trasferimento Quota a Saldo IBAN</h2>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('payoutDetailModalOverlay').classList.remove('active')">&times;</button>
+      </div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:12px 14px; margin-bottom:14px; font-size:12px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span style="color:var(--text-secondary);">ID Riferimento Bonifico:</span>
+          <strong style="font-family:var(--font-mono); color:var(--primary);">${escapeHtml(log.id)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span style="color:var(--text-secondary);">ID Gateway Originario:</span>
+          <strong style="font-family:var(--font-mono);">${escapeHtml(log.transactionId || 'N/A')}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span style="color:var(--text-secondary);">IBAN di Destinazione:</span>
+          <strong style="font-family:var(--font-mono); color:#003087;">${escapeHtml(ownerSettings.iban || 'IT60X0542811101000000123456')}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--text-secondary);">Data Esecuzione:</span>
+          <strong>${formatDateIT(log.createdAt, true)}</strong>
+        </div>
+      </div>
+
+      <!-- Scomposizione Matematica Dettagliata -->
+      <div style="border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:14px; margin-bottom:14px; font-size:12.5px;">
+        <h4 style="font-size:13px; font-weight:800; color:var(--text-main); margin-bottom:8px; border-bottom:1px solid #f1f5f9; padding-bottom:4px;">
+          📊 Scomposizione Flussi & Commissioni Gateway
+        </h4>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span>1. Totale Pagato dal Membro (${escapeHtml(memberUser.fullName)}):</span>
+          <strong>${formatCents(log.totalAmountCents)}</strong>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px; color:#dc2626;">
+          <span>2. Commissione Gateway (${isPayPal ? 'PayPal 3.4% + 0.35€' : 'Stripe 1.5% + 0.25€'}):</span>
+          <strong>- ${formatCents(providerFeeCents)}</strong>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#1e40af; font-weight:700; background:#f8fafc; padding:4px 8px; border-radius:4px;">
+          <span>3. Netto Incassato nel Conto Business Merchant:</span>
+          <strong>${formatCents(netMerchantReceivedCents)}</strong>
+        </div>
+
+        <div style="border-top:1px dashed #cbd5e1; padding-top:8px; margin-top:8px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px; color:#166534; font-size:13.5px;">
+            <strong>4. QUOTA TRASFERITA AL CAPOGRUPPO (TU):</strong>
+            <strong style="font-size:16px;">${formatCents(log.baseShareCents)} (100%)</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px; color:var(--text-secondary); font-size:11.5px;">
+            <span>Commissioni o trattenute a carico del Capogruppo:</span>
+            <strong style="color:#166534;">0,00 € (Capogruppo ESENTE)</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:6px; color:var(--accent); font-size:12px; border-top:1px solid #f1f5f9; padding-top:6px;">
+            <span>5. Ricavo Netto Rimasto a BuyYourShare:</span>
+            <strong>${formatCents(netPlatformRevenueCents)}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:16px; font-size:11.5px; color:#166534;">
+        ✅ <strong>Chi sostiene la commissione PayPal / Gateway?</strong><br>
+        <strong>BuyYourShare al 100%</strong>. La commissione del gateway viene interamente scalata dalla fee lorda della piattaforma (1,49 €). Il Capogruppo riceve esattamente e per intero la quota reale del piano (<strong>${formatCents(log.baseShareCents)}</strong>).
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary btn-block" onclick="window.print()" style="font-size:12.5px;">
+          🖨️ Stampa Distinta
+        </button>
+        <button class="btn btn-primary btn-block" onclick="document.getElementById('payoutDetailModalOverlay').classList.remove('active')" style="font-size:12.5px;">
+          Chiudi
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+function openEditAccessModal(groupId, currentUser) {
+  const instructions = db.getAccessInstructions(groupId, currentUser.id);
+  const group = db.getGroupById(groupId);
+
+  if (!instructions || !group || group.ownerId !== currentUser.id) {
+    alert('Solo il Capogruppo può modificare queste informazioni.');
+    return;
+  }
+
+  const isSpotify = group.serviceId === 'srv-spotify' || group.customServiceName.toLowerCase().includes('spotify');
+
+  let modal = document.getElementById('editAccessModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'editAccessModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">⚙️ Modifica Dati di Accesso</h2>
+          <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(group.customServiceName)}</p>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('editAccessModalOverlay').classList.remove('active')">&times;</button>
+      </div>
+
+      <form id="editAccessForm">
+        <div class="form-group">
+          <label class="form-label">Link di Accesso / Invito *</label>
+          <input type="url" id="editAccessUrl" class="form-input" value="${escapeHtml(instructions.accessUrl || '')}" required>
+        </div>
+
+        ${isSpotify ? `
+          <div class="form-group">
+            <label class="form-label">📧 Indirizzo Spotify del Capogruppo</label>
+            <input type="email" id="editSpotifyEmail" class="form-input" placeholder="email@esempio.com" value="${escapeHtml(instructions.ownerSpotifyAccount || '')}">
+            <span style="font-size:11px; color:var(--text-muted);">Indirizzo email/account Spotify per confermare l'invito Family.</span>
+          </div>
+        ` : ''}
+
+        <div class="form-group">
+          <label class="form-label">Istruzioni per i Membri *</label>
+          <textarea id="editInstructions" class="form-textarea" rows="3" required>${escapeHtml(instructions.instructions || '')}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Codice Invito (Opzionale)</label>
+          <input type="text" id="editAccessCode" class="form-input" value="${escapeHtml(instructions.accessCode || '')}">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Note Aggiuntive (Opzionale)</label>
+          <input type="text" id="editAdditionalInfo" class="form-input" value="${escapeHtml(instructions.additionalInfo || '')}">
+        </div>
+
+        <p style="font-size:11.5px; color:#166534; background:#f0fdf4; padding:8px 10px; border-radius:var(--radius-sm); margin-bottom:14px;">
+          📢 Il salvataggio aggiornerà automaticamente i dati per tutti i membri attivi e invierà loro una notifica e un messaggio nella chat del gruppo.
+        </p>
+
+        <button type="submit" class="btn btn-primary btn-block">
+          Salva e Notifica i Membri
+        </button>
+      </form>
+    </div>
+  `;
+
+  modal.querySelector('#editAccessForm').onsubmit = (e) => {
+    e.preventDefault();
+    const spotifyEmailInput = document.getElementById('editSpotifyEmail');
+    const ownerSpotifyAccount = spotifyEmailInput ? spotifyEmailInput.value : instructions.ownerSpotifyAccount;
+
+    db.updateAccessInstructions(groupId, {
+      accessUrl: document.getElementById('editAccessUrl').value,
+      instructions: document.getElementById('editInstructions').value,
+      accessCode: document.getElementById('editAccessCode').value,
+      additionalInfo: document.getElementById('editAdditionalInfo').value,
+      ownerSpotifyAccount: ownerSpotifyAccount
+    }, currentUser);
+
+    modal.classList.remove('active');
+    showToast('Dati di accesso aggiornati e notificati a tutti i membri!');
+    renderApp();
+  };
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+/**
+ * Caricamento asincrono dinamico del PayPal JavaScript SDK (supporta sia intent: subscription che intent: capture)
+ */
+function loadPayPalSdk(clientId = 'test', isSubscription = false) {
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById('paypal-sdk-script');
+    const requiredMode = isSubscription ? 'sub' : 'order';
+    if (existing) {
+      if (existing.dataset.clientId === clientId && existing.dataset.mode === requiredMode && window.paypal) {
+        return resolve(window.paypal);
+      }
+      existing.remove();
+      delete window.paypal;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'paypal-sdk-script';
+    script.dataset.clientId = clientId;
+    script.dataset.mode = requiredMode;
+    
+    if (isSubscription) {
+      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&vault=true&intent=subscription`;
+    } else {
+      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=EUR&intent=capture`;
+    }
+    
+    script.onload = () => {
+      if (window.paypal) {
+        resolve(window.paypal);
+      } else {
+        reject(new Error('PayPal SDK non inizializzato'));
+      }
+    };
+    script.onerror = (err) => reject(err);
+    document.head.appendChild(script);
+  });
+}
+
+function openStripeCheckoutModal(group, activeSlot, currentUser) {
+  const sessionData = stripeCheckoutService.createCheckoutSession(group.id, currentUser, activeSlot.slotNumber);
+
+  let modal = document.getElementById('stripeCheckoutModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'stripeCheckoutModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:460px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" style="color:var(--primary); font-size:18px;">🔒 Checkout Abbonamento Ricorrente</h2>
+          <p style="font-size:12px; color:var(--text-secondary);">Subscription mensile con split automatico</p>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('stripeCheckoutModalOverlay').classList.remove('active')">&times;</button>
+      </div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <strong style="font-size:14px;">${escapeHtml(group.customServiceName)} - ${escapeHtml(group.planName)}</strong>
+          <span style="font-weight:800; color:var(--primary);">Posto #${sessionData.slotNumber}</span>
+        </div>
+        
+        <div style="font-size:12px; display:flex; justify-content:space-between; margin-bottom:4px; color:var(--text-secondary);">
+          <span>Quota spettante al Capogruppo:</span>
+          <strong>${formatCents(sessionData.baseShareCents)} / mese</strong>
+        </div>
+        <div style="font-size:12px; display:flex; justify-content:space-between; margin-bottom:6px; color:var(--text-secondary);">
+          <span>Commissione BuyYourShare (LORDA FISSA):</span>
+          <span>+ ${formatCents(sessionData.platformFeeCents)} / mese</span>
+        </div>
+        
+        <div style="border-top:1px solid #cbd5e1; padding-top:6px; display:flex; justify-content:space-between; font-weight:800; font-size:15px; color:var(--text-main);">
+          <span>TOTALE ADDEBITATO OGNI MESE:</span>
+          <span style="color:#166534; font-size:18px;">${formatCents(sessionData.totalAmountCents)} / mese</span>
+        </div>
+      </div>
+
+      <!-- SELETTORE METODO DI PAGAMENTO -->
+      <div style="margin-bottom:14px;">
+        <label class="form-label" style="font-size:12px; font-weight:800;">Metodo di Pagamento *</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+          <button type="button" class="btn-pay-method selected" data-method="CARD_EEA" style="padding:8px 4px; font-size:12px; border:2px solid var(--primary); background:#eff6ff; border-radius:var(--radius-sm); font-weight:700; cursor:pointer;">
+            💳 Carta
+          </button>
+          <button type="button" class="btn-pay-method" data-method="APPLE_PAY" style="padding:8px 4px; font-size:12px; border:1px solid #cbd5e1; background:white; border-radius:var(--radius-sm); font-weight:700; cursor:pointer;">
+            📱 Wallet
+          </button>
+          <button type="button" class="btn-pay-method" data-method="PAYPAL_EEA" style="padding:8px 4px; font-size:12px; border:1px solid #cbd5e1; background:white; border-radius:var(--radius-sm); font-weight:700; cursor:pointer; color:#003087;">
+            🅿️ PayPal
+          </button>
+        </div>
+      </div>
+
+      <form id="stripePaymentForm">
+        <!-- VISTA CARTA -->
+        <div id="methodViewCard">
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label" style="font-size:11.5px;">Scenario Test Carta</label>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; padding:6px 8px; background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); cursor:pointer;">
+                <input type="radio" name="testScenarioType" value="success" checked>
+                <span>💳 Carta Valida (Stripe 4242)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; padding:6px 8px; background:#fef2f2; border:1px solid #fca5a5; border-radius:var(--radius-sm); cursor:pointer;">
+                <input type="radio" name="testScenarioType" value="decline">
+                <span>🚫 Carta Rifiutata (Stripe 4002)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label" style="font-size:12px;">Numero Carta di Credito / Debito *</label>
+            <input type="text" id="stripeCardNumber" class="form-input" placeholder="4242 4242 4242 4242" value="4242 4242 4242 4242" maxlength="19" style="font-family:var(--font-mono); font-size:13px;">
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label class="form-label" style="font-size:12px;">Scadenza (MM/AA) *</label>
+              <input type="text" id="stripeCardExpiry" class="form-input" placeholder="12/28" value="12/28" maxlength="5" style="font-size:13px;">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:12px;">CVC *</label>
+              <input type="text" id="stripeCardCvc" class="form-input" placeholder="123" value="123" maxlength="4" style="font-size:13px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- VISTA WALLET (APPLE PAY / GOOGLE PAY) -->
+        <div id="methodViewWallet" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-sm); padding:12px; margin-bottom:12px; text-align:center;">
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">
+            📱 <strong>Apple Pay / Google Pay Tokenizer:</strong> Autorizzazione biometrica del pagamento ricorrente mensile di ${formatCents(sessionData.totalAmountCents)}.
+          </p>
+          <span style="font-size:11px; color:#166534; font-weight:700;">🟢 Dispositivo Test Compatibile Riconosciuto</span>
+        </div>
+
+        <!-- VISTA PAYPAL -->
+        <div id="methodViewPayPal" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:var(--radius-sm); padding:14px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:20px;">🅿️</span>
+            <div>
+              <strong style="color:#003087; font-size:13.5px;">PayPal Subscription (Abbonamento Ricorrente Reale)</strong>
+              <p style="font-size:11px; color:var(--text-secondary);">Contratto ricorrente gestito da <strong>PayPal Billing Engine</strong></p>
+            </div>
+          </div>
+
+          <!-- Configurazione Client ID Merchant -->
+          <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:10px;">
+            <label style="font-size:11px; font-weight:800; color:#003087; display:block; margin-bottom:2px;">
+              ⚙️ PayPal Sandbox Client ID:
+            </label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="inputPaypalClientId" class="form-input" value="${escapeHtml(localStorage.getItem('paypal_sandbox_client_id') || 'test')}" placeholder="Inserisci Client ID" style="font-size:11px; padding:4px 8px; font-family:var(--font-mono); flex:1;">
+              <button type="button" id="btnApplyPaypalClient" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 10px; font-weight:700;">
+                Salva
+              </button>
+            </div>
+          </div>
+
+          <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-sm); padding:10px; margin-bottom:10px; font-size:12px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span>Canale:</span>
+              <strong style="color:#003087;">sandbox.paypal.com</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span>Tipo Contratto:</span>
+              <strong>Sottoscrizione Ricorrente Mensile (I-...)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; border-top:1px dashed #e2e8f0; padding-top:4px; font-weight:700;">
+              <span>Quota Mensile Addebitata:</span>
+              <span style="color:#166534;">${formatCents(sessionData.totalAmountCents)} / mese</span>
+            </div>
+          </div>
+
+          <p style="font-size:11px; color:#15803d; margin-bottom:10px;">
+            🔒 <strong>Abbonamento Automatico:</strong> Cliccando su "Sottoscrivi con PayPal", PayPal creerà un abbonamento ricorrente continuo (I-...) con addebito mensile automatico e payout al Capogruppo ad ogni ciclo.
+          </p>
+
+          <!-- Contenitore Ufficiale PayPal Smart Buttons -->
+          <div id="paypal-smart-button-container" style="min-height:45px; margin-top:8px;"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" style="font-size:12px;">Email di Ricevuta</label>
+          <input type="email" id="stripeCardEmail" class="form-input" value="${escapeHtml(sessionData.memberEmail || currentUser.email)}" style="font-size:13px;">
+        </div>
+
+        <button type="submit" id="btnSubmitStripePay" class="btn btn-accent btn-block" style="padding:14px; font-size:15px; font-weight:800;">
+          💳 PAGA E ATTIVA SUBITO (${formatCents(sessionData.totalAmountCents)} / Mese)
+        </button>
+        
+        <p style="font-size:11px; text-align:center; color:var(--text-muted); margin-top:8px;">
+          🔒 PayPal Subscriptions & Stripe Test Mode • Quota Capogruppo 3,50 € • Fee BYS 1,49 €
+        </p>
+      </form>
+    </div>
+  `;
+
+  let currentMethod = 'CARD_EEA';
+  const methodBtns = modal.querySelectorAll('.btn-pay-method');
+  const viewCard = modal.querySelector('#methodViewCard');
+  const viewWallet = modal.querySelector('#methodViewWallet');
+  const viewPayPal = modal.querySelector('#methodViewPayPal');
+  const submitBtn = modal.querySelector('#btnSubmitStripePay');
+
+  // Funzione di caricamento e rendering dinamico PayPal Subscription SDK
+  const mountPayPalSdkAndButtons = async () => {
+    submitBtn.style.display = 'none';
+    const ppContainer = modal.querySelector('#paypal-smart-button-container');
+    if (!ppContainer) return;
+    
+    ppContainer.innerHTML = '<div style="padding:12px; text-align:center; font-size:12px; color:#003087;">⏳ Connessione a PayPal Billing Plans (P-...)...</div>';
+
+    try {
+      // 1. Recupero o creazione del Plan ID reale (P-...) e Client ID dal server
+      const planInfo = await stripeCheckoutService.getPayPalPlan(sessionData.groupName, sessionData.totalAmountCents);
+      const realPlanId = planInfo.planId;
+      const serverClientId = planInfo.clientId || localStorage.getItem('paypal_sandbox_client_id') || 'test';
+      console.log('[PAYPAL SUBSCRIPTION] Plan ID ottenuto:', realPlanId, '- Client ID:', serverClientId);
+
+      // Aggiorna input nel modal se presente
+      const inputClient = modal.querySelector('#inputPaypalClientId');
+      if (inputClient && serverClientId && serverClientId !== 'test') {
+        inputClient.value = serverClientId;
+      }
+
+      // 2. Caricamento SDK con vault=true & intent=subscription usando il Client ID reale del server
+      const paypal = await loadPayPalSdk(serverClientId, true);
+      ppContainer.innerHTML = '';
+
+      if (paypal && typeof paypal.Buttons === 'function') {
+        paypal.Buttons({
+          style: {
+            layout: 'vertical',
+            color: 'gold',
+            shape: 'rect',
+            label: 'subscribe'
+          },
+          createSubscription: function(data, actions) {
+            console.log('[PAYPAL SDK] Inizio sottoscrizione con Plan ID:', realPlanId);
+            return actions.subscription.create({
+              plan_id: realPlanId,
+              custom_id: JSON.stringify({
+                groupId: sessionData.groupId,
+                memberId: sessionData.memberId,
+                slotNumber: sessionData.slotNumber,
+                baseShareCents: sessionData.baseShareCents
+              })
+            });
+          },
+          onApprove: function(data, actions) {
+            console.log('[PAYPAL SUBSCRIPTION APPROVED] Data:', data);
+            const realSubscriptionId = data.subscriptionID;
+
+            if (!realSubscriptionId || !realSubscriptionId.startsWith('I-')) {
+              alert('ID Subscription non valido ricevuto da PayPal: ' + realSubscriptionId);
+              return;
+            }
+
+            modal.classList.remove('active');
+            showToast(`⏳ Verifica Subscription ${realSubscriptionId} in corso...`);
+
+            // Attivazione server-side autentica con verifica API PayPal e Payout reale 3,50 €
+            stripeCheckoutService.activatePayPalSubscription(realSubscriptionId, sessionData)
+              .then(res => {
+                if (res.success) {
+                  window.__pendingPaymentVerification = { status: 'success' };
+                  navigateTo('#miei-abbonamenti');
+                } else {
+                  console.error('[ACTIVATION ERROR DETAILS]', res);
+                  alert('❌ Errore attivazione Subscription PayPal:\n' + (res.error || 'Verifica server-side fallita'));
+                }
+              })
+              .catch(err => {
+                console.error('[ACTIVATION THROW ERROR]', err);
+                alert('❌ Errore attivazione Subscription: ' + err.message);
+              });
+          },
+          onError: function(err) {
+            console.error('PayPal Subscription Buttons Error:', err);
+            alert('Errore PayPal Subscription: ' + (err.message || 'Autorizzazione ricorrente non concessa'));
+          }
+        }).render(ppContainer);
+      }
+    } catch (err) {
+      console.error('Errore inizializzazione PayPal Subscription:', err);
+      ppContainer.innerHTML = `<div style="color:#dc2626; font-size:12px; padding:8px;">Errore: ${escapeHtml(err.message)}</div>`;
+    }
+  };
+
+  // Handler salvataggio Client ID personalizzato
+  const btnApplyClient = modal.querySelector('#btnApplyPaypalClient');
+  if (btnApplyClient) {
+    btnApplyClient.addEventListener('click', () => {
+      const input = modal.querySelector('#inputPaypalClientId');
+      const val = input ? input.value.trim() : 'test';
+      localStorage.setItem('paypal_sandbox_client_id', val || 'test');
+      showToast('Client ID PayPal salvato! Ricaricamento SDK...');
+      mountPayPalSdkAndButtons();
+    });
+  }
+
+  methodBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      methodBtns.forEach(b => {
+        b.classList.remove('selected');
+        b.style.border = '1px solid #cbd5e1';
+        b.style.background = 'white';
+      });
+      btn.classList.add('selected');
+      btn.style.border = '2px solid var(--primary)';
+      btn.style.background = '#eff6ff';
+      currentMethod = btn.dataset.method;
+
+      viewCard.style.display = currentMethod === 'CARD_EEA' ? 'block' : 'none';
+      viewWallet.style.display = currentMethod === 'APPLE_PAY' ? 'block' : 'none';
+      viewPayPal.style.display = currentMethod === 'PAYPAL_EEA' ? 'block' : 'none';
+
+      if (currentMethod === 'PAYPAL_EEA') {
+        mountPayPalSdkAndButtons();
+      } else if (currentMethod === 'APPLE_PAY') {
+        submitBtn.style.display = 'block';
+        submitBtn.innerHTML = `📱 PAGA CON WALLET (${formatCents(sessionData.totalAmountCents)} / Mese)`;
+        submitBtn.style.background = '#000000';
+      } else {
+        submitBtn.style.display = 'block';
+        submitBtn.innerHTML = `💳 PAGA E ATTIVA SUBITO (${formatCents(sessionData.totalAmountCents)} / Mese)`;
+        submitBtn.style.background = 'var(--accent)';
+      }
+    });
+  });
+
+  const cardNumInput = modal.querySelector('#stripeCardNumber');
+  const cardExpInput = modal.querySelector('#stripeCardExpiry');
+  const radioSuccess = modal.querySelector('input[name="testScenarioType"][value="success"]');
+  const radioDecline = modal.querySelector('input[name="testScenarioType"][value="decline"]');
+
+  modal.querySelectorAll('input[name="testScenarioType"]').forEach(r => {
+    r.addEventListener('change', () => {
+      if (r.value === 'success') {
+        cardNumInput.value = '4242 4242 4242 4242';
+      } else {
+        cardNumInput.value = '4000 0000 0000 0002';
+      }
+    });
+  });
+
+  if (cardNumInput) {
+    cardNumInput.addEventListener('input', (e) => {
+      let v = e.target.value.replace(/\D/g, '').substring(0, 16);
+      let parts = [];
+      for (let i = 0; i < v.length; i += 4) {
+        parts.push(v.substring(i, i + 4));
+      }
+      e.target.value = parts.join(' ');
+      if (v.endsWith('0002') || v.endsWith('4002')) {
+        if (radioDecline) radioDecline.checked = true;
+      } else {
+        if (radioSuccess) radioSuccess.checked = true;
+      }
+    });
+  }
+
+  if (cardExpInput) {
+    cardExpInput.addEventListener('input', (e) => {
+      let v = e.target.value.replace(/\D/g, '').substring(0, 4);
+      if (v.length >= 2) {
+        e.target.value = v.substring(0, 2) + '/' + v.substring(2);
+      } else {
+        e.target.value = v;
+      }
+    });
+  }
+
+  modal.querySelector('#stripePaymentForm').onsubmit = (e) => {
+    e.preventDefault();
+    
+    let scenarioType = 'success';
+    if (currentMethod === 'PAYPAL_EEA') {
+      scenarioType = modal.querySelector('input[name="paypalScenarioType"]:checked')?.value || 'success';
+    } else if (currentMethod === 'CARD_EEA') {
+      const rawCard = cardNumInput ? cardNumInput.value.replace(/\s/g, '') : '';
+      scenarioType = (rawCard.endsWith('0002') || rawCard.endsWith('4002') || radioDecline?.checked) ? 'decline' : 'success';
+    }
+
+    modal.classList.remove('active');
+    
+    // Imposta lo stato di verifica in corso e naviga alla dashboard
+    window.__pendingPaymentVerification = {
+      status: 'verifying',
+      sessionData: { ...sessionData, paymentMethod: currentMethod },
+      cardType: scenarioType,
+      paymentMethod: currentMethod,
+      inFlight: false,
+      timestamp: Date.now()
+    };
+    
+    navigateTo('#miei-abbonamenti');
+  };
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+function openGatewayConfigModal() {
+  let modal = document.getElementById('gatewayConfigModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'gatewayConfigModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  const currentClientId = localStorage.getItem('paypal_sandbox_client_id') || '';
+
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:480px; padding:24px;">
+      <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:24px;">🅿️</span>
+          <div>
+            <h2 class="modal-title" style="font-size:18px; font-weight:900; color:#003087;">Configura PayPal Sandbox</h2>
+            <p style="font-size:12px; color:var(--text-secondary);">Collega la tua App Merchant Sandbox (es. BYS-Platform)</p>
+          </div>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('gatewayConfigModalOverlay').classList.remove('active')">&times;</button>
+      </div>
+
+      <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-md); padding:12px; margin-bottom:16px; font-size:12px; color:#1e40af;">
+        ℹ️ Inserendo il <strong>Client ID</strong> della tua Sandbox App, i pagamenti di <strong>4,99 €</strong> effettuati dal Personal Buyer verranno realmente accreditati al tuo conto Business Sandbox su <strong>sandbox.paypal.com</strong>.
+      </div>
+
+      <form id="formGatewayConfig">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label" style="font-size:12px; font-weight:800;">
+            PayPal Sandbox Client ID (App BYS-Platform) *
+          </label>
+          <input type="text" id="popupPaypalClientId" class="form-input" placeholder="Incolla il tuo Client ID (es. AX... / AaB1Cc...)" value="${escapeHtml(currentClientId)}" style="font-family:var(--font-mono); font-size:12.5px; padding:10px;" required>
+          <span style="font-size:11px; color:var(--text-muted); margin-top:4px; display:block;">
+            Copialo da <a href="https://developer.paypal.com/dashboard/applications/sandbox" target="_blank" style="color:var(--primary); font-weight:700;">developer.paypal.com $\rightarrow$ Apps $\rightarrow$ BYS-Platform</a>
+          </span>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button type="submit" class="btn btn-primary btn-block" style="background:#0070ba; font-weight:800; padding:12px;">
+            💾 Salva e Attiva Client ID
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('gatewayConfigModalOverlay').classList.remove('active')">
+            Annulla
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  modal.querySelector('#formGatewayConfig').onsubmit = (e) => {
+    e.preventDefault();
+    const val = document.getElementById('popupPaypalClientId').value.trim();
+    if (val) {
+      localStorage.setItem('paypal_sandbox_client_id', val);
+      showToast('✅ Client ID PayPal Sandbox salvato con successo!');
+    } else {
+      localStorage.removeItem('paypal_sandbox_client_id');
+      showToast('Client ID reimpostato.');
+    }
+    modal.classList.remove('active');
+    renderApp();
+  };
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// =========================================================================
+// INITIALIZATION
+// =========================================================================
+function init() {
+  const btnConfigHeader = document.getElementById('btnOpenGatewayConfigHeader');
+  if (btnConfigHeader) {
+    btnConfigHeader.onclick = () => openGatewayConfigModal();
+  }
+
+  const btnPaymentHeader = document.getElementById('btnOpenPaymentSettingsHeader');
+  if (btnPaymentHeader) {
+    btnPaymentHeader.onclick = () => openPaymentAndPayoutSettingsModal(authService.getCurrentUser(), 'payout');
+  }
+
+  renderApp();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

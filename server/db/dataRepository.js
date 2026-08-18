@@ -1,0 +1,375 @@
+/**
+ * BuyYourShare - Server DataRepository (Abstract Data Access Layer)
+ * Gestione thread-safe con scritture atomiche su server/data/database.json.
+ * Strutturato con interfaccia asincrona per poter passare a PostgreSQL/MySQL con zero modifiche alle route.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import {
+  INITIAL_SERVICES,
+  INITIAL_USERS,
+  INITIAL_CONNECTED_ACCOUNTS,
+  INITIAL_GROUPS,
+  INITIAL_ACCESS_INSTRUCTIONS,
+  INITIAL_MEMBERSHIPS,
+  INITIAL_CHATS,
+  INITIAL_CHAT_MESSAGES
+} from './seedData.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DEFAULT_DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || DEFAULT_DATA_DIR;
+const DB_FILE = process.env.DATABASE_PATH || path.join(DATA_DIR, 'database.json');
+
+class DataRepository {
+  constructor() {
+    this.data = null;
+    this._writeLock = Promise.resolve();
+    this.init();
+  }
+
+  init() {
+    if (!fs.existsSync(DATA_DIR)) {
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      } catch (err) {
+        console.warn(`[DB] Impossibile creare DATA_DIR (${DATA_DIR}), uso fallback locale:`, err.message);
+      }
+    }
+
+    if (fs.existsSync(DB_FILE)) {
+      try {
+        const raw = fs.readFileSync(DB_FILE, 'utf8');
+        this.data = JSON.parse(raw);
+        console.log(`[DB] Database persistente caricato da: ${DB_FILE}`);
+      } catch (err) {
+        console.error('[DB] Errore lettura database.json, reinizializzazione con seed...', err);
+        this.data = this.createDefaultState();
+        this.saveSync();
+      }
+    } else {
+      // Se siamo su volume persistente Railway vuoto, copia lo stato esistente da DEFAULT_DATA_DIR se presente
+      const bundledDb = path.join(DEFAULT_DATA_DIR, 'database.json');
+      if (fs.existsSync(bundledDb) && DB_FILE !== bundledDb) {
+        try {
+          const raw = fs.readFileSync(bundledDb, 'utf8');
+          this.data = JSON.parse(raw);
+          console.log(`[DB] Database inizializzato sul Volume Persistente da: ${bundledDb}`);
+          this.saveSync();
+          return;
+        } catch (copyErr) {
+          console.warn('[DB] Fallita copia da bundledDb, uso defaultState:', copyErr.message);
+        }
+      }
+
+      this.data = this.createDefaultState();
+      this.saveSync();
+    }
+  }
+
+  createDefaultState() {
+    return {
+      users: JSON.parse(JSON.stringify(INITIAL_USERS)),
+      services: JSON.parse(JSON.stringify(INITIAL_SERVICES)),
+      groups: JSON.parse(JSON.stringify(INITIAL_GROUPS)),
+      memberships: JSON.parse(JSON.stringify(INITIAL_MEMBERSHIPS)),
+      accessInstructions: JSON.parse(JSON.stringify(INITIAL_ACCESS_INSTRUCTIONS)),
+      chats: JSON.parse(JSON.stringify(INITIAL_CHATS)),
+      chatMessages: JSON.parse(JSON.stringify(INITIAL_CHAT_MESSAGES)),
+      connectedAccounts: JSON.parse(JSON.stringify(INITIAL_CONNECTED_ACCOUNTS)),
+      financialAuditLogs: [],
+      notifications: [],
+      sessions: []
+    };
+  }
+
+  saveSync() {
+    const tempFile = DB_FILE + '.tmp.' + Date.now();
+    fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2), 'utf8');
+    fs.renameSync(tempFile, DB_FILE);
+  }
+
+  async save() {
+    this._writeLock = this._writeLock.then(async () => {
+      const tempFile = DB_FILE + '.tmp.' + Date.now();
+      await fs.promises.writeFile(tempFile, JSON.stringify(this.data, null, 2), 'utf8');
+      await fs.promises.rename(tempFile, DB_FILE);
+    });
+    return this._writeLock;
+  }
+
+  // ==========================================
+  // USERS & SESSIONS
+  // ==========================================
+  async findUserById(id) {
+    return this.data.users.find(u => u.id === id) || null;
+  }
+
+  async findUserByEmail(email) {
+    if (!email) return null;
+    const clean = email.trim().toLowerCase();
+    return this.data.users.find(u => u.email.toLowerCase() === clean) || null;
+  }
+
+  async createUser(userData) {
+    this.data.users.push(userData);
+    await this.save();
+    return userData;
+  }
+
+  async updateUser(id, updateData) {
+    const user = await this.findUserById(id);
+    if (!user) return null;
+    Object.assign(user, updateData, { updatedAt: new Date().toISOString() });
+    await this.save();
+    return user;
+  }
+
+  async createSession(userId) {
+    const token = 'bys_token_' + Date.now() + '_' + Math.random().toString(36).substring(2, 12);
+    const session = {
+      token,
+      userId,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 giorni
+    };
+    this.data.sessions.push(session);
+    await this.save();
+    return session;
+  }
+
+  async findSession(token) {
+    if (!token) return null;
+    return this.data.sessions.find(s => s.token === token) || null;
+  }
+
+  async deleteSession(token) {
+    this.data.sessions = this.data.sessions.filter(s => s.token !== token);
+    await this.save();
+  }
+
+  // ==========================================
+  // GROUPS & SERVICES
+  // ==========================================
+  async getServices() {
+    return this.data.services;
+  }
+
+  async getGroups(filter = {}) {
+    let list = this.data.groups;
+    if (filter.serviceId) {
+      list = list.filter(g => g.serviceId === filter.serviceId);
+    }
+    if (filter.ownerId) {
+      list = list.filter(g => g.ownerId === filter.ownerId);
+    }
+    if (filter.status) {
+      list = list.filter(g => g.status === filter.status);
+    }
+    if (filter.search) {
+      const q = filter.search.toLowerCase();
+      list = list.filter(g => 
+        g.customServiceName.toLowerCase().includes(q) || 
+        g.planName.toLowerCase().includes(q) ||
+        (g.description && g.description.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }
+
+  async findGroupById(id) {
+    return this.data.groups.find(g => g.id === id) || null;
+  }
+
+  async createGroup(groupData) {
+    this.data.groups.push(groupData);
+    await this.save();
+    return groupData;
+  }
+
+  async updateGroup(id, updateData) {
+    const group = await this.findGroupById(id);
+    if (!group) return null;
+    Object.assign(group, updateData, { updatedAt: new Date().toISOString() });
+    await this.save();
+    return group;
+  }
+
+  // ==========================================
+  // MEMBERSHIPS
+  // ==========================================
+  async getMemberships(filter = {}) {
+    let list = this.data.memberships;
+    if (filter.groupId) {
+      list = list.filter(m => m.groupId === filter.groupId);
+    }
+    if (filter.userId) {
+      list = list.filter(m => m.userId === filter.userId);
+    }
+    if (filter.slotNumber !== undefined) {
+      list = list.filter(m => m.slotNumber === filter.slotNumber);
+    }
+    if (filter.role) {
+      list = list.filter(m => m.role === filter.role);
+    }
+    if (filter.status) {
+      list = list.filter(m => m.status === filter.status);
+    }
+    return list;
+  }
+
+  async findMembershipById(id) {
+    return this.data.memberships.find(m => m.id === id) || null;
+  }
+
+  async createMembership(memData) {
+    this.data.memberships.push(memData);
+    await this.save();
+    return memData;
+  }
+
+  async updateMembership(id, updateData) {
+    const mem = await this.findMembershipById(id);
+    if (!mem) return null;
+    Object.assign(mem, updateData, { updatedAt: new Date().toISOString() });
+    await this.save();
+    return mem;
+  }
+
+  // ==========================================
+  // ACCESS INSTRUCTIONS
+  // ==========================================
+  async getAccessInstructions(groupId) {
+    return this.data.accessInstructions.find(a => a.groupId === groupId) || null;
+  }
+
+  async saveAccessInstructions(groupId, data) {
+    let inst = await this.getAccessInstructions(groupId);
+    if (!inst) {
+      inst = { id: 'acc-' + Date.now(), groupId: groupId, ...data };
+      this.data.accessInstructions.push(inst);
+    } else {
+      Object.assign(inst, data);
+    }
+    await this.save();
+    return inst;
+  }
+
+  // ==========================================
+  // CHATS & MESSAGES
+  // ==========================================
+  async getChatByGroupId(groupId) {
+    let chat = this.data.chats.find(c => c.groupId === groupId);
+    if (!chat) {
+      chat = { id: 'cht-' + Date.now(), groupId, status: 'ACTIVE', createdAt: new Date().toISOString() };
+      this.data.chats.push(chat);
+      await this.save();
+    }
+    return chat;
+  }
+
+  async getChatMessages(chatId) {
+    return this.data.chatMessages.filter(m => m.chatId === chatId);
+  }
+
+  async addChatMessage(msgData) {
+    this.data.chatMessages.push(msgData);
+    await this.save();
+    return msgData;
+  }
+
+  // ==========================================
+  // CONNECTED ACCOUNTS (STRIPE CONNECT)
+  // ==========================================
+  async findConnectedAccountByUserId(userId) {
+    return this.data.connectedAccounts.find(c => c.userId === userId) || null;
+  }
+
+  async saveConnectedAccount(data) {
+    let conn = await this.findConnectedAccountByUserId(data.userId);
+    if (!conn) {
+      conn = { id: 'conn-' + Date.now(), ...data };
+      this.data.connectedAccounts.push(conn);
+    } else {
+      Object.assign(conn, data);
+    }
+    await this.save();
+    return conn;
+  }
+
+  // ==========================================
+  // FINANCIAL AUDIT LOGS (LEDGER IMMUTABILE)
+  // ==========================================
+  async getFinancialAuditLogs(filter = {}) {
+    let list = this.data.financialAuditLogs || [];
+    if (filter.memberId) {
+      list = list.filter(l => l.memberId === filter.memberId);
+    }
+    if (filter.connectedAccountId || filter.ownerId) {
+      const ownerId = filter.connectedAccountId || filter.ownerId;
+      list = list.filter(l => l.connectedAccountId === ownerId);
+    }
+    if (filter.groupId) {
+      list = list.filter(l => l.groupId === filter.groupId);
+    }
+    if (filter.idempotencyKey) {
+      list = list.filter(l => l.idempotencyKey === filter.idempotencyKey);
+    }
+    return list;
+  }
+
+  async recordFinancialAuditLog(logData) {
+    // Controllo Idempotenza Reale
+    if (logData.idempotencyKey) {
+      const existing = (this.data.financialAuditLogs || []).find(l => l.idempotencyKey === logData.idempotencyKey);
+      if (existing) {
+        console.warn(`[LEDGER] Transazione già registrata (Idempotency Key: ${logData.idempotencyKey})`);
+        return existing;
+      }
+    }
+
+    const newLog = {
+      id: 'tx_log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      ...logData,
+      createdAt: new Date().toISOString()
+    };
+
+    if (!this.data.financialAuditLogs) this.data.financialAuditLogs = [];
+    this.data.financialAuditLogs.push(newLog);
+    await this.save();
+    return newLog;
+  }
+
+  // ==========================================
+  // NOTIFICATIONS
+  // ==========================================
+  async getNotifications(userId) {
+    return (this.data.notifications || []).filter(n => n.userId === userId);
+  }
+
+  async addNotification(data) {
+    const notif = {
+      id: 'notif-' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      ...data
+    };
+    if (!this.data.notifications) this.data.notifications = [];
+    this.data.notifications.push(notif);
+    await this.save();
+    return notif;
+  }
+
+  async markNotificationsRead(userId) {
+    if (!this.data.notifications) return;
+    this.data.notifications.forEach(n => {
+      if (n.userId === userId) n.isRead = true;
+    });
+    await this.save();
+  }
+}
+
+export const dataRepository = new DataRepository();

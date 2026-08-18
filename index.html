@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BuyYourShare - Marketplace Condivisione Abbonamenti P2P</title>
+  <meta name="description" content="Condividi i costi dei tuoi abbonamenti digitali legittimamente. Quota proporzionale reale, commissione fissa 0,99€, chat privata nativa e accesso automatico.">
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="css/design-system.css?v=4">
+  <link rel="stylesheet" href="css/layout.css?v=4">
+  <link rel="stylesheet" href="css/marketplace.css?v=4">
+  <link rel="stylesheet" href="css/chat.css?v=4">
+  <link rel="stylesheet" href="css/wizard.css?v=4">
+  <link rel="stylesheet" href="css/components.css?v=4">
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="container">
+      <div class="header-content">
+        <a href="#home" class="brand-logo">
+          <div class="brand-icon-box">B</div>
+          <span class="brand-name">BuyYourShare <span>P2P</span></span>
+        </a>
+        
+        <div class="header-actions">
+          <!-- Demo User Switcher -->
+          <select id="userSwitcher" class="user-select-box" title="Cambia utente per testare l'app"></select>
+          
+          <!-- Notifiche Button -->
+          <a href="#notifiche" class="notif-btn" title="Notifiche">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <span id="headerNotifBadge" class="notif-badge hidden">0</span>
+          </a>
+
+          <!-- Admin Quick Link -->
+          <a href="#admin" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Pannello Admin">
+            ⚙️ Admin
+          </a>
+
+          <!-- Payment and Payout Settings Button -->
+          <button id="btnOpenPaymentSettingsHeader" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Gestione IBAN e Metodi di Pagamento">
+            💳 Pagamenti & IBAN
+          </button>
+
+          <!-- Gateway Config Button -->
+          <button id="btnOpenGatewayConfigHeader" class="btn btn-sm" style="font-size:11px; padding:4px 8px; background:#f0fdf4; border:1px solid #86efac; color:#166534; font-weight:700;" title="Configura PayPal Sandbox Client ID">
+            🅿️ Config PayPal
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dynamic SPA View Container -->
+  <main class="container" id="mainAppContainer">
+    <!-- Popolato dinamicamente da app.js -->
+  </main>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="bottom-nav">
+    <a href="#home" class="nav-item active">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+      </svg>
+      <span>Home</span>
+    </a>
+    
+    <a href="#cerca" class="nav-item">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+      </svg>
+      <span>Cerca</span>
+    </a>
+    
+    <a href="#crea" class="nav-item nav-item-highlight">
+      <div class="nav-create-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+        </svg>
+      </div>
+      <span>Crea</span>
+    </a>
+    
+    <a href="#miei-gruppi" class="nav-item">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+      </svg>
+      <span>I Miei Gruppi</span>
+    </a>
+
+    <a href="#miei-abbonamenti" class="nav-item">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+      </svg>
+      <span>Abbonamenti</span>
+    </a>
+  </nav>
+
+  <!-- Main SPA Script -->
+  <script type="module" src="js/app.js?v=20"></script>
+</body>
+</html>
