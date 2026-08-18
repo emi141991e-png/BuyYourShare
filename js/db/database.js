@@ -41,23 +41,7 @@ class Database {
       g.planName !== 'YouTube Famiglia' &&
       g.status !== 'CLOSED'
     );
-    this.save();
-  }
 
-  async syncGroupsFromServer() {
-    try {
-      const resp = await fetch('/api/groups');
-      if (resp.ok) {
-        const data = await resp.json();
-        if (Array.isArray(data.groups)) {
-          this.data.groups = data.groups;
-          this.save();
-        }
-      }
-    } catch (err) {
-      console.warn('[DB] Sync gruppi dal server non riuscita:', err.message);
-    }
-  }
     if (this.data.connectedAccounts) {
       if (!this.data.connectedAccounts.some(c => c.userId === 'usr-owner-1')) {
         this.data.connectedAccounts.push({
@@ -131,6 +115,22 @@ class Database {
       if (added) this.save();
     }
     this.checkExpirations();
+    this.save();
+  }
+
+  async syncGroupsFromServer() {
+    try {
+      const resp = await fetch('/api/groups');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.groups)) {
+          this.data.groups = data.groups;
+          this.save();
+        }
+      }
+    } catch (err) {
+      console.warn('[DB] Sync gruppi dal server non riuscita:', err.message);
+    }
   }
 
   load() {
