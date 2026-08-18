@@ -247,8 +247,8 @@ function updateHeader(currentUser) {
   // Bind Logout
   const btnLogout = document.getElementById('btnLogoutHeader');
   if (btnLogout) {
-    btnLogout.onclick = () => {
-      authService.logout();
+    btnLogout.onclick = async () => {
+      await authService.logout();
       showToast('Disconnessione effettuata.');
       navigateTo('#login');
       renderApp();
@@ -452,12 +452,12 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
     // Submit Login Form
     const loginForm = container.querySelector('#loginForm');
     if (loginForm) {
-      loginForm.onsubmit = (e) => {
+      loginForm.onsubmit = async (e) => {
         e.preventDefault();
         const email = container.querySelector('#loginEmail').value;
         const password = container.querySelector('#loginPassword').value;
         try {
-          const u = authService.login(email, password);
+          const u = await authService.login(email, password);
           showToast(`🎉 Bentornato/a, ${u.fullName}!`);
           navigateTo('#home');
           renderApp();
@@ -470,7 +470,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
     // Submit Register Form (Accesso Diretto Immediato)
     const registerForm = container.querySelector('#registerForm');
     if (registerForm) {
-      registerForm.onsubmit = (e) => {
+      registerForm.onsubmit = async (e) => {
         e.preventDefault();
         const firstName = container.querySelector('#regFirstName').value;
         const lastName = container.querySelector('#regLastName').value;
@@ -481,7 +481,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         const privacyConsent = container.querySelector('#regPrivacy').checked;
 
         try {
-          const newUser = authService.register({
+          const newUser = await authService.register({
             firstName,
             lastName,
             email,
