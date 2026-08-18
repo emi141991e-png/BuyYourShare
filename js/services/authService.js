@@ -152,48 +152,6 @@ class AuthService {
     localStorage.removeItem(SESSION_TOKEN_KEY);
     localStorage.removeItem(SESSION_USER_ID_KEY);
   }
-
-  /**
-   * Switch rapido utente per test demo
-   */
-  async switchUser(userId) {
-    try {
-      const resp = await fetch('/api/auth/switch-demo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const data = await resp.json();
-      if (data.success) {
-        this.sessionToken = data.token;
-        this.currentUserId = data.user.id;
-        localStorage.setItem(SESSION_TOKEN_KEY, this.sessionToken);
-        localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
-
-        let localUser = db.data.users.find(u => u.id === data.user.id);
-        if (localUser) Object.assign(localUser, data.user);
-        db.save();
-        return data.user;
-      }
-    } catch (e) {
-      // fallback
-    }
-    const user = db.data.users.find(u => u.id === userId);
-    if (user) {
-      user.isEmailVerified = true;
-      this.currentUserId = user.id;
-      this.sessionToken = 'bys_demo_token_' + user.id;
-      localStorage.setItem(SESSION_TOKEN_KEY, this.sessionToken);
-      localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
-      db.save();
-      return user;
-    }
-    return null;
-  }
-
-  getAllUsers() {
-    return db.data.users;
-  }
 }
 
 export const authService = new AuthService();

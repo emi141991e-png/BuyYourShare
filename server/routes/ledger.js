@@ -38,6 +38,7 @@ ledgerRouter.get('/admin', requireAuth, requireRole('admin'), async (req, res) =
       .reduce((acc, l) => acc + (l.baseShareCents || 0), 0);
 
     return res.json({
+      success: true,
       summary: {
         totalTransactionsCount: logs.length,
         totalVolumeCents,

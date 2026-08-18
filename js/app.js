@@ -156,27 +156,17 @@ function renderForbiddenAdminView(container, currentUser) {
         <div style="width:56px; height:56px; background:#fee2e2; color:#dc2626; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto 16px;">
           🚫
         </div>
-        <h2 style="font-size:18px; font-weight:900; color:#991b1b; margin-bottom:8px;">Accesso Riservato agli Amministratori (403 Forbidden)</h2>
+        <h2 style="font-size:18px; font-weight:900; color:#991b1b; margin-bottom:8px;">Accesso Riservato (403 Forbidden)</h2>
         <p style="font-size:13px; color:#7f1d1d; margin-bottom:18px; line-height:1.5;">
-          L'account attuale (<strong>${escapeHtml(currentUser?.fullName || 'Utente')}</strong>) ha il ruolo di <em>${currentUser?.role === 'owner' || currentUser?.id?.includes('owner') ? 'Capogruppo' : 'Membro'}</em> e non dispone delle autorizzazioni per accedere all'Audit Ledger e alla gestione globale.
+          Quest'area amministrativa è privata ed accessibile esclusivamente all'Amministratore della piattaforma.
         </p>
         <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
           <a href="#home" class="btn btn-primary btn-sm" style="font-size:12.5px;">🏠 Torna alla Home</a>
-          <button class="btn btn-secondary btn-sm" id="btnSwitchAdminQuick" style="font-size:12.5px;">🔑 Accedi come Admin</button>
+          <a href="#login" class="btn btn-secondary btn-sm" style="font-size:12.5px;">🔐 Accedi con altro account</a>
         </div>
       </div>
     </div>
   `;
-
-  const btnSw = container.querySelector('#btnSwitchAdminQuick');
-  if (btnSw) {
-    btnSw.onclick = () => {
-      authService.switchUser('usr-admin');
-      showToast('Accesso eseguito come Amministratore.');
-      navigateTo('#admin');
-      renderApp();
-    };
-  }
 }
 
 function updateHeader(currentUser) {

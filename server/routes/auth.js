@@ -172,18 +172,3 @@ authRouter.put('/payout-settings', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 });
-
-// 6. Switch Rapido Utente Demo (per verifiche e test)
-authRouter.post('/switch-demo', async (req, res) => {
-  const { userId } = req.body || {};
-  const user = await dataRepository.findUserById(userId);
-  if (!user) {
-    return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'Utente demo non trovato.' });
-  }
-  const token = 'bys_demo_token_' + user.id;
-  return res.json({
-    success: true,
-    token: token,
-    user: sanitizeUser(user)
-  });
-});

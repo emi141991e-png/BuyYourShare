@@ -59,13 +59,26 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 5. Static Files Serving (Frontend SPA)
+// 5. Static Files Serving (Frontend SPA) con No-Cache headers per aggiornamenti istantanei
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 app.use(express.static(ROOT_DIR, {
-  extensions: ['html', 'js', 'css', 'json', 'png', 'jpg', 'svg']
+  extensions: ['html', 'js', 'css', 'json', 'png', 'jpg', 'svg'],
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
 }));
 
 // Fallback to index.html for SPA routes
 app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(ROOT_DIR, 'index.html'));
 });
 
