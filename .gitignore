@@ -21,3 +21,4 @@ Thumbs.db
 # Tools & Temporary Files
 tools/
 scratch/
+*.backup.json

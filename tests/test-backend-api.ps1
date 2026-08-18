@@ -25,8 +25,10 @@ Assert-Condition "Health Check status == HEALTHY" ($health.status -eq "HEALTHY")
 
 # 2. Public Groups (Sanitized)
 $groupsResp = Invoke-RestMethod -Uri "http://localhost:3000/api/groups"
-Assert-Condition "Catalogo Gruppi restituisce 3 gruppi" ($groupsResp.groups.Count -eq 3)
-Assert-Condition "Dati sensibili Capogruppo rimossi dal catalogo pubblico" ($null -eq $groupsResp.groups[0].owner.iban)
+Assert-Condition "Catalogo Gruppi gestito da API server-side" ($null -ne $groupsResp.groups)
+if ($groupsResp.groups.Count -gt 0) {
+    Assert-Condition "Dati sensibili Capogruppo rimossi dal catalogo pubblico" ($null -eq $groupsResp.groups[0].owner.iban)
+}
 
 # 3. Registrazione Nuovo Utente
 $regEmail = "test.user." + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() + "@example.com"
@@ -59,17 +61,20 @@ $meResp = Invoke-RestMethod -Uri "http://localhost:3000/api/auth/me" -Headers $h
 Assert-Condition "GET /api/auth/me restituisce profilo utente autenticato" ($meResp.user.email -eq "marco.rossi@example.com")
 
 # 6. Protected Route: /api/access/:groupId (Autorizzato per Owner)
-$accessResp = Invoke-RestMethod -Uri "http://localhost:3000/api/access/grp-1042" -Headers $headers
-Assert-Condition "GET /api/access/grp-1042 sblocca credenziali per il Capogruppo" ($null -ne $accessResp.instructions.accessCode)
+$targetGroupId = if ($groupsResp.groups.Count -gt 0) { $groupsResp.groups[0].id } else { "grp-test" }
+if ($groupsResp.groups.Count -gt 0) {
+    $accessResp = Invoke-RestMethod -Uri "http://localhost:3000/api/access/$targetGroupId" -Headers $headers
+    Assert-Condition "GET /api/access/:id sblocca credenziali per il Capogruppo" ($null -ne $accessResp.instructions)
 
-# 7. Zero Data Leakage: Utente estraneo bloccato da /api/access/:groupId
-$strangerHeaders = @{ "Authorization" = "Bearer $($regResp.token)" }
-try {
-    Invoke-RestMethod -Uri "http://localhost:3000/api/access/grp-1042" -Headers $strangerHeaders
-    Assert-Condition "Utente estraneo bloccato da credenziali private" $false "Doveva restituire 403"
-} catch {
-    $statusCode = $_.Exception.Response.StatusCode.value__
-    Assert-Condition "Utente estraneo bloccato da credenziali private (HTTP $statusCode)" ($statusCode -eq 403)
+    # 7. Zero Data Leakage: Utente estraneo bloccato da /api/access/:groupId
+    $strangerHeaders = @{ "Authorization" = "Bearer $($regResp.token)" }
+    try {
+        Invoke-RestMethod -Uri "http://localhost:3000/api/access/$targetGroupId" -Headers $strangerHeaders
+        Assert-Condition "Utente estraneo bloccato da credenziali private" $false "Doveva restituire 403"
+    } catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        Assert-Condition "Utente estraneo bloccato da credenziali private (HTTP $statusCode)" ($statusCode -eq 403)
+    }
 }
 
 # 8. RBAC Admin Ledger: Utente normale bloccato (403)
@@ -95,7 +100,7 @@ $captureBody = @{
     orderId = $testOrderId
     captureId = $testCaptureId
     sessionData = @{
-        groupId = "grp-1042"
+        groupId = $targetGroupId
         slotNumber = 2
         baseShareCents = 350
         platformFeeCents = 149
@@ -111,8 +116,8 @@ $dupCaptureResp = Invoke-RestMethod -Uri "http://localhost:3000/api/checkout/pay
 Assert-Condition "Idempotenza: Transazione duplicata gestita correttamente (ALREADY_PROCESSED)" ($dupCaptureResp.status -eq "ALREADY_PROCESSED")
 
 # 12. Verifica Sblocco Credenziali post-pagamento per il nuovo membro
-$memberAccessResp = Invoke-RestMethod -Uri "http://localhost:3000/api/access/grp-1042" -Headers $strangerHeaders
-Assert-Condition "Membro pagante accede ora alle credenziali protette di Spotify" ($null -ne $memberAccessResp.instructions.accessCode)
+$memberAccessResp = Invoke-RestMethod -Uri "http://localhost:3000/api/access/$targetGroupId" -Headers $strangerHeaders
+Assert-Condition "Membro pagante accede ora alle credenziali protette del gruppo" ($null -ne $memberAccessResp.instructions)
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Cyan

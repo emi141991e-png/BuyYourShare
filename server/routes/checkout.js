@@ -23,11 +23,7 @@ const stripe = config.stripe.secretKey && !config.stripe.secretKey.includes('pla
 checkoutRouter.post('/create-session', requireAuth, async (req, res) => {
   try {
     const { groupId, slotNumber, paymentMethod } = req.body || {};
-    let group = await dataRepository.findGroupById(groupId);
-    if (!group) {
-      const all = await dataRepository.getGroups();
-      group = all.find(g => g.id === 'grp-1042' || g.serviceId === 'srv-spotify') || all[0];
-    }
+    const group = await dataRepository.findGroupById(groupId);
     if (!group) return res.status(404).json({ error: 'GROUP_NOT_FOUND', message: 'Gruppo non trovato.' });
 
     const memberships = await dataRepository.getMemberships({ groupId });

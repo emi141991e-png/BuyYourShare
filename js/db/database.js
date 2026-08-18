@@ -15,7 +15,7 @@ import {
 import { calculatePricingBreakdown, DEFAULT_PLATFORM_FEE_CENTS, validateGroupEconomicMargin } from '../engine/FeeEngine.js';
 import { calculateMonthlyPeriod, isPeriodExpired } from '../engine/DateEngine.js';
 
-const DB_KEY = 'buyyourshare_db_v5';
+const DB_KEY = 'buyyourshare_db_v6';
 
 class Database {
   constructor() {
@@ -31,28 +31,33 @@ class Database {
     if (!this.data.notifications) this.data.notifications = [];
     if (!this.data.connectedAccounts) this.data.connectedAccounts = [];
     if (!this.data.financialAuditLogs) this.data.financialAuditLogs = [];
-    if (this.data.accessInstructions) {
-      const spotifyAccess = this.data.accessInstructions.find(a => a.groupId === 'grp-1042');
-      if (spotifyAccess && !spotifyAccess.ownerSpotifyAccount) {
-        spotifyAccess.ownerSpotifyAccount = 'marco.rossi.spotify@gmail.com';
+
+    // Pulizia rigorosa da qualsiasi vecchio gruppo demo
+    this.data.groups = this.data.groups.filter(g => 
+      g.id !== 'grp-1042' && 
+      g.id !== 'grp-1089' && 
+      g.id !== 'grp-1120' && 
+      g.planName !== 'Canva for Teams' && 
+      g.planName !== 'YouTube Famiglia' &&
+      g.status !== 'CLOSED'
+    );
+    this.save();
+  }
+
+  async syncGroupsFromServer() {
+    try {
+      const resp = await fetch('/api/groups');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.groups)) {
+          this.data.groups = data.groups;
+          this.save();
+        }
       }
+    } catch (err) {
+      console.warn('[DB] Sync gruppi dal server non riuscita:', err.message);
     }
-    if (this.data.users) {
-      const owner1 = this.data.users.find(u => u.id === 'usr-owner-1');
-      if (owner1 && !owner1.iban) {
-        owner1.iban = 'IT60X0542811101000000123456';
-        owner1.bankName = 'Intesa Sanpaolo (Conto Corrente)';
-        owner1.paypalPayoutEmail = 'marco.rossi.paypal@gmail.com';
-        owner1.stripeAccountId = 'acct_1N42MarcoRossi';
-      }
-      const owner2 = this.data.users.find(u => u.id === 'usr-owner-2');
-      if (owner2 && !owner2.iban) {
-        owner2.iban = 'IT40Y030020328000000789012';
-        owner2.bankName = 'UniCredit (Conto Smart)';
-        owner2.paypalPayoutEmail = 'sara.bianchi.paypal@gmail.com';
-        owner2.stripeAccountId = 'acct_1N43SaraBianchi';
-      }
-    }
+  }
     if (this.data.connectedAccounts) {
       if (!this.data.connectedAccounts.some(c => c.userId === 'usr-owner-1')) {
         this.data.connectedAccounts.push({
@@ -349,9 +354,12 @@ class Database {
   getGroups(filters = {}) {
     this.checkExpirations();
     return this.data.groups.filter(g => {
-      if (g.status === 'terminated') return false;
+      const isDraftOrBlocked = g.status === 'DRAFT' || g.status === 'PAYOUT_NOT_READY' || g.status === 'CLOSED' || g.status === 'terminated' || g.status === 'cancellation_scheduled';
+      const isPublished = g.status === 'PUBLISHED' || g.status === 'FULL' || g.status === 'active' || g.status === 'available';
+      if (!isPublished || isDraftOrBlocked) return false;
+
       if (filters.serviceId && g.serviceId !== filters.serviceId) return false;
-      if (filters.onlyAvailable && (g.occupiedMemberSlots >= g.availableSlots || g.status !== 'active')) return false;
+      if (filters.onlyAvailable && (g.occupiedMemberSlots >= g.availableSlots || (g.status !== 'PUBLISHED' && g.status !== 'active' && g.status !== 'available'))) return false;
       if (filters.search) {
         const q = filters.search.toLowerCase();
         const srv = this.data.services.find(s => s.id === g.serviceId);

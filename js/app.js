@@ -21,14 +21,14 @@ let searchKeyword = '';
 let wizardState = {
   serviceId: 'srv-spotify',
   customServiceName: 'Spotify',
-  planName: 'Piano Standard',
+  planName: 'Spotify Family (6 Account)',
   realCostEuros: '20.99',
   totalSlots: 6,
   ownerSlots: 1,
-  accessUrl: 'https://spotify.com/family/join/invite/demo',
-  instructions: '1. Clicca sul link di invito\n2. Accedi con il tuo account Spotify personale\n3. Conferma l\'ingresso nel piano Famiglia.',
-  additionalInfo: 'Il tuo account e le tue playlist rimangono 100% personali e privati.',
-  accessCode: 'SPOTIFY-8492'
+  accessUrl: '',
+  instructions: 'Accedi al link con il tuo account Spotify personale.',
+  additionalInfo: 'Playlist e libreria personale 100% private.',
+  accessCode: ''
 };
 
 export function showToast(message) {
@@ -63,8 +63,11 @@ function navigateTo(hash) {
   window.location.hash = hash;
 }
 
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', async () => {
   currentRoute = window.location.hash || '#home';
+  if (currentRoute === '#home' || currentRoute === '#cerca' || currentRoute === '') {
+    await db.syncGroupsFromServer();
+  }
   renderApp();
 });
 
@@ -3561,7 +3564,7 @@ function escapeHtml(str) {
 // =========================================================================
 // INITIALIZATION
 // =========================================================================
-function init() {
+async function init() {
   const btnConfigHeader = document.getElementById('btnOpenGatewayConfigHeader');
   if (btnConfigHeader) {
     btnConfigHeader.onclick = () => openGatewayConfigModal();
@@ -3572,6 +3575,7 @@ function init() {
     btnPaymentHeader.onclick = () => openPaymentAndPayoutSettingsModal(authService.getCurrentUser(), 'payout');
   }
 
+  await db.syncGroupsFromServer();
   renderApp();
 }
 

@@ -131,6 +131,79 @@
       "bankName": "Conto Personale SEPA",
       "paypalPayoutEmail": "test.user.1787002075655@example.com",
       "createdAt": "2026-08-17T21:27:55.689Z"
+    },
+    {
+      "id": "usr-1787066504869",
+      "email": "test.user.1787066504855@example.com",
+      "fullName": "Mario Rossi",
+      "firstName": "Mario",
+      "lastName": "Rossi",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-18T15:21:44.869Z",
+      "privacyAcceptedAt": "2026-08-18T15:21:44.869Z",
+      "iban": "IT60X0542811101000000361473",
+      "bankName": "Conto Personale SEPA",
+      "paypalPayoutEmail": "test.user.1787066504855@example.com",
+      "createdAt": "2026-08-18T15:21:44.869Z"
+    },
+    {
+      "id": "usr-1787066535735",
+      "email": "test.user.1787066535723@example.com",
+      "fullName": "Mario Rossi",
+      "firstName": "Mario",
+      "lastName": "Rossi",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-18T15:22:15.735Z",
+      "privacyAcceptedAt": "2026-08-18T15:22:15.735Z",
+      "iban": "IT60X0542811101000000903402",
+      "bankName": "Conto Personale SEPA",
+      "paypalPayoutEmail": "test.user.1787066535723@example.com",
+      "createdAt": "2026-08-18T15:22:15.735Z"
+    },
+    {
+      "id": "usr-1787066565354",
+      "email": "test.user.1787066565343@example.com",
+      "fullName": "Mario Rossi",
+      "firstName": "Mario",
+      "lastName": "Rossi",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-18T15:22:45.354Z",
+      "privacyAcceptedAt": "2026-08-18T15:22:45.354Z",
+      "iban": "IT60X0542811101000000641491",
+      "bankName": "Conto Personale SEPA",
+      "paypalPayoutEmail": "test.user.1787066565343@example.com",
+      "createdAt": "2026-08-18T15:22:45.354Z"
+    },
+    {
+      "id": "usr-1787066992505",
+      "email": "capogruppo.1787066992428@example.com",
+      "fullName": "Alessandro Verdi",
+      "firstName": "Alessandro",
+      "lastName": "Verdi",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-18T15:29:52.505Z",
+      "privacyAcceptedAt": "2026-08-18T15:29:52.506Z",
+      "iban": "IT60X0542811101000000888999",
+      "bankName": "Banca Intesa Sanpaolo",
+      "paypalPayoutEmail": "sb-439eed52340185@personal.example.com",
+      "createdAt": "2026-08-18T15:29:52.506Z",
+      "updatedAt": "2026-08-18T15:29:52.559Z"
     }
   ],
   "services": [
@@ -209,7 +282,7 @@
   ],
   "groups": [
     {
-      "id": "grp-1042",
+      "id": "grp-1787066374922",
       "ownerId": "usr-owner-1",
       "serviceId": "srv-spotify",
       "customServiceName": "Spotify",
@@ -218,61 +291,44 @@
       "totalSlots": 6,
       "ownerSlots": 1,
       "availableSlots": 5,
-      "occupiedMemberSlots": 4,
+      "occupiedMemberSlots": 0,
       "baseMemberShareCents": 350,
       "platformFeeCents": 149,
       "memberTotalCents": 499,
       "groupType": "public",
-      "status": "active",
-      "inviteCode": "BYS-1042",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-18T16:53:24.876Z",
+      "inviteCode": "BYS-7127",
       "rulesAndRequirements": "Invito ufficiale Spotify Family tramite email.",
-      "description": "Gruppo Spotify Family attivo da oltre 6 mesi. Rinnovo puntuale ogni mese.",
-      "createdAt": "2026-08-01T10:00:00Z",
-      "updatedAt": "2026-08-17T21:27:55.806Z"
+      "description": "Gruppo Spotify Family gestito da Marco Rossi con rinnovo puntuale.",
+      "createdAt": "2026-08-18T15:19:34.922Z",
+      "updatedAt": "2026-08-18T16:53:24.876Z"
     },
     {
-      "id": "grp-1089",
+      "id": "grp-1787072082706",
       "ownerId": "usr-owner-1",
-      "serviceId": "srv-canva",
-      "customServiceName": "Canva Pro",
-      "planName": "Canva for Teams",
-      "realSubscriptionCostCents": 1199,
-      "totalSlots": 5,
-      "ownerSlots": 1,
-      "availableSlots": 4,
-      "occupiedMemberSlots": 0,
-      "baseMemberShareCents": 240,
-      "platformFeeCents": 149,
-      "memberTotalCents": 389,
-      "groupType": "public",
-      "status": "active",
-      "inviteCode": "BYS-1089",
-      "rulesAndRequirements": "Accesso al team grafico con template ed elementi premium.",
-      "description": "Condivisione postazioni Canva Pro Team.",
-      "createdAt": "2026-08-02T11:00:00Z",
-      "updatedAt": "2026-08-02T11:00:00Z"
-    },
-    {
-      "id": "grp-1120",
-      "ownerId": "usr-owner-2",
       "serviceId": "srv-youtube",
-      "customServiceName": "YouTube Premium",
-      "planName": "YouTube Famiglia",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
       "realSubscriptionCostCents": 1799,
       "totalSlots": 6,
       "ownerSlots": 1,
       "availableSlots": 5,
       "occupiedMemberSlots": 0,
-      "baseMemberShareCents": 300,
+      "baseMemberShareCents": 299,
       "platformFeeCents": 149,
-      "memberTotalCents": 449,
+      "memberTotalCents": 448,
       "groupType": "public",
-      "status": "active",
-      "inviteCode": "BYS-1120",
-      "rulesAndRequirements": "Video senza pubblicità e YouTube Music.",
-      "description": "Gruppo YouTube Famiglia super stabile.",
-      "createdAt": "2026-08-05T12:00:00Z",
-      "updatedAt": "2026-08-05T12:00:00Z"
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-9677",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T16:54:42.706Z",
+      "updatedAt": "2026-08-18T16:54:42.722Z",
+      "closedAt": "2026-08-18T16:54:42.722Z"
     }
   ],
   "memberships": [
@@ -416,96 +472,162 @@
       "currentPeriodEnd": "2026-09-18T10:00:00Z",
       "nextBillingDate": "2026-09-18T10:00:00Z",
       "joinedAt": "2026-08-18T07:10:32.433Z"
+    },
+    {
+      "id": "mem-grp-1787066374922-owner",
+      "groupId": "grp-1787066374922",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 350,
+      "paidFeeCents": 0,
+      "memberTotalCents": 350,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T15:19:34.923Z",
+      "currentPeriodEnd": "2026-09-17T15:19:34.924Z",
+      "nextBillingDate": "2026-09-17T15:19:34.924Z",
+      "joinedAt": "2026-08-18T15:19:34.924Z"
+    },
+    {
+      "id": "mem_pp_1787066565419",
+      "groupId": "grp-1787066374922",
+      "userId": "usr-1787066565354",
+      "role": "MEMBER",
+      "slotNumber": 2,
+      "paidShareCents": 350,
+      "paidFeeCents": 149,
+      "memberTotalCents": 499,
+      "paymentMethod": "PAYPAL_EEA",
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "paypalSubscriptionId": "2GG1787066565416",
+      "currentPeriodStart": "2026-08-18T15:22:45.419Z",
+      "currentPeriodEnd": "2026-09-18T15:22:45.419Z",
+      "nextBillingDate": "2026-09-18T15:22:45.419Z",
+      "joinedAt": "2026-08-18T15:22:45.419Z"
+    },
+    {
+      "id": "mem-grp-1787066992532-owner",
+      "groupId": "grp-1787066992532",
+      "userId": "usr-1787066992505",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 350,
+      "paidFeeCents": 0,
+      "memberTotalCents": 350,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T15:29:52.534Z",
+      "currentPeriodEnd": "2026-09-17T15:29:52.534Z",
+      "nextBillingDate": "2026-09-17T15:29:52.534Z",
+      "joinedAt": "2026-08-18T15:29:52.534Z"
+    },
+    {
+      "id": "mem-grp-1787072082706-owner",
+      "groupId": "grp-1787072082706",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T16:54:42.707Z",
+      "currentPeriodEnd": "2026-09-17T16:54:42.707Z",
+      "nextBillingDate": "2026-09-17T16:54:42.707Z",
+      "joinedAt": "2026-08-18T16:54:42.707Z"
     }
   ],
   "accessInstructions": [
     {
-      "id": "acc-1042",
-      "groupId": "grp-1042",
-      "accessUrl": "https://spotify.com/family/join/invite/demo-bys-1042",
+      "id": "acc-1787066374922",
+      "groupId": "grp-1787066374922",
+      "accessUrl": "https://spotify.com/family/join/invite/official-marco-rossi",
+      "instructions": "Accedi con il tuo account Spotify personale.",
+      "accessCode": "SPOTIFY-FAMILY-2026",
       "ownerSpotifyAccount": "marco.rossi.spotify@gmail.com",
-      "instructions": "1. Clicca su \"Apri Link\"\n2. Accedi con il tuo account Spotify personale\n3. Inserisci le informazioni del Capogruppo.",
-      "additionalInfo": "Il tuo account e le tue playlist rimangono 100% personali e privati.",
-      "accessCode": "SPOTIFY-8492"
+      "additionalInfo": "Playlist personali 100% private."
     },
     {
-      "id": "acc-1089",
-      "groupId": "grp-1089",
-      "accessUrl": "https://canva.com/brand/join?invite=demo-bys-1089",
-      "instructions": "1. Clicca su \"Apri Link\"\n2. Accedi a Canva con la tua email\n3. Seleziona il team \"BYS Creator Team\".",
-      "additionalInfo": "Accesso illimitato ai template Pro.",
-      "accessCode": "CANVA-PRO-99"
-    },
-    {
-      "id": "acc-1120",
-      "groupId": "grp-1120",
-      "accessUrl": "https://families.google.com/join/demo-bys-1120",
-      "instructions": "1. Clicca su \"Apri Link\"\n2. Accetta l'invito al gruppo Famiglia Google\n3. Apri YouTube senza pubblicità.",
-      "additionalInfo": "Include YouTube Music Premium.",
-      "accessCode": "YT-PREM-44"
+      "id": "acc-1787072082710",
+      "groupId": "grp-1787072082706",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
     }
   ],
   "chats": [
     {
-      "id": "cht-1042",
-      "groupId": "grp-1042",
+      "id": "cht-1787066374927",
+      "groupId": "grp-1787066374922",
       "status": "ACTIVE",
-      "createdAt": "2026-08-01T10:00:00Z"
+      "createdAt": "2026-08-18T15:19:34.927Z"
     },
     {
-      "id": "cht-1089",
-      "groupId": "grp-1089",
+      "id": "cht-1787066992539",
+      "groupId": "grp-1787066992532",
       "status": "ACTIVE",
-      "createdAt": "2026-08-02T11:00:00Z"
+      "createdAt": "2026-08-18T15:29:52.539Z"
     },
     {
-      "id": "cht-1120",
-      "groupId": "grp-1120",
+      "id": "cht-1787072082713",
+      "groupId": "grp-1787072082706",
       "status": "ACTIVE",
-      "createdAt": "2026-08-05T12:00:00Z"
+      "createdAt": "2026-08-18T16:54:42.713Z"
     }
   ],
   "chatMessages": [
     {
-      "id": "msg-1",
-      "chatId": "cht-1042",
+      "id": "msg-1787066374928",
+      "chatId": "cht-1787066374927",
       "senderId": null,
       "messageType": "SYSTEM",
-      "messageContent": "🎉 Gruppo creato. Benvenuti nella chat privata del gruppo Spotify Family!",
-      "actionUrl": null,
-      "createdAt": "2026-08-01T10:00:00Z"
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T15:19:34.928Z"
     },
     {
-      "id": "msg-1786997624331",
-      "chatId": "cht-1042",
+      "id": "msg-1787066565422",
+      "chatId": "cht-1787066374927",
       "senderId": null,
       "messageType": "SYSTEM",
       "messageContent": "👤 Mario Rossi è entrato nel gruppo (Posto #2). Pagamento PayPal confermato.",
-      "createdAt": "2026-08-17T20:13:44.331Z"
+      "createdAt": "2026-08-18T15:22:45.422Z"
     },
     {
-      "id": "msg-1786997714303",
-      "chatId": "cht-1042",
+      "id": "msg-1787066992541",
+      "chatId": "cht-1787066992539",
       "senderId": null,
       "messageType": "SYSTEM",
-      "messageContent": "👤 Mario Rossi è entrato nel gruppo (Posto #2). Pagamento PayPal confermato.",
-      "createdAt": "2026-08-17T20:15:14.303Z"
+      "messageContent": "🎉 Gruppo creato da Alessandro Verdi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T15:29:52.541Z"
     },
     {
-      "id": "msg-1786997730537",
-      "chatId": "cht-1042",
+      "id": "msg-1787066992580",
+      "chatId": "cht-1787066992539",
       "senderId": null,
       "messageType": "SYSTEM",
-      "messageContent": "👤 Elena Conti è entrato nel gruppo (Posto #3). Pagamento Carta confermato.",
-      "createdAt": "2026-08-17T20:15:30.537Z"
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T15:29:52.580Z"
     },
     {
-      "id": "msg-1787002075808",
-      "chatId": "cht-1042",
+      "id": "msg-1787072082715",
+      "chatId": "cht-1787072082713",
       "senderId": null,
       "messageType": "SYSTEM",
-      "messageContent": "👤 Mario Rossi è entrato nel gruppo (Posto #2). Pagamento PayPal confermato.",
-      "createdAt": "2026-08-17T21:27:55.808Z"
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T16:54:42.715Z"
+    },
+    {
+      "id": "msg-1787072082724",
+      "chatId": "cht-1787072082713",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T16:54:42.724Z"
     }
   ],
   "connectedAccounts": [
@@ -757,6 +879,35 @@
       "payoutDate": "2026-08-18T07:11:00.459Z",
       "idempotencyKey": "pp_sub_act_I-MDJSFS3MRVBY",
       "createdAt": "2026-08-18T07:10:32.436Z"
+    },
+    {
+      "id": "tx_log_1787066572981_2luyr",
+      "transactionId": "2GG1787066565416",
+      "invoiceId": "ORD-1787066565416",
+      "subscriptionId": "pp_vault_ORD-1787066565416",
+      "connectedAccountId": "usr-owner-1",
+      "memberId": "usr-1787066565354",
+      "groupId": "grp-1787066374922",
+      "slotNumber": 2,
+      "baseShareCents": 350,
+      "buyyourshareFeeCents": 149,
+      "totalAmountCents": 499,
+      "paymentProviderFeeCents": 36,
+      "payoutProviderFeeCents": 0,
+      "netPlatformAmountCents": 113,
+      "paymentMethod": "PAYPAL_EEA",
+      "cycleNumber": 1,
+      "paymentStatus": "SUCCEEDED",
+      "transferStatus": "PENDING_PROVIDER",
+      "payoutStatus": "PENDING_PROVIDER",
+      "transferId": null,
+      "payoutId": "VDXEP3BG6BKMC",
+      "payoutBatchStatus": "PENDING",
+      "payoutItemStatus": "PENDING",
+      "payoutDestination": "marco.rossi.paypal@gmail.com",
+      "payoutDate": null,
+      "idempotencyKey": "pp_capture_2GG1787066565416",
+      "createdAt": "2026-08-18T15:22:52.981Z"
     }
   ],
   "notifications": [
@@ -849,6 +1000,24 @@
       "title": "Abbonamento Attivato! 🎉",
       "message": "Il tuo posto #2 in \"Spotify\" è attivo. Credenziali e chat sbloccate.",
       "actionUrl": "#miei-abbonamenti"
+    },
+    {
+      "id": "notif-1787066565423_9",
+      "isRead": false,
+      "createdAt": "2026-08-18T15:22:45.423Z",
+      "userId": "usr-owner-1",
+      "title": "🎉 Nuovo membro pagante (PayPal)!",
+      "message": "Mario Rossi ha acquistato il Posto #2 di \"Spotify Family Ufficiale\". Quota accreditata: +3.50 €/mese.",
+      "actionUrl": "#miei-gruppi"
+    },
+    {
+      "id": "notif-1787066565424_862",
+      "isRead": false,
+      "createdAt": "2026-08-18T15:22:45.424Z",
+      "userId": "usr-1787066565354",
+      "title": "Abbonamento Attivato! 🎉",
+      "message": "Il tuo posto #2 in \"Spotify Family Ufficiale\" è attivo. Credenziali e chat sbloccate.",
+      "actionUrl": "#miei-abbonamenti"
     }
   ],
   "sessions": [
@@ -935,6 +1104,72 @@
       "userId": "usr-admin",
       "createdAt": "2026-08-17T21:27:55.790Z",
       "expiresAt": "2026-09-16T21:27:55.790Z"
+    },
+    {
+      "token": "bys_token_1787066374908_aafdv04dl9",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T15:19:34.908Z",
+      "expiresAt": "2026-09-17T15:19:34.908Z"
+    },
+    {
+      "token": "bys_token_1787066504871_2ze8dd3nz5",
+      "userId": "usr-1787066504869",
+      "createdAt": "2026-08-18T15:21:44.871Z",
+      "expiresAt": "2026-09-17T15:21:44.871Z"
+    },
+    {
+      "token": "bys_token_1787066504883_7mgano8210",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T15:21:44.883Z",
+      "expiresAt": "2026-09-17T15:21:44.883Z"
+    },
+    {
+      "token": "bys_token_1787066535737_fb9fjl1k5k",
+      "userId": "usr-1787066535735",
+      "createdAt": "2026-08-18T15:22:15.737Z",
+      "expiresAt": "2026-09-17T15:22:15.737Z"
+    },
+    {
+      "token": "bys_token_1787066535753_91srl3oi2",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T15:22:15.753Z",
+      "expiresAt": "2026-09-17T15:22:15.753Z"
+    },
+    {
+      "token": "bys_token_1787066535799_kylajwi5b9",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T15:22:15.799Z",
+      "expiresAt": "2026-09-17T15:22:15.799Z"
+    },
+    {
+      "token": "bys_token_1787066565357_qfnpeo9gq6",
+      "userId": "usr-1787066565354",
+      "createdAt": "2026-08-18T15:22:45.357Z",
+      "expiresAt": "2026-09-17T15:22:45.357Z"
+    },
+    {
+      "token": "bys_token_1787066565367_b5of8bmjuj",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T15:22:45.367Z",
+      "expiresAt": "2026-09-17T15:22:45.367Z"
+    },
+    {
+      "token": "bys_token_1787066565406_70ihnrxt6k",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T15:22:45.406Z",
+      "expiresAt": "2026-09-17T15:22:45.406Z"
+    },
+    {
+      "token": "bys_token_1787066992509_iojgnkl6sx",
+      "userId": "usr-1787066992505",
+      "createdAt": "2026-08-18T15:29:52.509Z",
+      "expiresAt": "2026-09-17T15:29:52.509Z"
+    },
+    {
+      "token": "bys_token_1787072082699_zo36xhsf0r",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T16:54:42.699Z",
+      "expiresAt": "2026-09-17T16:54:42.699Z"
     }
   ]
 }

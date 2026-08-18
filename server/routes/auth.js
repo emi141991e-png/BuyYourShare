@@ -137,7 +137,43 @@ authRouter.post('/logout', async (req, res) => {
   return res.json({ success: true, message: 'Logout eseguito con successo.' });
 });
 
-// 5. Switch Rapido Utente Demo (per verifiche e test)
+// 5. Aggiornamento Impostazioni Payout Capogruppo (PayPal / IBAN)
+authRouter.put('/payout-settings', requireAuth, async (req, res) => {
+  try {
+    const { paypalPayoutEmail, iban, bankName } = req.body || {};
+    const updates = {};
+
+    if (paypalPayoutEmail !== undefined) {
+      const cleanEmail = (paypalPayoutEmail || '').trim().toLowerCase();
+      if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return res.status(400).json({ error: 'INVALID_EMAIL', message: 'Indirizzo email PayPal non valido.' });
+      }
+      updates.paypalPayoutEmail = cleanEmail;
+    }
+
+    if (iban !== undefined) {
+      updates.iban = (iban || '').trim().toUpperCase();
+    }
+
+    if (bankName !== undefined) {
+      updates.bankName = (bankName || '').trim();
+    }
+
+    await dataRepository.updateUser(req.user.id, updates);
+    const updatedUser = await dataRepository.findUserById(req.user.id);
+
+    return res.json({
+      success: true,
+      message: 'Impostazioni di ricezione quote aggiornate con successo.',
+      user: sanitizeUser(updatedUser)
+    });
+  } catch (err) {
+    console.error('[AUTH PAYOUT SETTINGS ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR' });
+  }
+});
+
+// 6. Switch Rapido Utente Demo (per verifiche e test)
 authRouter.post('/switch-demo', async (req, res) => {
   const { userId } = req.body || {};
   const user = await dataRepository.findUserById(userId);
