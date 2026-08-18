@@ -836,8 +836,8 @@ function renderGroupDetailView(container, groupId, currentUser) {
     return;
   }
 
-  const isOwner = group.ownerId === currentUser.id;
-  const isMember = db.data.memberships.some(m => m.groupId === groupId && m.userId === currentUser.id && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED'));
+  const isOwner = currentUser ? group.ownerId === currentUser.id : false;
+  const isMember = currentUser ? db.data.memberships.some(m => m.groupId === groupId && m.userId === currentUser.id && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED')) : false;
   
   const slotsInfo = group.slotsInfo;
   const freeSlots = slotsInfo.availableSlotsCount;
@@ -964,7 +964,7 @@ function renderGroupDetailView(container, groupId, currentUser) {
               <a href="#miei-gruppi" class="btn btn-secondary btn-sm" style="flex:1;">⚙️ Gestisci</a>
             </div>
           </div>
-        ` : activeSlot && activeSlot.isOccupied && activeSlot.assignedUser && activeSlot.assignedUser.id === currentUser.id ? `
+        ` : activeSlot && activeSlot.isOccupied && activeSlot.assignedUser && currentUser && activeSlot.assignedUser.id === currentUser.id ? `
           <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:14px; border-radius:var(--radius-md); text-align:center;">
             <p style="font-size:13px; font-weight:700; color:#166534; margin-bottom:10px;">✅ Questo Posto (#${activeSlot.slotNumber}) è attualmente occupato da te.</p>
             <div style="display:flex; gap:8px;">
@@ -1024,6 +1024,11 @@ function renderGroupDetailView(container, groupId, currentUser) {
   const reportBtn = document.getElementById('btnReportGroup');
   if (reportBtn) {
     reportBtn.addEventListener('click', () => {
+      if (!currentUser) {
+        showToast('🔐 Accedi per inviare una segnalazione.');
+        navigateTo('#login');
+        return;
+      }
       const reason = prompt('Motivo della segnalazione (es. Prezzo non conforme, servizio non funzionante):');
       if (reason) {
         db.createReport({ targetType: 'group', targetId: groupId, reason }, currentUser);
