@@ -329,6 +329,181 @@
       "createdAt": "2026-08-18T16:54:42.706Z",
       "updatedAt": "2026-08-18T16:54:42.722Z",
       "closedAt": "2026-08-18T16:54:42.722Z"
+    },
+    {
+      "id": "grp-1787072412882",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 299,
+      "platformFeeCents": 149,
+      "memberTotalCents": 448,
+      "groupType": "public",
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-4215",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T17:00:12.882Z",
+      "updatedAt": "2026-08-18T17:00:12.897Z",
+      "closedAt": "2026-08-18T17:00:12.897Z"
+    },
+    {
+      "id": "grp-1787083131405",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 299,
+      "platformFeeCents": 149,
+      "memberTotalCents": 448,
+      "groupType": "public",
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-8591",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T19:58:51.405Z",
+      "updatedAt": "2026-08-18T19:58:51.423Z",
+      "closedAt": "2026-08-18T19:58:51.423Z"
+    },
+    {
+      "id": "grp-1787084045714",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 299,
+      "platformFeeCents": 149,
+      "memberTotalCents": 448,
+      "groupType": "public",
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-4003",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T20:14:05.714Z",
+      "updatedAt": "2026-08-18T20:14:05.729Z",
+      "closedAt": "2026-08-18T20:14:05.729Z"
+    },
+    {
+      "id": "grp-1787085411282",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 299,
+      "platformFeeCents": 149,
+      "memberTotalCents": 448,
+      "groupType": "public",
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-5197",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T20:36:51.282Z",
+      "updatedAt": "2026-08-18T20:36:51.302Z",
+      "closedAt": "2026-08-18T20:36:51.302Z"
+    },
+    {
+      "id": "grp-1787085891636",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 299,
+      "platformFeeCents": 149,
+      "memberTotalCents": 448,
+      "groupType": "public",
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-8683",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T20:44:51.636Z",
+      "updatedAt": "2026-08-18T20:44:51.654Z",
+      "closedAt": "2026-08-18T20:44:51.654Z"
+    },
+    {
+      "id": "grp-1787086615133",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 299,
+      "platformFeeCents": 149,
+      "memberTotalCents": 448,
+      "groupType": "public",
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-8812",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T20:56:55.133Z",
+      "updatedAt": "2026-08-18T20:56:55.145Z",
+      "closedAt": "2026-08-18T20:56:55.145Z"
+    },
+    {
+      "id": "grp-1787087909072",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Test Draft",
+      "planName": "YouTube Premium",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 299,
+      "platformFeeCents": 149,
+      "memberTotalCents": 448,
+      "groupType": "public",
+      "status": "CLOSED",
+      "isPublished": false,
+      "publishedAt": null,
+      "inviteCode": "BYS-2163",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Test Draft",
+      "createdAt": "2026-08-18T21:18:29.072Z",
+      "updatedAt": "2026-08-18T21:18:29.088Z",
+      "closedAt": "2026-08-18T21:18:29.088Z"
     }
   ],
   "memberships": [
@@ -538,6 +713,118 @@
       "currentPeriodEnd": "2026-09-17T16:54:42.707Z",
       "nextBillingDate": "2026-09-17T16:54:42.707Z",
       "joinedAt": "2026-08-18T16:54:42.707Z"
+    },
+    {
+      "id": "mem-grp-1787072412882-owner",
+      "groupId": "grp-1787072412882",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T17:00:12.884Z",
+      "currentPeriodEnd": "2026-09-17T17:00:12.884Z",
+      "nextBillingDate": "2026-09-17T17:00:12.884Z",
+      "joinedAt": "2026-08-18T17:00:12.884Z"
+    },
+    {
+      "id": "mem-grp-1787083131405-owner",
+      "groupId": "grp-1787083131405",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T19:58:51.407Z",
+      "currentPeriodEnd": "2026-09-17T19:58:51.407Z",
+      "nextBillingDate": "2026-09-17T19:58:51.407Z",
+      "joinedAt": "2026-08-18T19:58:51.407Z"
+    },
+    {
+      "id": "mem-grp-1787084045714-owner",
+      "groupId": "grp-1787084045714",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T20:14:05.716Z",
+      "currentPeriodEnd": "2026-09-17T20:14:05.717Z",
+      "nextBillingDate": "2026-09-17T20:14:05.717Z",
+      "joinedAt": "2026-08-18T20:14:05.717Z"
+    },
+    {
+      "id": "mem-grp-1787085411282-owner",
+      "groupId": "grp-1787085411282",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T20:36:51.284Z",
+      "currentPeriodEnd": "2026-09-17T20:36:51.284Z",
+      "nextBillingDate": "2026-09-17T20:36:51.284Z",
+      "joinedAt": "2026-08-18T20:36:51.284Z"
+    },
+    {
+      "id": "mem-grp-1787085891636-owner",
+      "groupId": "grp-1787085891636",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T20:44:51.638Z",
+      "currentPeriodEnd": "2026-09-17T20:44:51.638Z",
+      "nextBillingDate": "2026-09-17T20:44:51.638Z",
+      "joinedAt": "2026-08-18T20:44:51.638Z"
+    },
+    {
+      "id": "mem-grp-1787086615133-owner",
+      "groupId": "grp-1787086615133",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T20:56:55.135Z",
+      "currentPeriodEnd": "2026-09-17T20:56:55.135Z",
+      "nextBillingDate": "2026-09-17T20:56:55.135Z",
+      "joinedAt": "2026-08-18T20:56:55.135Z"
+    },
+    {
+      "id": "mem-grp-1787087909072-owner",
+      "groupId": "grp-1787087909072",
+      "userId": "usr-owner-1",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 300,
+      "paidFeeCents": 0,
+      "memberTotalCents": 300,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-18T21:18:29.073Z",
+      "currentPeriodEnd": "2026-09-17T21:18:29.073Z",
+      "nextBillingDate": "2026-09-17T21:18:29.073Z",
+      "joinedAt": "2026-08-18T21:18:29.073Z"
     }
   ],
   "accessInstructions": [
@@ -553,6 +840,69 @@
     {
       "id": "acc-1787072082710",
       "groupId": "grp-1787072082706",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787072412886",
+      "groupId": "grp-1787072412882",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787083131409",
+      "groupId": "grp-1787083131405",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787084045719",
+      "groupId": "grp-1787084045714",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787085411287",
+      "groupId": "grp-1787085411282",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787085891640",
+      "groupId": "grp-1787085891636",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787086615137",
+      "groupId": "grp-1787086615133",
+      "accessUrl": "https://youtube.com",
+      "instructions": "Test",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787087909075",
+      "groupId": "grp-1787087909072",
       "accessUrl": "https://youtube.com",
       "instructions": "Test",
       "accessCode": "",
@@ -578,6 +928,48 @@
       "groupId": "grp-1787072082706",
       "status": "ACTIVE",
       "createdAt": "2026-08-18T16:54:42.713Z"
+    },
+    {
+      "id": "cht-1787072412887",
+      "groupId": "grp-1787072412882",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-18T17:00:12.887Z"
+    },
+    {
+      "id": "cht-1787083131411",
+      "groupId": "grp-1787083131405",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-18T19:58:51.411Z"
+    },
+    {
+      "id": "cht-1787084045721",
+      "groupId": "grp-1787084045714",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-18T20:14:05.721Z"
+    },
+    {
+      "id": "cht-1787085411289",
+      "groupId": "grp-1787085411282",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-18T20:36:51.289Z"
+    },
+    {
+      "id": "cht-1787085891642",
+      "groupId": "grp-1787085891636",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-18T20:44:51.642Z"
+    },
+    {
+      "id": "cht-1787086615138",
+      "groupId": "grp-1787086615133",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-18T20:56:55.138Z"
+    },
+    {
+      "id": "cht-1787087909076",
+      "groupId": "grp-1787087909072",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-18T21:18:29.076Z"
     }
   ],
   "chatMessages": [
@@ -628,6 +1020,118 @@
       "messageType": "SYSTEM",
       "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
       "createdAt": "2026-08-18T16:54:42.724Z"
+    },
+    {
+      "id": "msg-1787072412890",
+      "chatId": "cht-1787072412887",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T17:00:12.890Z"
+    },
+    {
+      "id": "msg-1787072412899",
+      "chatId": "cht-1787072412887",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T17:00:12.899Z"
+    },
+    {
+      "id": "msg-1787083131413",
+      "chatId": "cht-1787083131411",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T19:58:51.413Z"
+    },
+    {
+      "id": "msg-1787083131425",
+      "chatId": "cht-1787083131411",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T19:58:51.425Z"
+    },
+    {
+      "id": "msg-1787084045722",
+      "chatId": "cht-1787084045721",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T20:14:05.722Z"
+    },
+    {
+      "id": "msg-1787084045731",
+      "chatId": "cht-1787084045721",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T20:14:05.731Z"
+    },
+    {
+      "id": "msg-1787085411292",
+      "chatId": "cht-1787085411289",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T20:36:51.292Z"
+    },
+    {
+      "id": "msg-1787085411304",
+      "chatId": "cht-1787085411289",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T20:36:51.304Z"
+    },
+    {
+      "id": "msg-1787085891645",
+      "chatId": "cht-1787085891642",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T20:44:51.645Z"
+    },
+    {
+      "id": "msg-1787085891656",
+      "chatId": "cht-1787085891642",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T20:44:51.656Z"
+    },
+    {
+      "id": "msg-1787086615139",
+      "chatId": "cht-1787086615138",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T20:56:55.139Z"
+    },
+    {
+      "id": "msg-1787086615147",
+      "chatId": "cht-1787086615138",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T20:56:55.147Z"
+    },
+    {
+      "id": "msg-1787087909078",
+      "chatId": "cht-1787087909076",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Marco Rossi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-18T21:18:29.078Z"
+    },
+    {
+      "id": "msg-1787087909090",
+      "chatId": "cht-1787087909076",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
+      "createdAt": "2026-08-18T21:18:29.090Z"
     }
   ],
   "connectedAccounts": [
@@ -1170,6 +1674,275 @@
       "userId": "usr-owner-1",
       "createdAt": "2026-08-18T16:54:42.699Z",
       "expiresAt": "2026-09-17T16:54:42.699Z"
+    },
+    {
+      "token": "bys_token_1787072412877_cpyl9zw1we",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T17:00:12.877Z",
+      "expiresAt": "2026-09-17T17:00:12.877Z"
+    },
+    {
+      "token": "bys_token_1787083131399_8opqcnmcr1",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T19:58:51.399Z",
+      "expiresAt": "2026-09-17T19:58:51.399Z"
+    },
+    {
+      "token": "bys_token_1787084029902_ww5fb5ar2y",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:13:49.902Z",
+      "expiresAt": "2026-09-17T20:13:49.902Z"
+    },
+    {
+      "token": "bys_token_1787084045708_2ymca80qrg",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:14:05.708Z",
+      "expiresAt": "2026-09-17T20:14:05.708Z"
+    },
+    {
+      "token": "bys_token_1787085309417_nbvbfvlobc",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T20:35:09.417Z",
+      "expiresAt": "2026-09-17T20:35:09.417Z"
+    },
+    {
+      "token": "bys_token_1787085309428_lrfbfs2o32",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:35:09.428Z",
+      "expiresAt": "2026-09-17T20:35:09.428Z"
+    },
+    {
+      "token": "bys_token_1787085309435_n1r1skj77y",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T20:35:09.435Z",
+      "expiresAt": "2026-09-17T20:35:09.435Z"
+    },
+    {
+      "token": "bys_token_1787085352541_1gl33tiqxb",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T20:35:52.541Z",
+      "expiresAt": "2026-09-17T20:35:52.541Z"
+    },
+    {
+      "token": "bys_token_1787085352555_pxtxtln9qz",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:35:52.555Z",
+      "expiresAt": "2026-09-17T20:35:52.555Z"
+    },
+    {
+      "token": "bys_token_1787085352564_r9b4hx0l9c",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T20:35:52.564Z",
+      "expiresAt": "2026-09-17T20:35:52.564Z"
+    },
+    {
+      "token": "bys_token_1787085403469_o9sijv9dou",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T20:36:43.469Z",
+      "expiresAt": "2026-09-17T20:36:43.469Z"
+    },
+    {
+      "token": "bys_token_1787085403483_pdklmn1k5g",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:36:43.483Z",
+      "expiresAt": "2026-09-17T20:36:43.483Z"
+    },
+    {
+      "token": "bys_token_1787085403495_9cux9m0xzi",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T20:36:43.495Z",
+      "expiresAt": "2026-09-17T20:36:43.495Z"
+    },
+    {
+      "token": "bys_token_1787085411275_v8tyfihqfs",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:36:51.275Z",
+      "expiresAt": "2026-09-17T20:36:51.275Z"
+    },
+    {
+      "token": "bys_token_1787085891349_acwag6zv1c",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T20:44:51.349Z",
+      "expiresAt": "2026-09-17T20:44:51.349Z"
+    },
+    {
+      "token": "bys_token_1787085891364_ym1141ov8j",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:44:51.364Z",
+      "expiresAt": "2026-09-17T20:44:51.364Z"
+    },
+    {
+      "token": "bys_token_1787085891376_lpggb2hz1r",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T20:44:51.376Z",
+      "expiresAt": "2026-09-17T20:44:51.376Z"
+    },
+    {
+      "token": "bys_token_1787085891629_0m1ophe688",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:44:51.629Z",
+      "expiresAt": "2026-09-17T20:44:51.629Z"
+    },
+    {
+      "token": "bys_token_1787086468765_64hcvk56yp",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:54:28.765Z",
+      "expiresAt": "2026-09-17T20:54:28.765Z"
+    },
+    {
+      "token": "bys_token_1787086554126_2w6r9uejsq",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:55:54.126Z",
+      "expiresAt": "2026-09-17T20:55:54.126Z"
+    },
+    {
+      "token": "bys_token_1787086614820_cs2odsxnby",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T20:56:54.820Z",
+      "expiresAt": "2026-09-17T20:56:54.820Z"
+    },
+    {
+      "token": "bys_token_1787086614829_m3l6hyxmpq",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:56:54.829Z",
+      "expiresAt": "2026-09-17T20:56:54.829Z"
+    },
+    {
+      "token": "bys_token_1787086614837_e38xl4vsax",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T20:56:54.837Z",
+      "expiresAt": "2026-09-17T20:56:54.837Z"
+    },
+    {
+      "token": "bys_token_1787086615128_8o2fwu20sh",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:56:55.128Z",
+      "expiresAt": "2026-09-17T20:56:55.128Z"
+    },
+    {
+      "token": "bys_token_1787086615455_d4gud9w0y4",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T20:56:55.455Z",
+      "expiresAt": "2026-09-17T20:56:55.455Z"
+    },
+    {
+      "token": "bys_token_1787087885735_7vp1hldgag",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T21:18:05.735Z",
+      "expiresAt": "2026-09-17T21:18:05.736Z"
+    },
+    {
+      "token": "bys_token_1787087885763_upfyxxiu4h",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T21:18:05.763Z",
+      "expiresAt": "2026-09-17T21:18:05.763Z"
+    },
+    {
+      "token": "bys_token_1787087885773_9o6dvco88t",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T21:18:05.773Z",
+      "expiresAt": "2026-09-17T21:18:05.773Z"
+    },
+    {
+      "token": "bys_token_1787087904039_1l9dvpa0jl",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T21:18:24.039Z",
+      "expiresAt": "2026-09-17T21:18:24.039Z"
+    },
+    {
+      "token": "bys_token_1787087904055_uftwz2897z",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T21:18:24.055Z",
+      "expiresAt": "2026-09-17T21:18:24.055Z"
+    },
+    {
+      "token": "bys_token_1787087904061_r2qzfn40s1",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T21:18:24.061Z",
+      "expiresAt": "2026-09-17T21:18:24.061Z"
+    },
+    {
+      "token": "bys_token_1787087908718_t00p8919ut",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T21:18:28.718Z",
+      "expiresAt": "2026-09-17T21:18:28.718Z"
+    },
+    {
+      "token": "bys_token_1787087908730_a0qo162hp9",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T21:18:28.730Z",
+      "expiresAt": "2026-09-17T21:18:28.730Z"
+    },
+    {
+      "token": "bys_token_1787087908738_nmiv27amm3",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T21:18:28.738Z",
+      "expiresAt": "2026-09-17T21:18:28.738Z"
+    },
+    {
+      "token": "bys_token_1787087909066_ml5igyzfdy",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T21:18:29.066Z",
+      "expiresAt": "2026-09-17T21:18:29.066Z"
+    },
+    {
+      "token": "bys_token_1787087909390_y7vqrl2lvm",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T21:18:29.390Z",
+      "expiresAt": "2026-09-17T21:18:29.390Z"
+    },
+    {
+      "token": "bys_token_1787087909633_cmcau075ru",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T21:18:29.633Z",
+      "expiresAt": "2026-09-17T21:18:29.633Z"
+    },
+    {
+      "token": "bys_token_1787087909647_bty78031p0",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-18T21:18:29.647Z",
+      "expiresAt": "2026-09-17T21:18:29.647Z"
+    },
+    {
+      "token": "bys_token_1787087909652_jbsykwyhtd",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-18T21:18:29.652Z",
+      "expiresAt": "2026-09-17T21:18:29.652Z"
+    }
+  ],
+  "adminAuditLogs": [
+    {
+      "id": "adm_log_1787087909675_afyh6",
+      "timestamp": "2026-08-18T21:18:29.675Z",
+      "action": "GROUP_DELETED",
+      "targetType": "GROUP",
+      "targetId": "grp-1787087909664",
+      "targetName": "Servizio Temporaneo Test Admin (Piano Test Cancellazione)",
+      "performedBy": "usr-admin",
+      "performedByName": "Admin BuyYourShare",
+      "details": "Eliminazione fisica definitiva del gruppo Servizio Temporaneo Test Admin (Piano Test Cancellazione) dal database operativo."
+    },
+    {
+      "id": "adm_log_1787087904088_5yoer",
+      "timestamp": "2026-08-18T21:18:24.088Z",
+      "action": "GROUP_DELETED",
+      "targetType": "GROUP",
+      "targetId": "grp-1787087904076",
+      "targetName": "Servizio Temporaneo Test Admin (Piano Test Cancellazione)",
+      "performedBy": "usr-admin",
+      "performedByName": "Admin BuyYourShare",
+      "details": "Eliminazione fisica definitiva del gruppo Servizio Temporaneo Test Admin (Piano Test Cancellazione) dal database operativo."
+    },
+    {
+      "id": "adm_log_1787087885822_0wi31",
+      "timestamp": "2026-08-18T21:18:05.822Z",
+      "action": "GROUP_DELETED",
+      "targetType": "GROUP",
+      "targetId": "grp-1787087885801",
+      "targetName": "Servizio Temporaneo Test Admin (Piano Test Cancellazione)",
+      "performedBy": "usr-admin",
+      "performedByName": "Admin BuyYourShare",
+      "details": "Eliminazione fisica definitiva del gruppo Servizio Temporaneo Test Admin (Piano Test Cancellazione) dal database operativo."
     }
   ]
 }

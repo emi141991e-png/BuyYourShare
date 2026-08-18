@@ -20,6 +20,7 @@ import { checkoutRouter } from './routes/checkout.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { ledgerRouter } from './routes/ledger.js';
 import { notificationsRouter } from './routes/notifications.js';
+import { adminRouter } from './routes/admin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +49,7 @@ app.use('/api/connect', connectRouter);
 app.use('/api/checkout', checkoutRouter);
 app.use('/api/ledger', ledgerRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/admin', adminRouter);
 
 // Endpoint Health Check
 app.get('/api/health', (req, res) => {

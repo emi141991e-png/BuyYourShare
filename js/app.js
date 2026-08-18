@@ -2138,91 +2138,291 @@ function renderChatView(container, groupId, currentUser) {
   });
 }
 
-// =========================================================================
-// 8. ADMIN VIEW & MODERATION
-// =========================================================================
-function renderAdminView(container, currentUser) {
-  const metrics = db.getAdminMetrics();
-  const services = db.getAllServicesAdmin();
-  const groups = db.getGroups();
-  const auditSummary = financialAuditService.getFinancialSummary();
-  const allLogs = financialAuditService.getAllLogs();
+let currentAdminTab = 'dashboard';
+
+async function renderAdminView(container, currentUser) {
+  const token = authService.getToken();
+  let metrics = null;
+  let allGroups = [];
+  let allUsers = [];
+  let adminLogs = [];
+  let financialLogs = [];
+
+  // Fetch dati server-side protetti
+  try {
+    const [dashRes, grpRes, usrRes, logRes] = await Promise.all([
+      fetch('/api/admin/dashboard', { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch('/api/admin/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } }),
+      fetch('/api/admin/audit-logs', { headers: { 'Authorization': `Bearer ${token}` } })
+    ]);
+
+    if (dashRes.ok) metrics = (await dashRes.json()).metrics;
+    if (grpRes.ok) allGroups = (await grpRes.json()).groups || [];
+    if (usrRes.ok) allUsers = (await usrRes.json()).users || [];
+    if (logRes.ok) {
+      const lData = await logRes.json();
+      adminLogs = lData.adminLogs || [];
+      financialLogs = lData.financialLogs || [];
+    }
+  } catch (err) {
+    console.warn('[ADMIN VIEW] Fallito fetch server-side admin, fallback locale:', err.message);
+  }
+
+  // Fallback se offline/local
+  if (!metrics) {
+    const localSummary = financialAuditService.getFinancialSummary();
+    metrics = {
+      users: { total: db.data.users.length, members: db.data.users.filter(u => u.role === 'user').length, owners: db.data.users.filter(u => u.role === 'owner').length, admins: 1 },
+      groups: { total: db.data.groups.length, published: db.data.groups.filter(g => g.status === 'PUBLISHED' || g.status === 'active').length, draft: db.data.groups.filter(g => g.status === 'DRAFT').length, closed: db.data.groups.filter(g => g.status === 'CLOSED').length, availableSlots: 5, occupiedSlots: 1, totalSlots: 6 },
+      finance: { totalVolumeCents: localSummary.totalGrossFeesCents, totalGrossFeesCents: localSummary.totalGrossFeesCents, totalProviderFeesCents: localSummary.totalProviderFeesCents, totalNetPlatformRevenueCents: localSummary.totalNetPlatformRevenueCents, totalTransferredToOwnersCents: 0, transactionsCount: localSummary.totalTransactionsCount }
+    };
+    allGroups = db.getGroups();
+    allUsers = db.data.users;
+    financialLogs = financialAuditService.getAllLogs();
+  }
+
+  function getTabBtnStyle(tabName) {
+    const isActive = currentAdminTab === tabName;
+    return `padding:8px 14px; font-size:12.5px; font-weight:800; border-radius:var(--radius-sm); border:none; cursor:pointer; transition:all 0.15s ease; ${isActive ? 'background:#003087; color:white; box-shadow:0 2px 6px rgba(0,48,135,0.25);' : 'background:#f1f5f9; color:var(--text-secondary);'}`;
+  }
 
   container.innerHTML = `
-    <div class="page-view">
-      <div class="section-header" style="margin-bottom:16px;">
-        <h1 style="font-size:22px; font-weight:900;">Pannello Amministratore & Audit Finanziario</h1>
-        <p style="font-size:13px; color:var(--text-secondary);">Controllo marketplace, split Stripe Connect e registro contabile immutabile.</p>
-      </div>
-
-      <!-- KPI Metrics con Distinzione Lordo / Netto -->
-      <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; margin-bottom:16px;">
-        <div style="background:white; border:1px solid var(--border-subtle); padding:14px; border-radius:var(--radius-lg);">
-          <div style="font-size:11px; font-weight:700; color:var(--text-secondary);">COMMISSIONI LORDE BUY YOUR SHARE</div>
-          <div style="font-size:22px; font-weight:900; color:var(--accent);">${formatCents(auditSummary.totalGrossFeesCents)}</div>
-          <div style="font-size:11px; color:var(--text-muted);">${auditSummary.totalTransactionsCount} transazioni / rinnovi incassati (1,49 € fissi)</div>
+    <div class="page-view" style="max-width:1100px; margin:0 auto; padding-bottom:60px;">
+      <!-- Header Admin -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <h1 style="font-size:24px; font-weight:900; color:var(--text-main); margin:0;">⚙️ Pannello di Controllo Admin</h1>
+            <span style="background:#f3e8ff; color:#6b21a8; font-size:11px; font-weight:800; padding:2px 8px; border-radius:var(--radius-full);">RISERVATO</span>
+          </div>
+          <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
+            Gestione globale BuyYourShare, moderazione gruppi, utenti e supervisione contabile immutabile.
+          </p>
         </div>
-
-        <div style="background:white; border:1px solid var(--border-subtle); padding:14px; border-radius:var(--radius-lg);">
-          <div style="font-size:11px; font-weight:700; color:var(--text-secondary);">RICAVO NETTO PIATTAFORMA</div>
-          <div style="font-size:22px; font-weight:900; color:#166534;">${formatCents(auditSummary.totalNetPlatformRevenueCents)}</div>
-          <div style="font-size:11px; color:var(--text-muted);">Al netto dei costi Stripe (${formatCents(auditSummary.totalProviderFeesCents)}) • Target &ge; 1,00 €/membro</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:12px; color:var(--text-muted);">Autenticato come: <strong>${escapeHtml(currentUser.fullName)}</strong></span>
+          <a href="#home" class="btn btn-secondary btn-sm" style="font-size:11.5px;">🏠 Vai al Sito</a>
         </div>
       </div>
 
-      <!-- Tabella Audit Ledger Finanziario Immutabile con Catena Completa -->
-      <div style="background:white; border:1px solid var(--border-subtle); padding:16px; border-radius:var(--radius-lg); margin-bottom:20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h3 style="font-size:14px; font-weight:800; color:var(--text-main);">📑 Catena Completa Transazioni & Payouts Stripe Connect (${allLogs.length})</h3>
-          <span style="font-size:11px; background:#f1f5f9; padding:2px 8px; border-radius:var(--radius-full); font-family:var(--font-mono);">END-TO-END AUDIT</span>
-        </div>
-        
-        <p style="font-size:11.5px; color:var(--text-secondary); margin-bottom:12px;">
-          Tracciamento completo di ogni pagamento: <strong>Membro &rarr; Gateway &rarr; Quota &rarr; Connected Account Capogruppo &rarr; Payout &rarr; Stato Finale</strong>.
-        </p>
+      <!-- Navigation Tabs -->
+      <div style="display:flex; gap:6px; background:white; padding:6px; border-radius:var(--radius-md); border:1px solid #e2e8f0; margin-bottom:22px; overflow-x:auto;">
+        <button type="button" class="btn-admin-tab" data-tab="dashboard" style="${getTabBtnStyle('dashboard')}">
+          📊 Dashboard
+        </button>
+        <button type="button" class="btn-admin-tab" data-tab="groups" style="${getTabBtnStyle('groups')}">
+          📁 Gestione Gruppi (${metrics.groups.total || allGroups.length})
+        </button>
+        <button type="button" class="btn-admin-tab" data-tab="users" style="${getTabBtnStyle('users')}">
+          👥 Gestione Utenti (${metrics.users.total || allUsers.length})
+        </button>
+        <button type="button" class="btn-admin-tab" data-tab="ledger" style="${getTabBtnStyle('ledger')}">
+          📜 Audit Ledger & Azioni
+        </button>
+        <button type="button" class="btn-admin-tab" data-tab="gateway" style="${getTabBtnStyle('gateway')}">
+          🅿️ Config Gateway
+        </button>
+      </div>
 
-        ${allLogs.length > 0 ? `
+      <!-- ========================================== -->
+      <!-- TAB 1: DASHBOARD KPI                       -->
+      <!-- ========================================== -->
+      ${currentAdminTab === 'dashboard' ? `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:24px;">
+          <!-- Card Utenti -->
+          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">👥 Utenti Totali</span>
+            <div style="font-size:26px; font-weight:900; color:#003087; margin:6px 0;">${metrics.users.total}</div>
+            <div style="font-size:11.5px; color:var(--text-muted);">
+              <strong>${metrics.users.members}</strong> Membri • <strong>${metrics.users.owners}</strong> Capigruppo
+            </div>
+          </div>
+
+          <!-- Card Gruppi -->
+          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">📁 Gruppi a Sistema</span>
+            <div style="font-size:26px; font-weight:900; color:#166534; margin:6px 0;">${metrics.groups.total}</div>
+            <div style="font-size:11.5px; color:var(--text-muted);">
+              <span style="color:#166534; font-weight:700;">${metrics.groups.published} Pubblicati</span> • 
+              <span style="color:#d97706; font-weight:700;">${metrics.groups.draft || 0} Draft</span> • 
+              <span style="color:#991b1b; font-weight:700;">${metrics.groups.closed || 0} Chiusi</span>
+            </div>
+          </div>
+
+          <!-- Card Posti -->
+          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">🟢 Posti Marketplace</span>
+            <div style="font-size:26px; font-weight:900; color:#0284c7; margin:6px 0;">${metrics.groups.availableSlots || 0} <span style="font-size:14px; color:var(--text-muted); font-weight:500;">liberi</span></div>
+            <div style="font-size:11.5px; color:var(--text-muted);">
+              Totali: <strong>${metrics.groups.totalSlots || 0}</strong> • Occupati: <strong>${metrics.groups.occupiedSlots || 0}</strong>
+            </div>
+          </div>
+
+          <!-- Card Finanziaria -->
+          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">💰 Fee Lorde Incassate</span>
+            <div style="font-size:26px; font-weight:900; color:var(--accent); margin:6px 0;">${formatCents(metrics.finance.totalGrossFeesCents)}</div>
+            <div style="font-size:11.5px; color:var(--text-muted);">
+              Netto: <strong style="color:#166534;">${formatCents(metrics.finance.totalNetPlatformRevenueCents)}</strong> (${metrics.finance.transactionsCount || 0} cicli)
+            </div>
+          </div>
+        </div>
+
+        <!-- Riepilogo Finanziario Rapido -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; margin-bottom:24px;">
+          <h3 style="font-size:14px; font-weight:800; color:var(--text-main); margin-bottom:8px;">📊 Riepilogo Economico Piattaforma</h3>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:12.5px;">
+            <div>Volume Totale Transato: <strong>${formatCents(metrics.finance.totalVolumeCents)}</strong></div>
+            <div>Fee BYS Lorde (1,49 €/quota): <strong>${formatCents(metrics.finance.totalGrossFeesCents)}</strong></div>
+            <div>Costi Gateway Stimati: <strong>${formatCents(metrics.finance.totalProviderFeesCents)}</strong></div>
+            <div>Quote Trasferite ai Capigruppo: <strong style="color:#1e40af;">${formatCents(metrics.finance.totalTransferredToOwnersCents)}</strong></div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- ========================================== -->
+      <!-- TAB 2: GESTIONE GRUPPI                     -->
+      <!-- ========================================== -->
+      ${currentAdminTab === 'groups' ? `
+        <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div>
+              <h3 style="font-size:16px; font-weight:800; margin:0;">Elenco Completo Gruppi (${allGroups.length})</h3>
+              <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Visualizzazione e controllo di tutti i gruppi del database, inclusi DRAFT e CLOSED.</p>
+            </div>
+          </div>
+
+          ${allGroups.length > 0 ? `
+            <div style="overflow-x:auto;">
+              <table style="width:100%; font-size:11.5px; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:2px solid #e2e8f0; color:var(--text-secondary);">
+                    <th style="padding:8px;">ID Gruppo</th>
+                    <th style="padding:8px;">Servizio & Piano</th>
+                    <th style="padding:8px;">Capogruppo</th>
+                    <th style="padding:8px;">Stato</th>
+                    <th style="padding:8px;">Posti (Tot/Occ/Lib)</th>
+                    <th style="padding:8px;">Quota Membro</th>
+                    <th style="padding:8px;">Data Creazione</th>
+                    <th style="padding:8px; text-align:right;">Azioni Amministrative</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${allGroups.map(g => {
+                    const statusBg = g.status === 'PUBLISHED' || g.status === 'active' ? '#dcfce7' : g.status === 'FULL' || g.status === 'full' ? '#dbeafe' : g.status === 'DRAFT' ? '#fef3c7' : '#fee2e2';
+                    const statusColor = g.status === 'PUBLISHED' || g.status === 'active' ? '#166534' : g.status === 'FULL' || g.status === 'full' ? '#1e40af' : g.status === 'DRAFT' ? '#92400e' : '#991b1b';
+                    const ownerName = g.owner ? g.owner.fullName : (g.ownerId || 'N/A');
+                    const ownerEmail = g.owner ? g.owner.email : '';
+                    const availableCount = Math.max(0, (g.availableSlots || 0) - (g.occupiedMemberSlots || 0));
+
+                    return `
+                      <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:8px; font-family:var(--font-mono); font-weight:700; color:#003087;">${escapeHtml(g.id)}</td>
+                        <td style="padding:8px;">
+                          <strong>${escapeHtml(g.customServiceName)}</strong><br>
+                          <span style="color:var(--text-muted); font-size:10.5px;">${escapeHtml(g.planName)}</span>
+                        </td>
+                        <td style="padding:8px;">
+                          <strong>${escapeHtml(ownerName)}</strong><br>
+                          <span style="color:var(--text-muted); font-size:10.5px;">${escapeHtml(ownerEmail)}</span>
+                        </td>
+                        <td style="padding:8px;">
+                          <span style="background:${statusBg}; color:${statusColor}; font-weight:800; font-size:10.5px; padding:3px 8px; border-radius:var(--radius-full);">
+                            ${g.status}
+                          </span>
+                        </td>
+                        <td style="padding:8px; font-weight:700;">
+                          ${g.totalSlots} / <span style="color:#003087;">${g.occupiedMemberSlots || 0}</span> / <span style="color:#166534;">${availableCount}</span>
+                        </td>
+                        <td style="padding:8px; font-weight:800; color:#166534;">
+                          ${formatCents(g.memberTotalCents)}/m
+                        </td>
+                        <td style="padding:8px; color:var(--text-muted); font-size:11px;">
+                          ${formatDateIT(g.createdAt, true)}
+                        </td>
+                        <td style="padding:8px; text-align:right;">
+                          <div style="display:flex; gap:4px; justify-content:flex-end;">
+                            <a href="#gruppo-${g.id}" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Vedi gruppo">
+                              👁️ Dettagli
+                            </a>
+                            ${g.status !== 'CLOSED' ? `
+                              <button type="button" class="btn btn-secondary btn-sm btn-admin-close-group" data-id="${g.id}" style="font-size:11px; padding:4px 8px; color:#92400e;" title="Chiudi gruppo">
+                                ⏹️ Chiudi
+                              </button>
+                            ` : ''}
+                            <button type="button" class="btn btn-secondary btn-sm btn-admin-delete-group" data-id="${g.id}" data-title="${escapeHtml(g.customServiceName + ' - ' + g.planName)}" style="font-size:11px; padding:4px 8px; color:#dc2626; border-color:#fca5a5; font-weight:800;" title="Elimina definitivamente dal database">
+                              🗑️ Elimina
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : `
+            <p style="text-align:center; padding:30px; color:var(--text-muted);">Nessun gruppo presente nel database.</p>
+          `}
+        </div>
+      ` : ''}
+
+      <!-- ========================================== -->
+      <!-- TAB 3: GESTIONE UTENTI                     -->
+      <!-- ========================================== -->
+      ${currentAdminTab === 'users' ? `
+        <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+          <div style="margin-bottom:14px;">
+            <h3 style="font-size:16px; font-weight:800; margin:0;">Elenco Utenti Registrati (${allUsers.length})</h3>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Visualizzazione e gestione dello stato degli account utente.</p>
+          </div>
+
           <div style="overflow-x:auto;">
-            <table style="width:100%; font-size:11px; border-collapse:collapse; text-align:left;">
+            <table style="width:100%; font-size:11.5px; border-collapse:collapse; text-align:left;">
               <thead>
                 <tr style="border-bottom:2px solid #e2e8f0; color:var(--text-secondary);">
-                  <th style="padding:6px;">Data</th>
-                  <th style="padding:6px;">Membro Pagante</th>
-                  <th style="padding:6px;">Pagato</th>
-                  <th style="padding:6px;">Gateway</th>
-                  <th style="padding:6px; color:#1e40af;">Quota Capogruppo</th>
-                  <th style="padding:6px;">Fee BYS</th>
-                  <th style="padding:6px; color:#166534;">Netto BYS</th>
-                  <th style="padding:6px;">Connected Account</th>
-                  <th style="padding:6px;">Payout ID</th>
-                  <th style="padding:6px;">Stato Payout</th>
+                  <th style="padding:8px;">ID</th>
+                  <th style="padding:8px;">Nome & Cognome</th>
+                  <th style="padding:8px;">Email</th>
+                  <th style="padding:8px;">Ruolo</th>
+                  <th style="padding:8px;">Gruppi Creati</th>
+                  <th style="padding:8px;">Abbonamenti Attivi</th>
+                  <th style="padding:8px;">Stato Account</th>
+                  <th style="padding:8px; text-align:right;">Azioni</th>
                 </tr>
               </thead>
               <tbody>
-                ${allLogs.map(l => {
-                  const memberU = db.data.users.find(u => u.id === l.memberId) || { fullName: 'Membro' };
-                  const isPaid = l.payoutStatus === 'PAID' || l.transferStatus === 'TRANSFERRED';
-                  const isFailed = l.payoutStatus === 'FAILED' || l.transferStatus === 'FAILED';
+                ${allUsers.map(u => {
+                  const roleBg = u.role === 'admin' ? '#f3e8ff' : u.createdGroupsCount > 0 || u.role === 'owner' ? '#fef3c7' : '#e0f2fe';
+                  const roleColor = u.role === 'admin' ? '#6b21a8' : u.createdGroupsCount > 0 || u.role === 'owner' ? '#92400e' : '#0369a1';
+                  const roleLabel = u.role === 'admin' ? '⚙️ Admin' : u.createdGroupsCount > 0 || u.role === 'owner' ? '👑 Capogruppo' : '👤 Membro';
 
                   return `
                     <tr style="border-bottom:1px solid #f1f5f9;">
-                      <td style="padding:6px; white-space:nowrap;">${formatDateIT(l.createdAt, true)}</td>
-                      <td style="padding:6px; font-weight:700;">${escapeHtml(memberU.fullName)}</td>
-                      <td style="padding:6px; font-weight:800;">${formatCents(l.totalAmountCents)}</td>
-                      <td style="padding:6px; font-size:10.5px;">${l.paymentMethod?.includes('PAYPAL') ? '🅿️ PayPal' : '💳 Stripe'}</td>
-                      <td style="padding:6px; font-weight:800; color:#1e40af;">${formatCents(l.baseShareCents)}</td>
-                      <td style="padding:6px; font-weight:700; color:var(--accent);">+${formatCents(l.buyyourshareFeeCents || 149)}</td>
-                      <td style="padding:6px; font-weight:800; color:#166534;">${formatCents(l.netPlatformAmountCents)}</td>
-                      <td style="padding:6px; font-family:var(--font-mono); font-size:10.5px; color:#003087;">${escapeHtml(l.payoutDestination || l.connectedAccountId || 'acct_demo')}</td>
-                      <td style="padding:6px; font-family:var(--font-mono); font-size:10.5px; color:#0070ba;">${escapeHtml(l.payoutId || l.transferId || 'N/A')}</td>
-                      <td style="padding:6px;">
-                        ${isPaid ? `
-                          <span style="color:#166534; font-weight:800; font-size:10.5px; background:#dcfce7; padding:2px 6px; border-radius:4px;">🟢 PAID</span>
-                        ` : isFailed ? `
-                          <span style="color:#991b1b; font-weight:800; font-size:10.5px; background:#fee2e2; padding:2px 6px; border-radius:4px;">🔴 FAILED</span>
+                      <td style="padding:8px; font-family:var(--font-mono); font-weight:700; color:#003087;">${escapeHtml(u.id)}</td>
+                      <td style="padding:8px; font-weight:700;">${escapeHtml(u.fullName)}</td>
+                      <td style="padding:8px; color:var(--text-secondary); font-family:var(--font-mono); font-size:11px;">${escapeHtml(u.email)}</td>
+                      <td style="padding:8px;">
+                        <span style="background:${roleBg}; color:${roleColor}; font-weight:800; font-size:10.5px; padding:3px 8px; border-radius:var(--radius-full);">
+                          ${roleLabel}
+                        </span>
+                      </td>
+                      <td style="padding:8px; font-weight:700; color:#003087;">${u.createdGroupsCount || 0}</td>
+                      <td style="padding:8px; font-weight:700; color:#166534;">${u.activeMembershipsCount || 0}</td>
+                      <td style="padding:8px;">
+                        ${u.isSuspended ? `
+                          <span style="background:#fee2e2; color:#991b1b; font-weight:800; font-size:10.5px; padding:3px 8px; border-radius:var(--radius-full);">🔴 SOSPESO</span>
                         ` : `
-                          <span style="color:#854d0e; font-weight:800; font-size:10.5px; background:#fef9c3; padding:2px 6px; border-radius:4px;">⏳ PENDING</span>
+                          <span style="background:#dcfce7; color:#166534; font-weight:800; font-size:10.5px; padding:3px 8px; border-radius:var(--radius-full);">🟢 ATTIVO</span>
                         `}
+                      </td>
+                      <td style="padding:8px; text-align:right;">
+                        ${u.role !== 'admin' ? `
+                          <button type="button" class="btn btn-secondary btn-sm btn-admin-toggle-suspend" data-id="${u.id}" data-name="${escapeHtml(u.fullName)}" data-suspended="${!!u.isSuspended}" style="font-size:11px; padding:3px 8px; ${u.isSuspended ? 'color:#166534; border-color:#86efac;' : 'color:#dc2626; border-color:#fca5a5;'};">
+                            ${u.isSuspended ? '✅ Riattiva' : '🚫 Sospendi'}
+                          </button>
+                        ` : '<span style="color:var(--text-muted); font-size:10.5px;">Protetto</span>'}
                       </td>
                     </tr>
                   `;
@@ -2230,46 +2430,221 @@ function renderAdminView(container, currentUser) {
               </tbody>
             </table>
           </div>
-        ` : `
-          <p style="text-align:center; padding:20px; color:var(--text-muted); font-size:12px;">Nessuna transazione registrata nel ledger.</p>
-        `}
-      </div>
-
-      <!-- Configurazione Commissione -->
-      <div style="background:white; border:1px solid var(--border-subtle); padding:16px; border-radius:var(--radius-lg); margin-bottom:20px;">
-        <h3 style="font-size:14px; font-weight:800; margin-bottom:6px;">⚙️ Parametro Commerciale Fee Lorda BuyYourShare</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Regola di business approvata: <strong>1,49 € (149 centesimi fissi)</strong> applicata ad ogni ciclo mensile (Garanzia &ge; 1,00 € netto per quota &le; 9,42 €).</p>
-        <div style="display:flex; gap:10px; align-items:center;">
-          <input type="number" step="0.01" id="adminFeeInput" class="form-input" style="width:120px;" value="${(metrics.platformFeeCents / 100).toFixed(2)}" disabled>
-          <span style="font-size:11px; color:var(--text-muted);">🔒 Bloccata su 1,49 € (Garanzia &ge; 1,00 € netto)</span>
         </div>
-      </div>
+      ` : ''}
 
-      <!-- Configurazione Gateway PayPal Sandbox (Merchant App) -->
-      <div style="background:white; border:1px solid #bbf7d0; padding:16px; border-radius:var(--radius-lg); margin-bottom:20px; box-shadow:0 2px 8px rgba(34,197,94,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <h3 style="font-size:14px; font-weight:800; color:#003087;">🅿️ Configurazione PayPal Sandbox (App BYS-Platform)</h3>
-          <span style="font-size:11px; background:#f0fdf4; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">MERCHANT GATEWAY</span>
-        </div>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
-          Inserisci il <strong>Client ID</strong> della tua App PayPal Sandbox (es. <em>BYS-Platform</em>) generato su <strong>developer.paypal.com</strong> per ricevere gli accrediti reali sul tuo account Business Merchant.
-        </p>
-
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <div>
-            <label style="font-size:11.5px; font-weight:700; display:block; margin-bottom:4px;">PayPal Sandbox Client ID *</label>
-            <input type="text" id="adminPaypalClientId" class="form-input" placeholder="Incolla il Client ID Sandbox dalla tua App (es. AaB1Cc2Dd...)" value="${escapeHtml(localStorage.getItem('paypal_sandbox_client_id') || '')}" style="font-family:var(--font-mono); font-size:12px;">
+      <!-- ========================================== -->
+      <!-- TAB 4: AUDIT LEDGER & AZIONI ADMIN         -->
+      <!-- ========================================== -->
+      ${currentAdminTab === 'ledger' ? `
+        <!-- Sezione 1: Azioni Amministrative -->
+        <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; margin-bottom:20px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="font-size:15px; font-weight:800; color:var(--text-main); margin:0;">🛡️ Registro Azioni Amministrative (${adminLogs.length})</h3>
+            <span style="font-size:11px; background:#f1f5f9; padding:2px 8px; border-radius:var(--radius-full); font-family:var(--font-mono);">ADMIN AUDIT TRAIL</span>
           </div>
-          <div style="display:flex; align-items:center;">
-            <button id="btnSaveAdminPaypal" class="btn btn-primary btn-sm" style="font-size:12px; font-weight:700; background:#0070ba;">
-              💾 Salva Client ID PayPal
-            </button>
-            <span id="adminPaypalStatus" style="font-size:11.5px; color:#166534; margin-left:12px; font-weight:700;"></span>
+          ${adminLogs.length > 0 ? `
+            <div style="overflow-x:auto;">
+              <table style="width:100%; font-size:11px; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:2px solid #e2e8f0; color:var(--text-secondary);">
+                    <th style="padding:6px;">Data & Ora</th>
+                    <th style="padding:6px;">Azione</th>
+                    <th style="padding:6px;">Target</th>
+                    <th style="padding:6px;">Eseguita Da</th>
+                    <th style="padding:6px;">Dettagli</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${adminLogs.map(a => `
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                      <td style="padding:6px; white-space:nowrap; font-family:var(--font-mono);">${formatDateIT(a.timestamp, true)}</td>
+                      <td style="padding:6px;">
+                        <span style="font-weight:800; font-size:10px; padding:2px 6px; border-radius:4px; ${a.action.includes('DELETED') ? 'background:#fee2e2; color:#991b1b;' : 'background:#e0f2fe; color:#0369a1;'}">
+                          ${escapeHtml(a.action)}
+                        </span>
+                      </td>
+                      <td style="padding:6px; font-weight:700;">${escapeHtml(a.targetName || a.targetId)}</td>
+                      <td style="padding:6px; color:var(--text-secondary);">${escapeHtml(a.performedByName || a.performedBy)}</td>
+                      <td style="padding:6px; color:var(--text-secondary);">${escapeHtml(a.details || '')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : `
+            <p style="padding:16px; text-align:center; color:var(--text-muted); font-size:12px;">Nessuna azione amministrativa recente registrata.</p>
+          `}
+        </div>
+
+        <!-- Sezione 2: Ledger Finanziario Immutabile -->
+        <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="font-size:15px; font-weight:800; color:var(--text-main); margin:0;">📑 Ledger Finanziario Completo (${financialLogs.length})</h3>
+            <span style="font-size:11px; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">CONSOLIDATO</span>
+          </div>
+          ${financialLogs.length > 0 ? `
+            <div style="overflow-x:auto;">
+              <table style="width:100%; font-size:11px; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:2px solid #e2e8f0; color:var(--text-secondary);">
+                    <th style="padding:6px;">Data</th>
+                    <th style="padding:6px;">Membro</th>
+                    <th style="padding:6px;">Totale</th>
+                    <th style="padding:6px;">Gateway</th>
+                    <th style="padding:6px; color:#1e40af;">Quota Capogruppo</th>
+                    <th style="padding:6px;">Fee BYS</th>
+                    <th style="padding:6px; color:#166534;">Netto BYS</th>
+                    <th style="padding:6px;">Payout ID</th>
+                    <th style="padding:6px;">Stato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${financialLogs.map(l => {
+                    const memberU = allUsers.find(u => u.id === l.memberId) || { fullName: 'Membro' };
+                    const isPaid = l.payoutStatus === 'PAID' || l.transferStatus === 'TRANSFERRED';
+                    return `
+                      <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:6px; white-space:nowrap;">${formatDateIT(l.createdAt, true)}</td>
+                        <td style="padding:6px; font-weight:700;">${escapeHtml(memberU.fullName)}</td>
+                        <td style="padding:6px; font-weight:800;">${formatCents(l.totalAmountCents)}</td>
+                        <td style="padding:6px;">${l.paymentMethod?.includes('PAYPAL') ? '🅿️ PayPal' : '💳 Stripe'}</td>
+                        <td style="padding:6px; font-weight:800; color:#1e40af;">${formatCents(l.baseShareCents)}</td>
+                        <td style="padding:6px; font-weight:700; color:var(--accent);">+${formatCents(l.buyyourshareFeeCents || 149)}</td>
+                        <td style="padding:6px; font-weight:800; color:#166534;">${formatCents(l.netPlatformAmountCents)}</td>
+                        <td style="padding:6px; font-family:var(--font-mono); font-size:10px;">${escapeHtml(l.payoutId || l.transferId || 'N/A')}</td>
+                        <td style="padding:6px;">
+                          ${isPaid ? '<span style="color:#166534; font-weight:800; font-size:10.5px; background:#dcfce7; padding:2px 6px; border-radius:4px;">🟢 PAID</span>' : '<span style="color:#854d0e; font-weight:800; font-size:10.5px; background:#fef9c3; padding:2px 6px; border-radius:4px;">⏳ PENDING</span>'}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : `
+            <p style="padding:20px; text-align:center; color:var(--text-muted); font-size:12px;">Nessuna transazione contabile registrata.</p>
+          `}
+        </div>
+      ` : ''}
+
+      <!-- ========================================== -->
+      <!-- TAB 5: CONFIGURAZIONE GATEWAY              -->
+      <!-- ========================================== -->
+      ${currentAdminTab === 'gateway' ? `
+        <div style="background:white; border:1px solid #bbf7d0; padding:20px; border-radius:var(--radius-lg); box-shadow:0 2px 8px rgba(34,197,94,0.08); margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="font-size:15px; font-weight:800; color:#003087; margin:0;">🅿️ Configurazione Merchant PayPal Sandbox / Live</h3>
+            <span style="font-size:11px; background:#f0fdf4; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">GATEWAY SETTINGS</span>
+          </div>
+          <p style="font-size:12.5px; color:var(--text-secondary); margin-bottom:16px;">
+            Inserisci il <strong>Client ID</strong> della tua applicazione PayPal per ricevere i pagamenti degli abbonamenti.
+          </p>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">PayPal Client ID *</label>
+              <input type="text" id="adminPaypalClientId" class="form-input" placeholder="Incolla il Client ID PayPal..." value="${escapeHtml(localStorage.getItem('paypal_sandbox_client_id') || '')}" style="font-family:var(--font-mono); font-size:12px; padding:10px;">
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <button type="button" id="btnSaveAdminPaypal" class="btn btn-primary btn-sm" style="font-size:12px; font-weight:700; background:#0070ba; padding:8px 16px;">
+                💾 Salva Client ID
+              </button>
+              <span id="adminPaypalStatus" style="font-size:12px; color:#166534; font-weight:700;"></span>
+            </div>
           </div>
         </div>
-      </div>
+
+        <div style="background:white; border:1px solid #e2e8f0; padding:20px; border-radius:var(--radius-lg);">
+          <h3 style="font-size:14px; font-weight:800; margin-bottom:6px;">⚙️ Parametro Commerciale Fee Lorda BuyYourShare</h3>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Regola di business approvata: <strong>1,49 € (149 centesimi fissi)</strong> per quota mensile.</p>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input type="number" step="0.01" class="form-input" style="width:120px;" value="1.49" disabled>
+            <span style="font-size:11.5px; color:var(--text-muted);">🔒 Bloccata su 1,49 € (Garanzia &ge; 1,00 € netto)</span>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
+
+  // Bind Tab Click Listeners
+  container.querySelectorAll('.btn-admin-tab').forEach(btn => {
+    btn.onclick = () => {
+      currentAdminTab = btn.dataset.tab;
+      renderAdminView(container, currentUser);
+    };
+  });
+
+  // Bind Group Delete Action
+  container.querySelectorAll('.btn-admin-delete-group').forEach(btn => {
+    btn.onclick = async () => {
+      const gId = btn.dataset.id;
+      const gTitle = btn.dataset.title;
+      const confirmed = confirm(`⚠️ ATTENZIONE:\n\nStai per eliminare definitivamente il gruppo:\n"${gTitle}"\n\nL'operazione rimuoverà il gruppo dal database operativo in modo irreversibile.\n(Le transazioni finanziarie nel Ledger rimarranno intatte per tracciabilità contabile).\n\nContinuare?`);
+      if (!confirmed) return;
+
+      try {
+        const resp = await fetch(`/api/admin/groups/${gId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          throw new Error(data.message || 'Errore durante l\'eliminazione del gruppo.');
+        }
+        showToast(`🗑️ Gruppo "${gTitle}" eliminato definitivamente.`);
+        await db.syncGroupsFromServer();
+        renderAdminView(container, currentUser);
+      } catch (err) {
+        alert('❌ ' + err.message);
+      }
+    };
+  });
+
+  // Bind Group Close Action
+  container.querySelectorAll('.btn-admin-close-group').forEach(btn => {
+    btn.onclick = async () => {
+      const gId = btn.dataset.id;
+      if (!confirm('Vuoi chiudere questo gruppo e rimuoverlo dal Marketplace?')) return;
+      try {
+        const resp = await fetch(`/api/admin/groups/${gId}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ status: 'CLOSED' })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw new Error(data.message || 'Errore');
+        showToast('Gruppo portato a stato CLOSED.');
+        await db.syncGroupsFromServer();
+        renderAdminView(container, currentUser);
+      } catch (err) {
+        alert('❌ ' + err.message);
+      }
+    };
+  });
+
+  // Bind User Suspend Action
+  container.querySelectorAll('.btn-admin-toggle-suspend').forEach(btn => {
+    btn.onclick = async () => {
+      const uId = btn.dataset.id;
+      const uName = btn.dataset.name;
+      const isSusp = btn.dataset.suspended === 'true';
+      const action = isSusp ? 'riattivare' : 'sospendere';
+      if (!confirm(`Sei sicuro di voler ${action} l'utente "${uName}"?`)) return;
+
+      try {
+        const resp = await fetch(`/api/admin/users/${uId}/toggle-suspend`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw new Error(data.message || 'Errore');
+        showToast(`Utente ${uName} ${data.isSuspended ? 'sospeso' : 'riattivato'}.`);
+        renderAdminView(container, currentUser);
+      } catch (err) {
+        alert('❌ ' + err.message);
+      }
+    };
+  });
 
   // Handler salvataggio credenziali PayPal da Admin
   const saveBtn = container.querySelector('#btnSaveAdminPaypal');
@@ -2279,9 +2654,9 @@ function renderAdminView(container, currentUser) {
       const val = input ? input.value.trim() : '';
       if (val) {
         localStorage.setItem('paypal_sandbox_client_id', val);
-        showToast('✅ Client ID PayPal Sandbox salvato!');
+        showToast('✅ Client ID PayPal salvato!');
         const st = container.querySelector('#adminPaypalStatus');
-        if (st) st.textContent = '🟢 Salvato e attivo su tutta la piattaforma!';
+        if (st) st.textContent = '🟢 Salvato e attivo!';
       } else {
         localStorage.removeItem('paypal_sandbox_client_id');
         showToast('Client ID reimpostato.');

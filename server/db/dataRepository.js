@@ -419,6 +419,177 @@ class DataRepository {
     });
     await this.save();
   }
+
+  // ==========================================
+  // ADMIN DASHBOARD & MANAGEMENT
+  // ==========================================
+  async getAdminDashboardMetrics() {
+    const users = this.data.users || [];
+    const groups = this.data.groups || [];
+    const memberships = this.data.memberships || [];
+    const logs = this.data.financialAuditLogs || [];
+
+    const totalUsers = users.length;
+    const adminCount = users.filter(u => u.role === 'admin').length;
+    const ownerCount = users.filter(u => u.role === 'owner' || groups.some(g => g.ownerId === u.id)).length;
+    const memberCount = totalUsers - adminCount - (ownerCount > 0 ? ownerCount : 0);
+
+    const totalGroups = groups.length;
+    const publishedGroups = groups.filter(g => g.status === 'PUBLISHED' || g.status === 'active').length;
+    const fullGroups = groups.filter(g => g.status === 'FULL' || g.status === 'full').length;
+    const draftGroups = groups.filter(g => g.status === 'DRAFT').length;
+    const payoutNotReadyGroups = groups.filter(g => g.status === 'PAYOUT_NOT_READY').length;
+    const closedGroups = groups.filter(g => g.status === 'CLOSED' || g.status === 'cancellation_scheduled').length;
+
+    let totalSlots = 0;
+    let occupiedSlots = 0;
+    let availableSlots = 0;
+
+    groups.forEach(g => {
+      if (g.status === 'PUBLISHED' || g.status === 'FULL' || g.status === 'active') {
+        totalSlots += (g.totalSlots || 0);
+        occupiedSlots += (g.ownerSlots || 1) + (g.occupiedMemberSlots || 0);
+        availableSlots += Math.max(0, (g.availableSlots || 0) - (g.occupiedMemberSlots || 0));
+      }
+    });
+
+    const totalVolumeCents = logs.reduce((acc, l) => acc + (l.totalAmountCents || 0), 0);
+    const totalGrossFeesCents = logs.reduce((acc, l) => acc + (l.buyyourshareFeeCents || 149), 0);
+    const totalProviderFeesCents = logs.reduce((acc, l) => acc + (l.paymentProviderFeeCents || 0), 0);
+    const totalNetPlatformRevenueCents = logs.reduce((acc, l) => acc + (l.netPlatformAmountCents || 0), 0);
+    const totalTransferredToOwnersCents = logs.filter(l => l.transferStatus === 'TRANSFERRED' || l.payoutStatus === 'PAID')
+      .reduce((acc, l) => acc + (l.baseShareCents || 0), 0);
+
+    return {
+      users: {
+        total: totalUsers,
+        members: Math.max(0, memberCount),
+        owners: ownerCount,
+        admins: adminCount
+      },
+      groups: {
+        total: totalGroups,
+        published: publishedGroups,
+        full: fullGroups,
+        draft: draftGroups,
+        payoutNotReady: payoutNotReadyGroups,
+        closed: closedGroups,
+        totalSlots,
+        occupiedSlots,
+        availableSlots
+      },
+      finance: {
+        totalVolumeCents,
+        totalGrossFeesCents,
+        totalProviderFeesCents,
+        totalNetPlatformRevenueCents,
+        totalTransferredToOwnersCents,
+        transactionsCount: logs.length
+      }
+    };
+  }
+
+  async getAllUsersAdmin() {
+    const users = this.data.users || [];
+    const groups = this.data.groups || [];
+    const memberships = this.data.memberships || [];
+
+    return users.map(u => {
+      const createdGroupsCount = groups.filter(g => g.ownerId === u.id).length;
+      const activeMembershipsCount = memberships.filter(m => m.userId === u.id && m.status === 'ACTIVE').length;
+      const { password, ...safeUser } = u;
+      return {
+        ...safeUser,
+        createdGroupsCount,
+        activeMembershipsCount
+      };
+    });
+  }
+
+  async toggleUserSuspend(userId, adminUser) {
+    const user = await this.findUserById(userId);
+    if (!user) return null;
+    if (user.role === 'admin') {
+      throw new Error('Non è possibile sospendere un account Amministratore.');
+    }
+
+    user.isSuspended = !user.isSuspended;
+    user.updatedAt = new Date().toISOString();
+
+    if (user.isSuspended) {
+      // Invalida tutte le sessioni attive dell'utente sospeso
+      this.data.sessions = (this.data.sessions || []).filter(s => s.userId !== userId);
+    }
+
+    await this.logAdminAction({
+      action: user.isSuspended ? 'USER_SUSPENDED' : 'USER_REACTIVATED',
+      targetType: 'USER',
+      targetId: user.id,
+      targetName: user.fullName || user.email,
+      performedBy: adminUser.id,
+      performedByName: adminUser.fullName,
+      details: `Account ${user.isSuspended ? 'sospeso' : 'riattivato'} dall'amministratore.`
+    });
+
+    await this.save();
+    return user;
+  }
+
+  async deleteGroup(groupId, adminUser) {
+    const group = await this.findGroupById(groupId);
+    if (!group) return null;
+
+    const groupTitle = `${group.customServiceName} (${group.planName})`;
+
+    // 1. Rimuovi il gruppo dal catalogo operativo
+    this.data.groups = this.data.groups.filter(g => g.id !== groupId);
+
+    // 2. Rimuovi memberships operative collegate (se presenti)
+    this.data.memberships = (this.data.memberships || []).filter(m => m.groupId !== groupId);
+
+    // 3. Rimuovi istruzioni di accesso
+    this.data.accessInstructions = (this.data.accessInstructions || []).filter(a => a.groupId !== groupId);
+
+    // 4. Rimuovi chat operativa associata
+    const chat = (this.data.chats || []).find(c => c.groupId === groupId);
+    if (chat) {
+      this.data.chats = this.data.chats.filter(c => c.id !== chat.id);
+      this.data.chatMessages = (this.data.chatMessages || []).filter(m => m.chatId !== chat.id);
+    }
+
+    // 5. PRESERVAZIONE RIGOROSA DEI DATI FINANZIARI:
+    // Non tocca mai this.data.financialAuditLogs, this.data.activeSubscriptions, this.data.recordedCycles
+
+    // 6. Registra l'azione nel registro Audit Amministrativo
+    await this.logAdminAction({
+      action: 'GROUP_DELETED',
+      targetType: 'GROUP',
+      targetId: groupId,
+      targetName: groupTitle,
+      performedBy: adminUser ? adminUser.id : 'usr-admin',
+      performedByName: adminUser ? adminUser.fullName : 'Admin BuyYourShare',
+      details: `Eliminazione fisica definitiva del gruppo ${groupTitle} dal database operativo.`
+    });
+
+    await this.save();
+    return { success: true, deletedGroupId: groupId, groupTitle };
+  }
+
+  async logAdminAction(actionData) {
+    if (!this.data.adminAuditLogs) this.data.adminAuditLogs = [];
+    const entry = {
+      id: 'adm_log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      timestamp: new Date().toISOString(),
+      ...actionData
+    };
+    this.data.adminAuditLogs.unshift(entry); // Il più recente in cima
+    await this.save();
+    return entry;
+  }
+
+  async getAdminAuditLogs() {
+    return this.data.adminAuditLogs || [];
+  }
 }
 
 export const dataRepository = new DataRepository();
