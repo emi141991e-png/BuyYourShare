@@ -251,6 +251,27 @@
       "resetPasswordCode": null,
       "resetPasswordExpires": null,
       "updatedAt": "2026-08-19T21:45:28.691Z"
+    },
+    {
+      "id": "usr-1787176392616",
+      "email": "test_recovery_1787176392515@example.com",
+      "fullName": "Alessandro Manzoni",
+      "firstName": "Alessandro",
+      "lastName": "Manzoni",
+      "password": "NuovaPassword123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-19T21:53:12.616Z",
+      "privacyAcceptedAt": "2026-08-19T21:53:12.617Z",
+      "iban": null,
+      "bankName": null,
+      "paypalPayoutEmail": "test_recovery_1787176392515@example.com",
+      "createdAt": "2026-08-19T21:53:12.617Z",
+      "resetPasswordCode": null,
+      "resetPasswordExpires": null,
+      "updatedAt": "2026-08-19T21:53:12.678Z"
     }
   ],
   "services": [
@@ -2287,6 +2308,18 @@
       "userId": "usr-1787175928621",
       "createdAt": "2026-08-19T21:45:28.702Z",
       "expiresAt": "2026-09-18T21:45:28.702Z"
+    },
+    {
+      "token": "bys_token_1787176392622_4jfyj5f5ar",
+      "userId": "usr-1787176392616",
+      "createdAt": "2026-08-19T21:53:12.622Z",
+      "expiresAt": "2026-09-18T21:53:12.622Z"
+    },
+    {
+      "token": "bys_token_1787176392689_hczwikwm2k",
+      "userId": "usr-1787176392616",
+      "createdAt": "2026-08-19T21:53:12.689Z",
+      "expiresAt": "2026-09-18T21:53:12.689Z"
     }
   ],
   "adminAuditLogs": [

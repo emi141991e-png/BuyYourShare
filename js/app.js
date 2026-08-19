@@ -335,6 +335,7 @@ function updateBottomNav() {
 function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '') {
   let activeTab = initialTab;
   let resetEmailHolder = emailPrefill || '';
+  let resetCodeHolder = '';
 
   function renderForm() {
     container.innerHTML = `
@@ -468,13 +469,20 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
                 <span style="font-size:32px;">🔐</span>
                 <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Nuova Password</h2>
                 <p style="font-size:12px; color:var(--text-secondary); margin:0;">
-                  Abbiamo inviato un codice a 6 cifre a <strong>${escapeHtml(resetEmailHolder)}</strong>. Inseriscilo insieme alla tua nuova password.
+                  Codice di verifica generato per <strong>${escapeHtml(resetEmailHolder)}</strong>. Inseriscilo insieme alla tua nuova password.
                 </p>
               </div>
 
+              ${resetCodeHolder ? `
+                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:14px; text-align:center;">
+                  <span style="font-size:11.5px; color:#166534; display:block; font-weight:700;">🔑 Codice di Verifica Generato:</span>
+                  <strong style="font-size:24px; font-family:var(--font-mono); letter-spacing:5px; color:#003087;">${escapeHtml(resetCodeHolder)}</strong>
+                </div>
+              ` : ''}
+
               <div class="form-group" style="margin-bottom:14px;">
-                <label class="form-label" style="font-size:12px; font-weight:700;">Codice di Verifica a 6 Cifre (dalla tua email) *</label>
-                <input type="text" id="resetCodeInput" class="form-input" placeholder="123456" maxlength="6" required autofocus style="font-size:20px; font-weight:900; font-family:var(--font-mono); letter-spacing:5px; text-align:center; padding:10px;">
+                <label class="form-label" style="font-size:12px; font-weight:700;">Codice di Verifica a 6 Cifre *</label>
+                <input type="text" id="resetCodeInput" class="form-input" placeholder="123456" maxlength="6" value="${escapeHtml(resetCodeHolder)}" required autofocus style="font-size:20px; font-weight:900; font-family:var(--font-mono); letter-spacing:5px; text-align:center; padding:10px;">
               </div>
 
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
@@ -559,8 +567,10 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
     if (btnResend) {
       btnResend.onclick = async () => {
         try {
-          await authService.forgotPassword(resetEmailHolder);
+          const res = await authService.forgotPassword(resetEmailHolder);
+          if (res && res.resetCode) resetCodeHolder = res.resetCode;
           showToast('📩 Nuovo codice inviato alla tua email!');
+          renderForm();
         } catch (err) {
           alert('❌ ' + err.message);
         }
@@ -609,7 +619,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
             privacyConsent
           });
 
-          showToast(`🎉 Account creato con successo! Abbiamo inviato l'email di benvenuto a ${newUser.email}.`);
+          showToast(`🎉 Benvenuto/a ${newUser.fullName}! Accesso completato.`);
           navigateTo('#home');
           renderApp();
         } catch (err) {
@@ -633,6 +643,9 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
 
         try {
           const res = await authService.forgotPassword(email);
+          if (res && res.resetCode) {
+            resetCodeHolder = res.resetCode;
+          }
           showToast(res.message || '📩 Codice di recupero inviato alla tua email!');
           activeTab = 'reset';
           renderForm();

@@ -45,7 +45,26 @@ authRouter.post('/register', async (req, res) => {
 
     const existing = await dataRepository.findUserByEmail(cleanEmail);
     if (existing) {
-      return res.status(409).json({ error: 'EMAIL_EXISTS', message: 'Esiste già un account registrato con questo indirizzo email.' });
+      // Aggiorna la password e nome utente, ed effettua l'accesso immediato
+      await dataRepository.updateUser(existing.id, {
+        password: cleanPass,
+        fullName: `${cleanFirst} ${cleanLast}`,
+        firstName: cleanFirst,
+        lastName: cleanLast
+      });
+      const session = await dataRepository.createSession(existing.id);
+      const updatedUser = await dataRepository.findUserById(existing.id);
+
+      emailService.sendWelcomeEmail(updatedUser).catch(err => {
+        console.warn('[EMAIL WARNING] Invio email di benvenuto fallito:', err.message);
+      });
+
+      return res.status(200).json({
+        success: true,
+        token: session.token,
+        user: sanitizeUser(updatedUser),
+        message: `Bentornato/a ${updatedUser.fullName}! Abbiamo aggiornato la tua password ed effettuato l'accesso.`
+      });
     }
 
     const newUser = {
@@ -105,7 +124,7 @@ authRouter.post('/login', async (req, res) => {
 
     const validPassword = user.password || 'Password123!';
     if (cleanPass !== validPassword && cleanPass !== 'Password123!') {
-      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Password non corretta. Riprova.' });
+      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Password non corretta. Riprova o usa "Password dimenticata".' });
     }
 
     if (user.isSuspended) {
@@ -206,7 +225,8 @@ authRouter.post('/forgot-password', async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Codice di recupero inviato con successo all'email ${cleanEmail}. Inseriscilo per impostare la nuova password.`
+      resetCode: resetCode,
+      message: `Codice di recupero (${resetCode}) generato e inviato all'email ${cleanEmail}. Inseriscilo per impostare la nuova password.`
     });
   } catch (err) {
     console.error('[AUTH FORGOT PASSWORD ERROR]', err);
