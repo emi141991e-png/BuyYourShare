@@ -765,7 +765,7 @@ function renderGroupCardsHTML(groups) {
   return groups.map(g => {
     const slotsInfo = db.getGroupSlotsBreakdown(g);
     const freeSlots = slotsInfo.availableSlotsCount;
-    const isAvailable = freeSlots > 0 && g.status === 'active';
+    const isAvailable = freeSlots > 0 && (g.status === 'PUBLISHED' || g.status === 'active' || g.status === 'available');
     const letter = g.customServiceName.substring(0, 2).toUpperCase();
     const nextSlot = slotsInfo.nextAvailableSlot;
 

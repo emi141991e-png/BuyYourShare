@@ -500,6 +500,30 @@
       "description": "Gruppo condivisione Gemini Advanced",
       "createdAt": "2026-08-19T21:16:05.672Z",
       "updatedAt": "2026-08-19T21:16:05.672Z"
+    },
+    {
+      "id": "grp-youtube-famiglia",
+      "ownerId": "usr-owner-1",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Premium",
+      "planName": "YouTube Famiglia (6 Account)",
+      "realSubscriptionCostCents": 1799,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 300,
+      "platformFeeCents": 149,
+      "memberTotalCents": 449,
+      "groupType": "public",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-19T21:22:04.603Z",
+      "inviteCode": "BYS-7788",
+      "rulesAndRequirements": "Condivisione autorizzata piano Famiglia.",
+      "description": "Gruppo ufficiale YouTube Premium con musica inclusa e zero annunci.",
+      "createdAt": "2026-08-19T21:22:04.604Z",
+      "updatedAt": "2026-08-19T21:22:04.604Z"
     }
   ],
   "memberships": [

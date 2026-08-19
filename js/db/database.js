@@ -536,6 +536,11 @@ class Database {
     return true;
   }
 
+  getMyCreatedGroups(userId) {
+    this.checkExpirations();
+    return this.data.groups.filter(g => g.ownerId === userId && g.status !== 'terminated');
+  }
+
   // ==========================================
   // ACCESS INSTRUCTIONS & SECURITY
   // ==========================================
