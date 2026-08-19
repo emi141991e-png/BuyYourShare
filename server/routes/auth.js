@@ -64,8 +64,8 @@ authRouter.post('/register', async (req, res) => {
       isSuspended: false,
       termsAcceptedAt: new Date().toISOString(),
       privacyAcceptedAt: new Date().toISOString(),
-      iban: 'IT60X0542811101000000' + Math.floor(100000 + Math.random() * 900000).toString().slice(0, 6),
-      bankName: 'Conto Personale SEPA',
+      iban: null,
+      bankName: null,
       paypalPayoutEmail: cleanEmail,
       createdAt: new Date().toISOString()
     };

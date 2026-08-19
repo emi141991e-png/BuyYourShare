@@ -17,18 +17,20 @@ import { financialAuditService } from './services/financialAuditService.js';
 // =========================================================================
 let currentRoute = window.location.hash || '#home';
 let selectedCategoryFilter = 'ALL';
-let searchKeyword = '';
 let wizardState = {
-  serviceId: 'srv-spotify',
-  customServiceName: 'Spotify',
-  planName: 'Spotify Family (6 Account)',
-  realCostEuros: '20.99',
-  totalSlots: 6,
-  ownerSlots: 1,
+  serviceId: '',
+  customServiceName: '',
+  planName: '',
+  realCostEuros: '',
+  totalSlots: '',
+  ownerSlots: '1',
   accessUrl: '',
-  instructions: 'Accedi al link con il tuo account Spotify personale.',
-  additionalInfo: 'Playlist e libreria personale 100% private.',
-  accessCode: ''
+  instructions: '',
+  additionalInfo: '',
+  accessCode: '',
+  payoutLegalName: '',
+  payoutIban: '',
+  payoutBankName: ''
 };
 
 export function showToast(message) {
@@ -1044,11 +1046,25 @@ function renderGroupDetailView(container, groupId, currentUser) {
 function renderWizardView(container, currentUser) {
   const services = db.getServices();
   const feeCents = db.getPlatformFeeCents();
+  const pSet = db.getUserPayoutSettings(currentUser.id) || {};
+
+  if (!wizardState.payoutLegalName) {
+    wizardState.payoutLegalName = pSet.legalName || currentUser.fullName || '';
+  }
+  if (!wizardState.payoutIban && pSet.iban) {
+    wizardState.payoutIban = pSet.iban;
+  }
+  if (!wizardState.payoutBankName && pSet.bankName) {
+    wizardState.payoutBankName = pSet.bankName;
+  }
 
   // Calcolo quote live con MoneySplit
   const realCents = eurosToCents(wizardState.realCostEuros || 0);
-  const totalSlots = parseInt(wizardState.totalSlots, 10) || 6;
-  const pricing = calculatePricingBreakdown(realCents, totalSlots, feeCents);
+  const totalSlots = parseInt(wizardState.totalSlots, 10) || 0;
+  const ownerSlots = parseInt(wizardState.ownerSlots, 10) || 1;
+  const pricing = totalSlots >= 2 && realCents > 0
+    ? calculatePricingBreakdown(realCents, totalSlots, feeCents)
+    : { realCostCents: realCents, sumExactSharesCents: realCents, displayShareText: '0,00 €', memberTotalCents: feeCents, ownerShareCents: 0, baseMemberShareCents: 0, platformFeeCents: feeCents };
 
   const isCustomSelected = wizardState.serviceId === 'srv-custom';
 
@@ -1058,17 +1074,44 @@ function renderWizardView(container, currentUser) {
         
         <div class="wizard-progress">
           <span class="wizard-step-pill">Creazione Gruppo</span>
-          <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">100% Mensile</span>
+          <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">100% Trasparente</span>
         </div>
 
         <h1 class="wizard-title">Crea il tuo gruppo di condivisione</h1>
-        <p class="wizard-desc">Inserisci i dati reali del tuo abbonamento. La quota verrà calcolata matematicamente senza ricarichi.</p>
+        <p class="wizard-desc">Inserisci i dati reali del tuo abbonamento e il tuo IBAN per ricevere le quote mensili dai membri.</p>
 
         <form id="createGroupForm">
           
-          <!-- STEP 1: Scelta Servizio o Personalizzato -->
-          <div class="form-group">
-            <label class="form-label">1. Che abbonamento vuoi condividere? *</label>
+          <!-- SEZIONE 1: Dati per Ricevere le Quote (IBAN Capogruppo) -->
+          <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:var(--radius-lg); padding:16px; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <h3 style="font-size:15px; font-weight:800; color:var(--text-main); margin:0;">🏦 1. Dati per Ricevere le Quote (IBAN) *</h3>
+              <span style="font-size:11px; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">100% ESENTE FEE</span>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+              Ricevi direttamente su questo conto l'accredito delle quote mensili. Nessuna commissione a carico del Capogruppo.
+            </p>
+
+            <div class="form-group" style="margin-bottom:10px;">
+              <label class="form-label" style="font-size:12px; font-weight:700;">Intestatario del Conto (Nome e Cognome o Ragione Sociale) *</label>
+              <input type="text" id="wizPayoutLegalName" class="form-input" placeholder="es. Mario Rossi" value="${escapeHtml(wizardState.payoutLegalName)}" required>
+            </div>
+
+            <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
+              <div class="form-group">
+                <label class="form-label" style="font-size:12px; font-weight:700;">Codice IBAN (SEPA) *</label>
+                <input type="text" id="wizPayoutIban" class="form-input" placeholder="IT00X0000000000000000000000" value="${escapeHtml(wizardState.payoutIban)}" style="font-family:var(--font-mono); text-transform:uppercase; font-weight:700;" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size:12px; font-weight:700;">Banca (Opzionale)</label>
+                <input type="text" id="wizPayoutBankName" class="form-input" placeholder="es. Intesa, Revolut, BBVA" value="${escapeHtml(wizardState.payoutBankName)}">
+              </div>
+            </div>
+          </div>
+
+          <!-- SEZIONE 2: Scelta Servizio o Personalizzato -->
+          <div class="form-group" style="margin-bottom:18px;">
+            <label class="form-label" style="font-size:13px; font-weight:800;">2. Che abbonamento vuoi condividere? *</label>
             <div class="service-pick-grid">
               ${services.map(s => `
                 <div class="service-card-select ${wizardState.serviceId === s.id ? 'selected' : ''}" data-id="${s.id}" data-name="${escapeHtml(s.name)}">
@@ -1077,7 +1120,6 @@ function renderWizardView(container, currentUser) {
                 </div>
               `).join('')}
               
-              <!-- Opzione Inserisci un altro servizio -->
               <div class="service-card-select ${isCustomSelected ? 'selected' : ''}" data-id="srv-custom" data-name="" style="border-style:dashed; background:#f1f5f9;">
                 <div class="service-card-icon" style="background:#0f172a; font-size:18px;">➕</div>
                 <span class="service-card-name" style="color:var(--primary);">+ Altro Servizio</span>
@@ -1086,157 +1128,101 @@ function renderWizardView(container, currentUser) {
             
             <div id="customServiceWrap" style="${isCustomSelected ? '' : 'display:none;'} margin-top:10px;">
               <label class="form-label" style="font-size:12px; color:var(--primary);">Nome del Servizio Personalizzato *</label>
-              <input type="text" id="wizCustomName" class="form-input" placeholder="es. Netflix, Notion, ChatGPT, Microsoft 365, Amazon Prime..." value="${escapeHtml(wizardState.customServiceName)}" required>
+              <input type="text" id="wizCustomName" class="form-input" placeholder="es. Netflix, Notion, ChatGPT, Microsoft 365, Amazon Prime..." value="${escapeHtml(wizardState.customServiceName)}">
             </div>
           </div>
 
-          <!-- STEP 2: Costo Reale & Posti -->
-          <div class="form-group">
-            <label class="form-label">2. Nome del Piano (es. Family, Team, Duo, Premium) *</label>
-            <input type="text" id="wizPlanName" class="form-input" placeholder="es. Spotify Family, Canva for Teams, Notion Plus..." value="${escapeHtml(wizardState.planName)}" required>
+          <!-- SEZIONE 3: Costo Reale & Posti -->
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label" style="font-size:13px; font-weight:800;">3. Nome del Piano (es. Family, Team, Duo, Premium, 2TB) *</label>
+            <input type="text" id="wizPlanName" class="form-input" placeholder="es. Family (6 Account), Premium, Pro Team..." value="${escapeHtml(wizardState.planName)}" required>
           </div>
 
-          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
             <div class="form-group">
-              <label class="form-label">Costo Reale Totale (€) *</label>
-              <input type="number" step="0.01" min="0.50" id="wizRealCost" class="form-input" value="${wizardState.realCostEuros}" required>
+              <label class="form-label" style="font-size:12.5px; font-weight:700;">Costo Reale Totale Ufficiale (€) *</label>
+              <input type="number" step="0.01" min="0.50" id="wizRealCost" class="form-input" placeholder="es. 17.99" value="${wizardState.realCostEuros}" required>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Frequenza di Pagamento</label>
-              <div class="fixed-frequency-badge">
+              <label class="form-label" style="font-size:12.5px; font-weight:700;">Frequenza di Pagamento</label>
+              <div class="fixed-frequency-badge" style="padding:10px 12px; font-weight:700;">
                 📅 MENSILE (Fisso)
               </div>
             </div>
           </div>
 
-          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
             <div class="form-group">
-              <label class="form-label">Posti Totali del Piano *</label>
-              <input type="number" min="2" max="20" id="wizTotalSlots" class="form-input" value="${wizardState.totalSlots}" required>
+              <label class="form-label" style="font-size:12.5px; font-weight:700;">Posti Totali del Piano (min. 2) *</label>
+              <input type="number" min="2" max="30" id="wizTotalSlots" class="form-input" placeholder="es. 6" value="${wizardState.totalSlots}" required>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Posti per te (Capogruppo) *</label>
-              <input type="number" min="1" max="5" id="wizOwnerSlots" class="form-input" value="${wizardState.ownerSlots}" required>
+              <label class="form-label" style="font-size:12.5px; font-weight:700;">Posti per te (Capogruppo) *</label>
+              <input type="number" min="1" max="10" id="wizOwnerSlots" class="form-input" value="${wizardState.ownerSlots || 1}" required>
             </div>
           </div>
 
-          <!-- STEP 3: Trasparenza Economica con MoneySplit -->
-          <div class="wizard-calc-box">
+          <!-- Box Trasparenza Economica Live MoneySplit -->
+          <div class="wizard-calc-box" style="margin-bottom:20px;">
             <div class="wizard-calc-header">
               <span>📊</span> Calcolo Trasparente MoneySplit:
             </div>
             <div class="wizard-calc-row">
-              <span>Costo reale abbonamento dichiarato:</span>
+              <span>Costo totale dichiarato dal Capogruppo:</span>
               <strong>${formatCents(pricing.realCostCents)} / mese</strong>
             </div>
             <div class="wizard-calc-row">
-              <span>Quota base complessiva (Somma esatta quote):</span>
-              <strong>${formatCents(pricing.sumExactSharesCents)} / mese (100% Esatta)</strong>
-            </div>
-            <div class="wizard-calc-row">
-              <span>Quota base per membro (${pricing.realCostCents > 0 ? `${formatCents(pricing.realCostCents)} ÷ ${pricing.totalSlots}` : '0,00 €'}):</span>
+              <span>Quota base per ciascun membro:</span>
               <strong>${pricing.displayShareText} / mese</strong>
             </div>
             <div class="wizard-calc-row">
               <span>Commissione BuyYourShare (a carico membro):</span>
-              <span>+ ${formatCents(pricing.platformFeeCents)} / mese</span>
+              <span>+ ${formatCents(pricing.platformFeeCents)} / mese</strong>
             </div>
             <div class="wizard-calc-row highlight">
-              <span>Totale mensile a carico del membro:</span>
-              <span>${formatCents(pricing.memberTotalCents)} / mese</span>
+              <span>Totale mensile pagato dal membro:</span>
+              <span>${formatCents(pricing.memberTotalCents)} / mese</strong>
             </div>
-            <div class="wizard-owner-exemption-note">
-              🛡️ <strong>Esenzione Capogruppo:</strong> Tu paghi solo la tua quota reale (${formatCents(pricing.ownerShareCents)}). <strong>Nessuna commissione applicata al Capogruppo.</strong>
+            <div class="wizard-owner-exemption-note" style="margin-top:8px;">
+              🛡️ <strong>Esenzione Capogruppo:</strong> Tu ricevi ${formatCents(pricing.baseMemberShareCents)} netti per ogni membro. <strong>Nessuna commissione applicata a te.</strong>
             </div>
           </div>
 
-          <!-- STEP 4: Informazioni di Accesso (Una sola volta) -->
-          <div style="border-top:1px solid var(--border-subtle); padding-top:18px; margin-top:18px;">
-            <h3 style="font-size:15px; font-weight:800; margin-bottom:4px;">🔒 Informazioni per l'Accesso</h3>
+          <!-- SEZIONE 4: Informazioni per l'Accesso dei Membri -->
+          <div style="border-top:1px solid var(--border-subtle); padding-top:18px; margin-top:18px; margin-bottom:18px;">
+            <h3 style="font-size:15px; font-weight:800; margin-bottom:4px;">🔒 4. Informazioni per l'Accesso dei Membri</h3>
             <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">
-              Inserisci i dati una sola volta. Il sistema li consegnerà automaticamente a ogni nuovo membro autorizzato.
+              Inserisci il link di invito o le istruzioni. Verranno mostrati in automatico solo ai membri che acquistano un posto.
             </p>
 
-            <div class="form-group">
-              <label class="form-label">Link di Accesso / Invito Diretto *</label>
-              <input type="text" id="wizAccessUrl" class="form-input" placeholder="https://..." value="${escapeHtml(wizardState.accessUrl)}" required>
+            <div class="form-group" style="margin-bottom:12px;">
+              <label class="form-label" style="font-size:12.5px; font-weight:700;">Link di Invito / Accesso Diretto (Opzionale o Consigliato)</label>
+              <input type="text" id="wizAccessUrl" class="form-input" placeholder="https://..." value="${escapeHtml(wizardState.accessUrl)}">
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Istruzioni per il Membro *</label>
-              <textarea id="wizInstructions" class="form-textarea" rows="3" placeholder="Scrivi come accedere passo dopo passo..." required>${escapeHtml(wizardState.instructions)}</textarea>
+            <div class="form-group" style="margin-bottom:12px;">
+              <label class="form-label" style="font-size:12.5px; font-weight:700;">Istruzioni Passo-Passo per il Membro *</label>
+              <textarea id="wizInstructions" class="form-textarea" rows="3" placeholder="Scrivi come accedere (es. 'Clicca sul link di invito con il tuo account personale')..." required>${escapeHtml(wizardState.instructions)}</textarea>
             </div>
 
             <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div class="form-group">
-                <label class="form-label">Codice Invito (Opzionale)</label>
+                <label class="form-label" style="font-size:12px;">Codice Invito (Opzionale)</label>
                 <input type="text" id="wizAccessCode" class="form-input" placeholder="es. 849204" value="${escapeHtml(wizardState.accessCode)}">
               </div>
               <div class="form-group">
-                <label class="form-label">Note Aggiuntive (Opzionale)</label>
-                <input type="text" id="wizAdditionalInfo" class="form-input" placeholder="es. Playlist personali protette" value="${escapeHtml(wizardState.additionalInfo)}">
+                <label class="form-label" style="font-size:12px;">Note Aggiuntive (Opzionale)</label>
+                <input type="text" id="wizAdditionalInfo" class="form-input" placeholder="es. Account 100% personale e privato" value="${escapeHtml(wizardState.additionalInfo)}">
               </div>
             </div>
-          <!-- STEP 5: Dati per Ricevere le Quote (Stripe Connect & IBAN) -->
-          <div style="border-top:1px solid var(--border-subtle); padding-top:18px; margin-top:18px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <h3 style="font-size:15px; font-weight:800;">🏦 5. Dati per Ricevere le Quote & IBAN *</h3>
-              <span style="font-size:11px; background:${stripeConnectService.isPayoutReady(currentUser.id) ? '#dcfce7' : '#fee2e2'}; color:${stripeConnectService.isPayoutReady(currentUser.id) ? '#166534' : '#991b1b'}; padding:3px 8px; border-radius:var(--radius-full); font-weight:800;">
-                ${stripeConnectService.isPayoutReady(currentUser.id) ? '🟢 CONTO ATTIVO & VERIFICATO' : '🔴 CONFIGURAZIONE RICHIESTA'}
-              </span>
-            </div>
-            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
-              Per ricevere l'accredito mensile delle quote dei membri (es. 3,50 €), il tuo IBAN e conto di ricezione devono essere configurati tramite Stripe Connect.
-            </p>
-
-            ${(() => {
-              const isReady = stripeConnectService.isPayoutReady(currentUser.id);
-              const pSet = db.getUserPayoutSettings(currentUser.id);
-
-              if (isReady) {
-                return `
-                  <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                    <div>
-                      <strong style="color:#166534; font-size:13.5px; display:block;">✅ Conto Stripe Connect & IBAN Attivi</strong>
-                      <span style="font-size:12px; color:var(--text-secondary); display:block; margin-top:2px;">
-                        Intestatario: <strong>${escapeHtml(pSet.legalName)}</strong> • IBAN: <code style="font-family:var(--font-mono); font-weight:700; color:#003087;">${escapeHtml(pSet.iban)}</code>
-                      </span>
-                    </div>
-                    <button type="button" id="btnManageStripeOnboarding" class="btn btn-secondary btn-sm" style="font-size:12px; font-weight:800;">
-                      ✏️ Modifica IBAN / Dati
-                    </button>
-                  </div>
-                `;
-              } else {
-                return `
-                  <div style="background:#fff7ed; border:1px solid #fdba74; border-radius:var(--radius-md); padding:16px; margin-bottom:10px;">
-                    <p style="font-size:13px; color:#9a3412; font-weight:800; margin-bottom:6px;">
-                      ⚠️ Configurazione IBAN di Ricezione Quote Obbligatoria
-                    </p>
-                    <p style="font-size:11.5px; color:#7c2d12; margin-bottom:12px; line-height:1.4;">
-                      Non puoi pubblicare questo abbonamento senza prima impostare il tuo IBAN per ricevere le quote. I dati bancari vengono protetti e gestiti tramite Stripe Connect.
-                    </p>
-                    <button type="button" id="btnStartStripeOnboarding" class="btn btn-primary btn-block" style="background:#0070ba; font-size:13.5px; font-weight:800; padding:11px;">
-                      🏦 CONFIGURA IBAN & ATTIVA RICEZIONE QUOTE
-                    </button>
-                  </div>
-                `;
-              }
-            })()}
           </div>
 
           <!-- Submit Button -->
-          ${stripeConnectService.isPayoutReady(currentUser.id) ? `
-            <button type="submit" class="btn btn-primary btn-block" style="padding:14px; font-size:15px; margin-top:14px; font-weight:800;">
-              🎉 PUBBLICA GRUPPO NEL MARKETPLACE
-            </button>
-          ` : `
-            <button type="button" id="btnBlockedPublish" class="btn btn-secondary btn-block" style="padding:14px; font-size:13.5px; margin-top:14px; opacity:0.75; font-weight:700; cursor:not-allowed;">
-              🔒 Completa prima i "Dati per Ricevere le Quote" per pubblicare
-            </button>
-          `}
+          <button type="submit" class="btn btn-primary btn-block" style="padding:14px; font-size:15px; font-weight:800;">
+            🎉 PUBBLICA GRUPPO NEL MARKETPLACE
+          </button>
         </form>
 
       </div>
@@ -1251,45 +1237,38 @@ function renderWizardView(container, currentUser) {
   const customNameInput = document.getElementById('wizCustomName');
   const planNameInput = document.getElementById('wizPlanName');
   const customWrap = document.getElementById('customServiceWrap');
+  const ibanInput = document.getElementById('wizPayoutIban');
+  const legalNameInput = document.getElementById('wizPayoutLegalName');
+  const bankNameInput = document.getElementById('wizPayoutBankName');
 
   const updateStateAndRerender = () => {
-    wizardState.realCostEuros = costInput.value;
-    wizardState.totalSlots = totalSlotsInput.value;
-    wizardState.ownerSlots = ownerSlotsInput.value;
-    wizardState.customServiceName = customNameInput.value;
-    wizardState.planName = planNameInput.value;
-    wizardState.accessUrl = document.getElementById('wizAccessUrl').value;
-    wizardState.instructions = document.getElementById('wizInstructions').value;
-    wizardState.accessCode = document.getElementById('wizAccessCode').value;
-    wizardState.additionalInfo = document.getElementById('wizAdditionalInfo').value;
+    wizardState.realCostEuros = costInput ? costInput.value : '';
+    wizardState.totalSlots = totalSlotsInput ? totalSlotsInput.value : '';
+    wizardState.ownerSlots = ownerSlotsInput ? ownerSlotsInput.value : '1';
+    wizardState.customServiceName = customNameInput ? customNameInput.value : '';
+    wizardState.planName = planNameInput ? planNameInput.value : '';
+    wizardState.accessUrl = document.getElementById('wizAccessUrl')?.value || '';
+    wizardState.instructions = document.getElementById('wizInstructions')?.value || '';
+    wizardState.accessCode = document.getElementById('wizAccessCode')?.value || '';
+    wizardState.additionalInfo = document.getElementById('wizAdditionalInfo')?.value || '';
+    wizardState.payoutIban = ibanInput ? ibanInput.value.trim().toUpperCase() : '';
+    wizardState.payoutLegalName = legalNameInput ? legalNameInput.value.trim() : '';
+    wizardState.payoutBankName = bankNameInput ? bankNameInput.value.trim() : '';
   };
 
   const updateCalcBoxLive = () => {
     const rCents = eurosToCents(costInput.value || 0);
-    const tSlots = parseInt(totalSlotsInput.value, 10) || 6;
-    const pr = calculatePricingBreakdown(rCents, tSlots, feeCents);
+    const tSlots = parseInt(totalSlotsInput.value, 10) || 0;
+    const pr = tSlots >= 2 && rCents > 0
+      ? calculatePricingBreakdown(rCents, tSlots, feeCents)
+      : { realCostCents: rCents, sumExactSharesCents: rCents, displayShareText: '0,00 €', memberTotalCents: feeCents, ownerShareCents: 0, baseMemberShareCents: 0, platformFeeCents: feeCents };
+
     const calcBox = container.querySelector('.wizard-calc-box');
     if (calcBox) {
       const rows = calcBox.querySelectorAll('.wizard-calc-row strong, .wizard-calc-row span:last-child');
       if (rows[0]) rows[0].textContent = `${formatCents(pr.realCostCents)} / mese`;
-      if (rows[1]) rows[1].textContent = `${formatCents(pr.sumExactSharesCents)} / mese (100% Esatta)`;
-      if (rows[2]) rows[2].textContent = `${pr.displayShareText} / mese`;
-      if (rows[4]) rows[4].textContent = `${formatCents(pr.memberTotalCents)} / mese`;
-
-      // Controllo Economico Live Guardrail (9,42 €)
-      let warnEl = calcBox.querySelector('.wizard-margin-warning');
-      const margin = validateGroupEconomicMargin(pr.baseMemberShareCents);
-      if (!margin.isValid) {
-        if (!warnEl) {
-          warnEl = document.createElement('div');
-          warnEl.className = 'wizard-margin-warning';
-          warnEl.style.cssText = 'background:#fef2f2; border:1px solid #f87171; border-radius:var(--radius-sm); padding:10px; margin-top:10px; font-size:12px; color:#991b1b;';
-          calcBox.appendChild(warnEl);
-        }
-        warnEl.innerHTML = `⚠️ <strong>Attenzione Economica:</strong> La quota base per membro (${formatCents(pr.baseMemberShareCents)}) supera la soglia di 9,42 €/mese. Per garantire la sostenibilità a 1,49 € fissi, aumenta il numero di posti del piano.`;
-      } else if (warnEl) {
-        warnEl.remove();
-      }
+      if (rows[1]) rows[1].textContent = `${pr.displayShareText} / mese`;
+      if (rows[3]) rows[3].textContent = `${formatCents(pr.memberTotalCents)} / mese`;
     }
   };
 
@@ -1312,42 +1291,19 @@ function renderWizardView(container, currentUser) {
       card.classList.add('selected');
 
       if (sId === 'srv-custom') {
-        customWrap.style.display = 'block';
-        customNameInput.value = '';
-        wizardState.customServiceName = '';
-        customNameInput.focus();
+        if (customWrap) customWrap.style.display = 'block';
+        if (customNameInput) {
+          customNameInput.value = '';
+          wizardState.customServiceName = '';
+          customNameInput.focus();
+        }
       } else {
-        customWrap.style.display = 'none';
+        if (customWrap) customWrap.style.display = 'none';
         wizardState.customServiceName = card.dataset.name;
-        customNameInput.value = card.dataset.name;
+        if (customNameInput) customNameInput.value = card.dataset.name;
       }
     });
   });
-
-  // Onboarding modal triggers
-  const btnStartOnboarding = container.querySelector('#btnStartStripeOnboarding');
-  if (btnStartOnboarding) {
-    btnStartOnboarding.onclick = (e) => {
-      e.preventDefault();
-      openStripeOnboardingModal(currentUser);
-    };
-  }
-
-  const btnManageOnboarding = container.querySelector('#btnManageStripeOnboarding');
-  if (btnManageOnboarding) {
-    btnManageOnboarding.onclick = (e) => {
-      e.preventDefault();
-      openStripeOnboardingModal(currentUser);
-    };
-  }
-
-  const btnBlocked = container.querySelector('#btnBlockedPublish');
-  if (btnBlocked) {
-    btnBlocked.onclick = (e) => {
-      e.preventDefault();
-      openStripeOnboardingModal(currentUser);
-    };
-  }
 
   // Form Submit
   form.addEventListener('submit', async (e) => {
@@ -1356,10 +1312,27 @@ function renderWizardView(container, currentUser) {
 
     const realCostCents = eurosToCents(wizardState.realCostEuros);
     const totalSlots = parseInt(wizardState.totalSlots, 10);
-    const ownerSlots = parseInt(wizardState.ownerSlots, 10);
+    const ownerSlots = parseInt(wizardState.ownerSlots, 10) || 1;
+    const cleanIban = (wizardState.payoutIban || '').replace(/\s/g, '').toUpperCase();
 
+    if (!cleanIban || cleanIban.length < 15) {
+      alert('Inserisci un codice IBAN valido per ricevere le quote.');
+      if (ibanInput) ibanInput.focus();
+      return;
+    }
+    if (!wizardState.payoutLegalName) {
+      alert('Inserisci l\'intestatario del conto.');
+      if (legalNameInput) legalNameInput.focus();
+      return;
+    }
     if (isNaN(realCostCents) || realCostCents <= 0) {
       alert('Inserisci un costo valido maggiore di zero');
+      if (costInput) costInput.focus();
+      return;
+    }
+    if (isNaN(totalSlots) || totalSlots < 2) {
+      alert('Il piano deve avere almeno 2 posti totali.');
+      if (totalSlotsInput) totalSlotsInput.focus();
       return;
     }
     if (ownerSlots >= totalSlots) {
@@ -1377,7 +1350,7 @@ function renderWizardView(container, currentUser) {
     }
 
     const payload = {
-      serviceId: wizardState.serviceId,
+      serviceId: wizardState.serviceId || 'srv-custom',
       customServiceName: wizardState.customServiceName.trim(),
       planName: wizardState.planName.trim(),
       realCostEuros: wizardState.realCostEuros,
@@ -1387,8 +1360,18 @@ function renderWizardView(container, currentUser) {
       instructions: (wizardState.instructions || '').trim(),
       additionalInfo: (wizardState.additionalInfo || '').trim(),
       accessCode: (wizardState.accessCode || '').trim(),
+      payoutIban: cleanIban,
+      payoutLegalName: wizardState.payoutLegalName,
+      payoutBankName: wizardState.payoutBankName,
       publishImmediately: true
     };
+
+    // Salva subito anche nel client db
+    db.updateUserPayoutSettings(currentUser.id, {
+      iban: cleanIban,
+      legalName: wizardState.payoutLegalName,
+      bankName: wizardState.payoutBankName
+    }, currentUser);
 
     const submitBtn = form.querySelector('button[type="submit"]');
     if (submitBtn) {
@@ -1397,7 +1380,6 @@ function renderWizardView(container, currentUser) {
     }
 
     try {
-      // 1. Invio persistente al Backend Server Node.js
       const token = localStorage.getItem('buyyourshare_session_token');
       const resp = await fetch('/api/groups', {
         method: 'POST',
@@ -1413,10 +1395,8 @@ function renderWizardView(container, currentUser) {
 
       if (resp.ok && serverRes.success && serverRes.group) {
         createdId = serverRes.group.id;
-        // Sincronizza il database locale dal server
         await db.syncGroupsFromServer();
       } else {
-        // Fallback locale in caso di problemi di rete
         const localGroup = db.createGroup(
           { serviceId: payload.serviceId, customServiceName: payload.customServiceName, planName: payload.planName, realSubscriptionCostCents: realCostCents, totalSlots, ownerSlots },
           { accessUrl: finalUrl, instructions: payload.instructions, additionalInfo: payload.additionalInfo, accessCode: payload.accessCode },
@@ -3069,21 +3049,7 @@ function openPaymentAndPayoutSettingsModal(currentUser, initialTab = 'payout') {
           <form id="formSavePayoutIban">
             <div class="form-group" style="margin-bottom:12px;">
               <label class="form-label" style="font-size:12px; font-weight:800;">Intestatario del Conto (Nome e Cognome o Ragione Sociale) *</label>
-              <input type="text" id="inputSettingsLegalName" class="form-input" value="${escapeHtml(payoutSettings.legalName || currentUser.fullName)}" style="font-size:12.5px;" required>
-            </div>
-
-            <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
-              <div class="form-group">
-                <label class="form-label" style="font-size:12px; font-weight:800;">Tipo Soggetto *</label>
-                <select id="inputSettingsAccountType" class="form-select" style="font-size:12.5px;">
-                  <option value="individual" ${conn.businessType !== 'company' ? 'selected' : ''}>Persona Fisica / Privato</option>
-                  <option value="company" ${conn.businessType === 'company' ? 'selected' : ''}>Azienda / Ditta</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label" style="font-size:12px; font-weight:800;">Codice Fiscale / P.IVA *</label>
-                <input type="text" id="inputSettingsTaxId" class="form-input" value="${escapeHtml(payoutSettings.taxId || 'RSSMRC85M01H501Z')}" style="font-size:12.5px; text-transform:uppercase;" required>
-              </div>
+              <input type="text" id="inputSettingsLegalName" class="form-input" placeholder="es. Mario Rossi" value="${escapeHtml(payoutSettings.legalName || currentUser.fullName)}" style="font-size:12.5px;" required>
             </div>
 
             <div class="form-group" style="margin-bottom:12px;">
@@ -3206,22 +3172,16 @@ function openPaymentAndPayoutSettingsModal(currentUser, initialTab = 'payout') {
         e.preventDefault();
         const ibanVal = document.getElementById('inputSettingsIban').value;
         const bankNameVal = document.getElementById('inputSettingsBankName').value;
-        const legalNameVal = document.getElementById('inputSettingsLegalName').value;
-        const taxIdVal = document.getElementById('inputSettingsTaxId').value;
-        const accountTypeVal = document.getElementById('inputSettingsAccountType').value;
-
         await stripeConnectService.completeOnboarding(currentUser, {
           legalName: legalNameVal,
-          accountType: accountTypeVal,
           iban: ibanVal,
           simulatedStatus: 'success'
         });
 
         db.updateUserPayoutSettings(currentUser.id, {
           iban: ibanVal,
-          bankName: bankNameVal || 'Conto Bancario Principale (SEPA)',
-          legalName: legalNameVal,
-          taxId: taxIdVal
+          bankName: bankNameVal || '',
+          legalName: legalNameVal
         }, currentUser);
 
         modal.classList.remove('active');

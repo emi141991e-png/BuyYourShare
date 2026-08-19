@@ -962,11 +962,10 @@ class Database {
     if (!user) return null;
     const conn = (this.data.connectedAccounts || []).find(c => c.userId === userId) || {};
     return {
-      iban: user.iban || (conn.bankLast4 ? `IT60X0542811101000000${conn.bankLast4}` : 'IT60X0542811101000000123456'),
-      bankName: user.bankName || 'Conto Bancario Principale (SEPA)',
+      iban: user.iban || (conn.bankLast4 ? `IT...${conn.bankLast4}` : null),
+      bankName: user.bankName || '',
       paypalPayoutEmail: user.paypalPayoutEmail || user.email,
-      legalName: user.legalName || conn.legalName || user.fullName,
-      taxId: user.taxId || conn.taxId || 'RSSMRC85M01H501Z',
+      legalName: user.legalName || conn.legalName || user.fullName || '',
       stripeAccountId: conn.stripeAccountId || user.stripeAccountId || `acct_${user.id.replace('usr-', '')}`,
       payoutsEnabled: conn.payoutsEnabled !== false,
       onboardingStatus: conn.onboardingStatus || 'completed'
@@ -985,12 +984,11 @@ class Database {
     if (settings.bankName !== undefined) user.bankName = settings.bankName.trim();
     if (settings.paypalPayoutEmail !== undefined) user.paypalPayoutEmail = settings.paypalPayoutEmail.trim();
     if (settings.legalName !== undefined) user.legalName = settings.legalName.trim();
-    if (settings.taxId !== undefined) user.taxId = settings.taxId.trim().toUpperCase();
 
     // Sincronizza anche connectedAccounts
     if (!this.data.connectedAccounts) this.data.connectedAccounts = [];
     let conn = this.data.connectedAccounts.find(c => c.userId === userId);
-    const last4 = cleanIban ? cleanIban.slice(-4) : (user.iban ? user.iban.slice(-4) : '1234');
+    const last4 = cleanIban ? cleanIban.slice(-4) : (user.iban ? user.iban.slice(-4) : '');
     
     if (!conn) {
       conn = {
@@ -1005,7 +1003,6 @@ class Database {
         country: 'IT',
         defaultCurrency: 'eur',
         legalName: user.legalName || user.fullName,
-        taxId: user.taxId || 'RSSMRC85M01H501Z',
         onboardedAt: new Date().toISOString()
       };
       this.data.connectedAccounts.push(conn);
@@ -1016,7 +1013,6 @@ class Database {
       conn.detailsSubmitted = true;
       conn.onboardingStatus = 'completed';
       conn.legalName = user.legalName || user.fullName;
-      conn.taxId = user.taxId || 'RSSMRC85M01H501Z';
       conn.updatedAt = new Date().toISOString();
     }
 

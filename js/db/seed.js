@@ -86,8 +86,8 @@ export const INITIAL_USERS = [
     role: 'user',
     isVerified: true,
     isSuspended: false,
-    iban: 'IT60X0542811101000000123456',
-    bankName: 'Intesa Sanpaolo (Conto Corrente)',
+    iban: null,
+    bankName: null,
     paypalPayoutEmail: 'marco.rossi.paypal@gmail.com',
     stripeAccountId: 'acct_1N42MarcoRossi',
     createdAt: '2026-08-01T10:00:00Z'

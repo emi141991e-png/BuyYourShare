@@ -176,6 +176,44 @@
       "privacyAcceptedAt": "2026-08-18T15:29:52.506Z",
       "createdAt": "2026-08-18T15:29:52.506Z",
       "updatedAt": "2026-08-18T15:29:52.559Z"
+    },
+    {
+      "id": "usr-1787174909030",
+      "email": "acquirente@test.com",
+      "fullName": "Mario Rossi",
+      "firstName": "Mario",
+      "lastName": "Rossi",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-19T21:28:29.030Z",
+      "privacyAcceptedAt": "2026-08-19T21:28:29.031Z",
+      "iban": "IT60X0542811101000000483284",
+      "bankName": "Conto Personale SEPA",
+      "paypalPayoutEmail": "acquirente@test.com",
+      "createdAt": "2026-08-19T21:28:29.031Z"
+    },
+    {
+      "id": "usr-1787175324354",
+      "email": "capogruppo_1787175324244@example.com",
+      "fullName": "Giuseppe Verdi",
+      "firstName": "Giuseppe",
+      "lastName": "Verdi",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-19T21:35:24.354Z",
+      "privacyAcceptedAt": "2026-08-19T21:35:24.355Z",
+      "iban": "IT89N0306909606100000012345",
+      "bankName": "Banca Intesa",
+      "paypalPayoutEmail": "capogruppo_1787175324244@example.com",
+      "createdAt": "2026-08-19T21:35:24.355Z",
+      "legalName": "Giuseppe Verdi",
+      "updatedAt": "2026-08-19T21:35:24.381Z"
     }
   ],
   "services": [
@@ -263,7 +301,7 @@
       "totalSlots": 6,
       "ownerSlots": 1,
       "availableSlots": 5,
-      "occupiedMemberSlots": 0,
+      "occupiedMemberSlots": 1,
       "baseMemberShareCents": 350,
       "platformFeeCents": 149,
       "memberTotalCents": 499,
@@ -275,7 +313,7 @@
       "rulesAndRequirements": "Invito ufficiale Spotify Family tramite email.",
       "description": "Gruppo Spotify Family gestito da Marco Rossi con rinnovo puntuale.",
       "createdAt": "2026-08-18T15:19:34.922Z",
-      "updatedAt": "2026-08-18T16:53:24.876Z"
+      "updatedAt": "2026-08-19T21:28:29.091Z"
     },
     {
       "id": "grp-1787072082706",
@@ -524,6 +562,30 @@
       "description": "Gruppo ufficiale YouTube Premium con musica inclusa e zero annunci.",
       "createdAt": "2026-08-19T21:22:04.604Z",
       "updatedAt": "2026-08-19T21:22:04.604Z"
+    },
+    {
+      "id": "grp-1787175324383",
+      "ownerId": "usr-1787175324354",
+      "serviceId": "srv-youtube",
+      "customServiceName": "YouTube Premium",
+      "planName": "Famiglia (5 Membri)",
+      "realSubscriptionCostCents": 1599,
+      "totalSlots": 5,
+      "ownerSlots": 1,
+      "availableSlots": 4,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 319,
+      "platformFeeCents": 149,
+      "memberTotalCents": 468,
+      "groupType": "public",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-19T21:35:24.383Z",
+      "inviteCode": "BYS-3256",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione YouTube Premium",
+      "createdAt": "2026-08-19T21:35:24.383Z",
+      "updatedAt": "2026-08-19T21:35:24.383Z"
     }
   ],
   "memberships": [
@@ -862,6 +924,40 @@
       "currentPeriodEnd": "2026-09-18T21:16:05.674Z",
       "nextBillingDate": "2026-09-18T21:16:05.674Z",
       "joinedAt": "2026-08-19T21:16:05.674Z"
+    },
+    {
+      "id": "mem_str_1787174909088",
+      "groupId": "grp-1787066374922",
+      "userId": "usr-1787174909030",
+      "role": "MEMBER",
+      "slotNumber": 2,
+      "paidShareCents": 350,
+      "paidFeeCents": 149,
+      "memberTotalCents": 499,
+      "paymentMethod": "CARD_EEA",
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "stripeSubscriptionId": "sub_1787174909088",
+      "currentPeriodStart": "2026-08-19T21:28:29.083Z",
+      "currentPeriodEnd": "2026-09-19T21:28:29.083Z",
+      "nextBillingDate": "2026-09-19T21:28:29.083Z",
+      "joinedAt": "2026-08-19T21:28:29.088Z"
+    },
+    {
+      "id": "mem-grp-1787175324383-owner",
+      "groupId": "grp-1787175324383",
+      "userId": "usr-1787175324354",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 320,
+      "paidFeeCents": 0,
+      "memberTotalCents": 320,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-19T21:35:24.385Z",
+      "currentPeriodEnd": "2026-09-18T21:35:24.385Z",
+      "nextBillingDate": "2026-09-18T21:35:24.385Z",
+      "joinedAt": "2026-08-19T21:35:24.385Z"
     }
   ],
   "accessInstructions": [
@@ -954,6 +1050,15 @@
       "accessCode": "",
       "ownerSpotifyAccount": "",
       "additionalInfo": "Include 2TB di cloud storage e Gemini 1.5 Pro."
+    },
+    {
+      "id": "acc-1787175324388",
+      "groupId": "grp-1787175324383",
+      "accessUrl": "https://youtube.com/invite/test12345",
+      "instructions": "Clicca sul link di invito per unirti al gruppo famiglia.",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": "Musica senza pubblicità inclusa"
     }
   ],
   "chats": [
@@ -1022,6 +1127,12 @@
       "groupId": "grp-1787174165672",
       "status": "ACTIVE",
       "createdAt": "2026-08-19T21:16:05.680Z"
+    },
+    {
+      "id": "cht-1787175324390",
+      "groupId": "grp-1787175324383",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-19T21:35:24.390Z"
     }
   ],
   "chatMessages": [
@@ -1192,6 +1303,22 @@
       "messageType": "SYSTEM",
       "messageContent": "🎉 Gruppo creato da Admin BuyYourShare. Benvenuti nella chat del gruppo!",
       "createdAt": "2026-08-19T21:16:05.682Z"
+    },
+    {
+      "id": "msg-1787174909095",
+      "chatId": "cht-1787066374927",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "👤 Mario Rossi è entrato nel gruppo (Posto #2). Pagamento Carta confermato.",
+      "createdAt": "2026-08-19T21:28:29.095Z"
+    },
+    {
+      "id": "msg-1787175324392",
+      "chatId": "cht-1787175324390",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Giuseppe Verdi. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-19T21:35:24.392Z"
     }
   ],
   "connectedAccounts": [
@@ -1472,6 +1599,32 @@
       "payoutDate": null,
       "idempotencyKey": "pp_capture_2GG1787066565416",
       "createdAt": "2026-08-18T15:22:52.981Z"
+    },
+    {
+      "id": "tx_log_1787174909101_o7y01",
+      "transactionId": "pi_1787174909082_112",
+      "invoiceId": "in_1787174909100",
+      "subscriptionId": "sub_1787174909088",
+      "connectedAccountId": "usr-owner-1",
+      "memberId": "usr-1787174909030",
+      "groupId": "grp-1787066374922",
+      "slotNumber": 2,
+      "baseShareCents": 350,
+      "buyyourshareFeeCents": 149,
+      "totalAmountCents": 499,
+      "paymentProviderFeeCents": 36,
+      "netPlatformAmountCents": 113,
+      "paymentMethod": "CARD_EEA",
+      "cycleNumber": 1,
+      "paymentStatus": "SUCCEEDED",
+      "transferStatus": "TRANSFERRED",
+      "payoutStatus": "PAID",
+      "transferId": "tr_str_1787174909100",
+      "payoutId": "po_str_1787174909100",
+      "payoutDestination": "acct_1N42MarcoRossi",
+      "payoutDate": "2026-08-19T21:28:29.100Z",
+      "idempotencyKey": "stripe_pi_1787174909082_112",
+      "createdAt": "2026-08-19T21:28:29.101Z"
     }
   ],
   "notifications": [
@@ -1582,6 +1735,15 @@
       "title": "Abbonamento Attivato! 🎉",
       "message": "Il tuo posto #2 in \"Spotify Family Ufficiale\" è attivo. Credenziali e chat sbloccate.",
       "actionUrl": "#miei-abbonamenti"
+    },
+    {
+      "id": "notif-1787174909098_854",
+      "isRead": false,
+      "createdAt": "2026-08-19T21:28:29.098Z",
+      "userId": "usr-owner-1",
+      "title": "🎉 Nuovo membro pagante!",
+      "message": "Mario Rossi ha acquistato il Posto #2 di \"Spotify\". Quota accreditata: +3.50 €/mese.",
+      "actionUrl": "#miei-gruppi"
     }
   ],
   "sessions": [
@@ -2058,6 +2220,18 @@
       "userId": "usr-admin",
       "createdAt": "2026-08-19T21:16:05.649Z",
       "expiresAt": "2026-09-18T21:16:05.650Z"
+    },
+    {
+      "token": "bys_token_1787174909037_xn0s5rmefh",
+      "userId": "usr-1787174909030",
+      "createdAt": "2026-08-19T21:28:29.037Z",
+      "expiresAt": "2026-09-18T21:28:29.037Z"
+    },
+    {
+      "token": "bys_token_1787175324359_4xfhm3qdlq",
+      "userId": "usr-1787175324354",
+      "createdAt": "2026-08-19T21:35:24.359Z",
+      "expiresAt": "2026-09-18T21:35:24.359Z"
     }
   ],
   "adminAuditLogs": [

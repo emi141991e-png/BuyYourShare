@@ -165,8 +165,20 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       accessCode,
       ownerSpotifyAccount,
       additionalInfo,
-      publishImmediately
+      publishImmediately,
+      payoutIban,
+      payoutLegalName,
+      payoutBankName
     } = req.body || {};
+
+    // Se forniti dati IBAN nel wizard di creazione, salvali subito sul profilo
+    if (payoutIban && payoutIban.trim()) {
+      await dataRepository.updateUser(user.id, {
+        iban: payoutIban.trim().toUpperCase(),
+        bankName: payoutBankName ? payoutBankName.trim() : (user.bankName || ''),
+        legalName: payoutLegalName ? payoutLegalName.trim() : (user.legalName || user.fullName)
+      });
+    }
 
     const realCostCents = Math.round((parseFloat(realCostEuros) || 0) * 100);
     const tSlots = parseInt(totalSlots, 10) || 6;
