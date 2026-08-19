@@ -134,6 +134,81 @@ class AuthService {
   }
 
   /**
+   * Richiesta invio codice recupero password
+   */
+  async forgotPassword(email) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) throw new Error('Inserisci il tuo indirizzo email.');
+
+    const resp = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.message || 'Errore durante l\'invio del codice di recupero.');
+    }
+    return data;
+  }
+
+  /**
+   * Verifica validità codice di recupero
+   */
+  async verifyResetCode(email, code) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanCode = (code || '').trim();
+
+    const resp = await fetch('/api/auth/verify-reset-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, code: cleanCode })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.message || 'Codice di verifica non valido o scaduto.');
+    }
+    return data;
+  }
+
+  /**
+   * Reimpostazione nuova password con codice
+   */
+  async resetPassword(email, code, newPassword, confirmPassword) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanCode = (code || '').trim();
+    const cleanPass = (newPassword || '').trim();
+    const cleanConfirm = (confirmPassword || '').trim();
+
+    const resp = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        code: cleanCode,
+        newPassword: cleanPass,
+        confirmPassword: cleanConfirm
+      })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.message || 'Errore durante la modifica della password.');
+    }
+
+    // Aggiorna anche utente locale se presente
+    const localUser = db.data.users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (localUser) {
+      localUser.password = cleanPass;
+      db.save();
+    }
+
+    return data;
+  }
+
+  /**
    * Logout utente corrente
    */
   async logout() {

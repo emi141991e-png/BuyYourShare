@@ -330,10 +330,11 @@ function updateBottomNav() {
 }
 
 // =========================================================================
-// 0. AUTHENTICATION & REGISTRATION LANDING VIEW (CON VERIFICA EMAIL OTP & DEMO)
+// 0. AUTHENTICATION & REGISTRATION LANDING VIEW (CON EMAIL AUTOMATICA & RECUPERO PASSWORD)
 // =========================================================================
 function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '') {
   let activeTab = initialTab;
+  let resetEmailHolder = emailPrefill || '';
 
   function renderForm() {
     container.innerHTML = `
@@ -352,27 +353,32 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         <!-- Auth Card Container -->
         <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-xl); padding:26px 28px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.06);">
           
-          <!-- Tabs Switcher -->
-          <div style="display:grid; grid-template-columns:1fr 1fr; background:#f1f5f9; border-radius:var(--radius-md); padding:4px; margin-bottom:22px;">
-            <button type="button" id="tabBtnLogin" class="btn ${activeTab === 'login' ? 'btn-primary' : 'btn-ghost'}" style="font-size:13px; font-weight:800; padding:8px; border-radius:var(--radius-sm); border:none; ${activeTab === 'login' ? 'background:#003087; color:white;' : 'color:var(--text-secondary);'}">
-              🔐 Accedi
-            </button>
-            <button type="button" id="tabBtnRegister" class="btn ${activeTab === 'register' ? 'btn-primary' : 'btn-ghost'}" style="font-size:13px; font-weight:800; padding:8px; border-radius:var(--radius-sm); border:none; ${activeTab === 'register' ? 'background:#003087; color:white;' : 'color:var(--text-secondary);'}">
-              ✨ Registrati
-            </button>
-          </div>
+          ${activeTab === 'login' || activeTab === 'register' ? `
+            <!-- Tabs Switcher -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; background:#f1f5f9; border-radius:var(--radius-md); padding:4px; margin-bottom:22px;">
+              <button type="button" id="tabBtnLogin" class="btn ${activeTab === 'login' ? 'btn-primary' : 'btn-ghost'}" style="font-size:13px; font-weight:800; padding:8px; border-radius:var(--radius-sm); border:none; ${activeTab === 'login' ? 'background:#003087; color:white;' : 'color:var(--text-secondary);'}">
+                🔐 Accedi
+              </button>
+              <button type="button" id="tabBtnRegister" class="btn ${activeTab === 'register' ? 'btn-primary' : 'btn-ghost'}" style="font-size:13px; font-weight:800; padding:8px; border-radius:var(--radius-sm); border:none; ${activeTab === 'register' ? 'background:#003087; color:white;' : 'color:var(--text-secondary);'}">
+                ✨ Registrati
+              </button>
+            </div>
+          ` : ''}
 
           <!-- TAB 1: LOGIN -->
           ${activeTab === 'login' ? `
             <form id="loginForm">
               <div class="form-group" style="margin-bottom:14px;">
                 <label class="form-label" style="font-size:12.5px; font-weight:700;">Indirizzo Email</label>
-                <input type="email" id="loginEmail" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(emailPrefill || '')}" required autofocus style="font-size:13.5px; padding:10px 12px;">
+                <input type="email" id="loginEmail" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(resetEmailHolder || emailPrefill || '')}" required autofocus style="font-size:13.5px; padding:10px 12px;">
               </div>
 
               <div class="form-group" style="margin-bottom:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                   <label class="form-label" style="font-size:12.5px; font-weight:700; margin-bottom:0;">Password</label>
+                  <button type="button" id="btnForgotPassLink" style="background:none; border:none; color:#0070ba; font-size:11.5px; font-weight:700; cursor:pointer; padding:0; text-decoration:underline;">
+                    Password dimenticata?
+                  </button>
                 </div>
                 <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" value="" required style="font-size:13.5px; padding:10px 12px;">
               </div>
@@ -381,7 +387,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
                 🔐 Accedi al tuo Account
               </button>
             </form>
-          ` : `
+          ` : activeTab === 'register' ? `
             <!-- TAB 2: REGISTER -->
             <form id="registerForm">
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
@@ -425,6 +431,75 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
               <button type="submit" id="btnSubmitRegister" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px;">
                 ✨ Crea Account ed Entra Subito
               </button>
+              <p style="font-size:11px; text-align:center; color:var(--text-muted); margin-top:8px; margin-bottom:0;">
+                📧 Ti invieremo un'email automatica di conferma registrazione.
+              </p>
+            </form>
+          ` : activeTab === 'forgot' ? `
+            <!-- TAB 3: FORGOT PASSWORD (INSERISCI EMAIL) -->
+            <form id="forgotPasswordForm">
+              <div style="text-align:center; margin-bottom:18px;">
+                <span style="font-size:32px;">🔑</span>
+                <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Recupero Password</h2>
+                <p style="font-size:12.5px; color:var(--text-secondary); margin:0;">
+                  Inserisci la tua email registrata. Ti invieremo un <strong>codice di verifica a 6 cifre</strong> per ripristinare la password.
+                </p>
+              </div>
+
+              <div class="form-group" style="margin-bottom:16px;">
+                <label class="form-label" style="font-size:12.5px; font-weight:700;">Indirizzo Email dell'Account *</label>
+                <input type="email" id="forgotEmailInput" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(resetEmailHolder)}" required autofocus style="font-size:13.5px; padding:10px 12px;">
+              </div>
+
+              <button type="submit" id="btnSubmitForgot" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px;">
+                📩 Invia Codice di Recupero
+              </button>
+
+              <div style="text-align:center; margin-top:16px;">
+                <button type="button" id="btnBackToLoginFromForgot" style="background:none; border:none; color:#0070ba; font-size:12.5px; font-weight:700; cursor:pointer;">
+                  ← Torna all'Accesso
+                </button>
+              </div>
+            </form>
+          ` : `
+            <!-- TAB 4: RESET PASSWORD (INSERISCI CODICE E NUOVA PASSWORD) -->
+            <form id="resetPasswordForm">
+              <div style="text-align:center; margin-bottom:18px;">
+                <span style="font-size:32px;">🔐</span>
+                <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Nuova Password</h2>
+                <p style="font-size:12px; color:var(--text-secondary); margin:0;">
+                  Abbiamo inviato un codice a 6 cifre a <strong>${escapeHtml(resetEmailHolder)}</strong>. Inseriscilo insieme alla tua nuova password.
+                </p>
+              </div>
+
+              <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label" style="font-size:12px; font-weight:700;">Codice di Verifica a 6 Cifre (dalla tua email) *</label>
+                <input type="text" id="resetCodeInput" class="form-input" placeholder="123456" maxlength="6" required autofocus style="font-size:20px; font-weight:900; font-family:var(--font-mono); letter-spacing:5px; text-align:center; padding:10px;">
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-size:12px; font-weight:700;">Nuova Password *</label>
+                  <input type="password" id="resetNewPassInput" class="form-input" placeholder="Min. 8 caratteri" minlength="8" required style="font-size:13px; padding:9px 11px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-size:12px; font-weight:700;">Ripeti Password *</label>
+                  <input type="password" id="resetConfirmPassInput" class="form-input" placeholder="Ripeti password" minlength="8" required style="font-size:13px; padding:9px 11px;">
+                </div>
+              </div>
+
+              <button type="submit" id="btnSubmitReset" class="btn btn-primary btn-block" style="background:#166534; font-size:14px; font-weight:800; padding:12px;">
+                💾 Salva Nuova Password ed Entra
+              </button>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px;">
+                <button type="button" id="btnResendCode" style="background:none; border:none; color:#0070ba; font-weight:700; cursor:pointer; padding:0;">
+                  🔄 Reinvia codice
+                </button>
+                <button type="button" id="btnBackToLoginFromReset" style="background:none; border:none; color:var(--text-secondary); font-weight:700; cursor:pointer; padding:0;">
+                  ← Torna al Login
+                </button>
+              </div>
             </form>
           `}
         </div>
@@ -451,6 +526,47 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
       };
     }
 
+    // Link Forgot Password in login
+    const btnForgotLink = container.querySelector('#btnForgotPassLink');
+    if (btnForgotLink) {
+      btnForgotLink.onclick = () => {
+        const currentEmailVal = container.querySelector('#loginEmail')?.value || '';
+        if (currentEmailVal) resetEmailHolder = currentEmailVal;
+        activeTab = 'forgot';
+        renderForm();
+      };
+    }
+
+    // Back to login triggers
+    const btnBackForgot = container.querySelector('#btnBackToLoginFromForgot');
+    if (btnBackForgot) {
+      btnBackForgot.onclick = () => {
+        activeTab = 'login';
+        renderForm();
+      };
+    }
+
+    const btnBackReset = container.querySelector('#btnBackToLoginFromReset');
+    if (btnBackReset) {
+      btnBackReset.onclick = () => {
+        activeTab = 'login';
+        renderForm();
+      };
+    }
+
+    // Resend code trigger
+    const btnResend = container.querySelector('#btnResendCode');
+    if (btnResend) {
+      btnResend.onclick = async () => {
+        try {
+          await authService.forgotPassword(resetEmailHolder);
+          showToast('📩 Nuovo codice inviato alla tua email!');
+        } catch (err) {
+          alert('❌ ' + err.message);
+        }
+      };
+    }
+
     // Submit Login Form
     const loginForm = container.querySelector('#loginForm');
     if (loginForm) {
@@ -469,7 +585,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
       };
     }
 
-    // Submit Register Form (Accesso Diretto Immediato)
+    // Submit Register Form (Accesso Diretto Immediato con Email di Benvenuto)
     const registerForm = container.querySelector('#registerForm');
     if (registerForm) {
       registerForm.onsubmit = async (e) => {
@@ -493,11 +609,69 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
             privacyConsent
           });
 
-          showToast(`🎉 Account creato con successo! Benvenuto/a ${newUser.fullName}!`);
+          showToast(`🎉 Account creato con successo! Abbiamo inviato l'email di benvenuto a ${newUser.email}.`);
           navigateTo('#home');
           renderApp();
         } catch (err) {
           alert('❌ ' + err.message);
+        }
+      };
+    }
+
+    // Submit Forgot Password Form
+    const forgotForm = container.querySelector('#forgotPasswordForm');
+    if (forgotForm) {
+      forgotForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = container.querySelector('#forgotEmailInput').value;
+        resetEmailHolder = email;
+        const btnSub = forgotForm.querySelector('#btnSubmitForgot');
+        if (btnSub) {
+          btnSub.disabled = true;
+          btnSub.textContent = '⏳ Invio codice in corso...';
+        }
+
+        try {
+          const res = await authService.forgotPassword(email);
+          showToast(res.message || '📩 Codice di recupero inviato alla tua email!');
+          activeTab = 'reset';
+          renderForm();
+        } catch (err) {
+          alert('❌ ' + err.message);
+          if (btnSub) {
+            btnSub.disabled = false;
+            btnSub.textContent = '📩 Invia Codice di Recupero';
+          }
+        }
+      };
+    }
+
+    // Submit Reset Password Form
+    const resetForm = container.querySelector('#resetPasswordForm');
+    if (resetForm) {
+      resetForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const code = container.querySelector('#resetCodeInput').value;
+        const newPass = container.querySelector('#resetNewPassInput').value;
+        const confirmPass = container.querySelector('#resetConfirmPassInput').value;
+        const btnSub = resetForm.querySelector('#btnSubmitReset');
+
+        if (btnSub) {
+          btnSub.disabled = true;
+          btnSub.textContent = '⏳ Aggiornamento in corso...';
+        }
+
+        try {
+          const res = await authService.resetPassword(resetEmailHolder, code, newPass, confirmPass);
+          showToast(res.message || '✅ Password aggiornata con successo! Ora puoi accedere.');
+          activeTab = 'login';
+          renderForm();
+        } catch (err) {
+          alert('❌ ' + err.message);
+          if (btnSub) {
+            btnSub.disabled = false;
+            btnSub.textContent = '💾 Salva Nuova Password ed Entra';
+          }
         }
       };
     }

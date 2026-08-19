@@ -230,6 +230,27 @@
       "createdAt": "2026-08-19T21:35:24.355Z",
       "legalName": "Giuseppe Verdi",
       "updatedAt": "2026-08-19T21:35:24.381Z"
+    },
+    {
+      "id": "usr-1787175928621",
+      "email": "test_recovery_1787175928531@example.com",
+      "fullName": "Alessandro Manzoni",
+      "firstName": "Alessandro",
+      "lastName": "Manzoni",
+      "password": "NuovaPassword123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-19T21:45:28.621Z",
+      "privacyAcceptedAt": "2026-08-19T21:45:28.621Z",
+      "iban": null,
+      "bankName": null,
+      "paypalPayoutEmail": "test_recovery_1787175928531@example.com",
+      "createdAt": "2026-08-19T21:45:28.621Z",
+      "resetPasswordCode": null,
+      "resetPasswordExpires": null,
+      "updatedAt": "2026-08-19T21:45:28.691Z"
     }
   ],
   "services": [
@@ -2254,6 +2275,18 @@
       "userId": "usr-emilio",
       "createdAt": "2026-08-19T21:40:19.483Z",
       "expiresAt": "2026-09-18T21:40:19.484Z"
+    },
+    {
+      "token": "bys_token_1787175928625_e981mano2r",
+      "userId": "usr-1787175928621",
+      "createdAt": "2026-08-19T21:45:28.625Z",
+      "expiresAt": "2026-09-18T21:45:28.625Z"
+    },
+    {
+      "token": "bys_token_1787175928702_6hwqj76dm5",
+      "userId": "usr-1787175928621",
+      "createdAt": "2026-08-19T21:45:28.702Z",
+      "expiresAt": "2026-09-18T21:45:28.702Z"
     }
   ],
   "adminAuditLogs": [
