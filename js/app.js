@@ -2132,11 +2132,29 @@ function renderMyGroupsView(container, currentUser) {
                   </div>
                   <div class="price-row">
                     <span>Membri paganti attivi:</span>
-                    <strong>${grp.members.length} partecipanti (${slotsInfo.availableSlotsCount} posti liberi)</strong>
+                    <strong>${(grp.members || []).length} partecipanti (${slotsInfo.availableSlotsCount} posti liberi)</strong>
                   </div>
                   <div class="price-row total-row">
                     <span>Totale mensile maturato per te:</span>
                     <span class="total-amount">${formatCents(activeMembersTotalCents)} / mese</span>
+                  </div>
+                </div>
+
+                <!-- Elenco Dettagliato Posti e Membri -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:10px 12px; margin-top:10px; font-size:12px;">
+                  <span style="font-size:11.5px; font-weight:800; color:var(--text-main); display:block; margin-bottom:6px;">👥 Situazione Posti (${grp.totalSlots} totali):</span>
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    ${slotsInfo.slots.map(s => {
+                      if (s.isOwnerSlot) {
+                        return `<div style="display:flex; justify-content:space-between; color:#1e40af; font-weight:700;"><span>👑 Posto #${s.slotNumber} (Tu - Capogruppo)</span><span>${formatCents(s.baseShareCents)} / mese</span></div>`;
+                      } else if (s.isOccupied) {
+                        const mUser = s.assignedUser || (grp.members || []).find(m => m.slotNumber === s.slotNumber) || {};
+                        const mName = mUser.fullName || 'Membro Pagante';
+                        return `<div style="display:flex; justify-content:space-between; color:#166534; font-weight:700; background:#f0fdf4; padding:3px 6px; border-radius:4px;"><span>🟢 Posto #${s.slotNumber} (Occupato da ${escapeHtml(mName)})</span><span>+${formatCents(s.baseShareCents)} / mese</span></div>`;
+                      } else {
+                        return `<div style="display:flex; justify-content:space-between; color:var(--text-muted);"><span>⚪ Posto #${s.slotNumber} (Disponibile nel Marketplace)</span><span>${formatCents(s.baseShareCents)} / mese</span></div>`;
+                      }
+                    }).join('')}
                   </div>
                 </div>
 

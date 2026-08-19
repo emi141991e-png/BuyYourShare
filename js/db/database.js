@@ -536,7 +536,21 @@ class Database {
 
   getMyCreatedGroups(userId) {
     this.checkExpirations();
-    return this.data.groups.filter(g => g.ownerId === userId && g.status !== 'terminated');
+    return this.data.groups
+      .filter(g => g.ownerId === userId && g.status !== 'terminated')
+      .map(g => {
+        const groupMembers = (this.data.memberships || []).filter(m => 
+          m.groupId === g.id && 
+          m.role === 'MEMBER' && 
+          (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED')
+        );
+        const occupiedCount = Math.max(g.occupiedMemberSlots || 0, groupMembers.length);
+        return {
+          ...g,
+          occupiedMemberSlots: occupiedCount,
+          members: groupMembers
+        };
+      });
   }
 
   // ==========================================
