@@ -777,7 +777,7 @@ function openEmailVerificationModal(email, generatedCode = '123456') {
 function renderHomeView(container, currentUser) {
   const availableGroups = db.getGroups({ onlyAvailable: true });
   const hasAvailableGroups = availableGroups.length > 0;
-  const previewGroups = availableGroups.slice(0, 3);
+  const previewGroups = availableGroups;
 
   container.innerHTML = `
     <div class="page-view">
@@ -1569,11 +1569,13 @@ function renderWizardView(container, currentUser) {
 
     try {
       const token = localStorage.getItem('buyyourshare_session_token');
+      const userId = currentUser?.id || localStorage.getItem('buyyourshare_current_user_id');
       const resp = await fetch('/api/groups', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...(userId ? { 'X-User-Id': userId } : {})
         },
         body: JSON.stringify(payload)
       });
@@ -1583,6 +1585,13 @@ function renderWizardView(container, currentUser) {
 
       if (resp.ok && serverRes.success && serverRes.group) {
         createdId = serverRes.group.id;
+        const existsIdx = (db.data.groups || []).findIndex(g => g.id === createdId);
+        if (existsIdx >= 0) {
+          db.data.groups[existsIdx] = serverRes.group;
+        } else {
+          db.data.groups.unshift(serverRes.group);
+        }
+        db.save();
         await db.syncGroupsFromServer();
       } else {
         const localGroup = db.createGroup(

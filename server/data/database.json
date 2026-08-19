@@ -620,6 +620,30 @@
       "description": "Gruppo YouTube Premium gestito da Emilio Caruso (10,00 € / mese).",
       "createdAt": "2026-08-19T22:00:00.000Z",
       "updatedAt": "2026-08-19T22:00:00.000Z"
+    },
+    {
+      "id": "grp-1787177542100",
+      "ownerId": "usr-emilio",
+      "serviceId": "srv-capcut",
+      "customServiceName": "CapCut Pro",
+      "planName": "Piano Team (3 Posti)",
+      "realSubscriptionCostCents": 900,
+      "totalSlots": 3,
+      "ownerSlots": 1,
+      "availableSlots": 2,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 300,
+      "platformFeeCents": 149,
+      "memberTotalCents": 449,
+      "groupType": "public",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-19T22:10:00.000Z",
+      "inviteCode": "BYS-9144",
+      "rulesAndRequirements": "Accesso personale team di montaggio CapCut Pro.",
+      "description": "Gruppo CapCut Pro gestito da Emilio Caruso (9,00 € / mese).",
+      "createdAt": "2026-08-19T22:10:00.000Z",
+      "updatedAt": "2026-08-19T22:10:00.000Z"
     }
   ],
   "memberships": [
