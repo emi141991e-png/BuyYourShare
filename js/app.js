@@ -1754,18 +1754,14 @@ function renderMySubscriptionsView(container, currentUser) {
                   </a>
                 </div>
 
-                <!-- Test Rinnovo Mensile -->
-                <div style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
-                  <button class="btn-renew-simulation" data-id="${sub.id}" style="font-size:11px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:4px 8px; border-radius:var(--radius-sm); font-weight:700; cursor:pointer;">
-                    🔄 Simula Rinnovo Mensile (Mese 2)
-                  </button>
-
+                <!-- Gestione Rinnovo Automatico -->
+                <div style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-subtle); display:flex; justify-content:flex-end; align-items:center;">
                   ${!isCancellationScheduled ? `
-                    <button class="btn-cancel-membership" data-id="${sub.id}" style="font-size:11px; color:#dc2626; text-decoration:underline; background:none; border:none; cursor:pointer;">
+                    <button class="btn-cancel-membership" data-id="${sub.id}" style="font-size:11.5px; color:#dc2626; text-decoration:underline; background:none; border:none; cursor:pointer;">
                       ✕ Annulla rinnovo automatico
                     </button>
                   ` : `
-                    <span style="font-size:11px; color:var(--text-muted);">Rinnovo disattivato</span>
+                    <span style="font-size:11.5px; color:var(--text-muted);">Rinnovo disattivato a fine periodo</span>
                   `}
                 </div>
               </div>
@@ -3736,33 +3732,19 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
       <form id="stripePaymentForm">
         <!-- VISTA CARTA -->
         <div id="methodViewCard">
-          <div class="form-group" style="margin-bottom:10px;">
-            <label class="form-label" style="font-size:11.5px;">Scenario Test Carta</label>
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; padding:6px 8px; background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); cursor:pointer;">
-                <input type="radio" name="testScenarioType" value="success" checked>
-                <span>💳 Carta Valida (Stripe 4242)</span>
-              </label>
-              <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; padding:6px 8px; background:#fef2f2; border:1px solid #fca5a5; border-radius:var(--radius-sm); cursor:pointer;">
-                <input type="radio" name="testScenarioType" value="decline">
-                <span>🚫 Carta Rifiutata (Stripe 4002)</span>
-              </label>
-            </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-size:12px; font-weight:700;">Numero Carta di Credito / Debito *</label>
+            <input type="text" id="stripeCardNumber" class="form-input" placeholder="4242 •••• •••• 4242" value="" maxlength="19" required style="font-family:var(--font-mono); font-size:13.5px; padding:10px 12px;">
           </div>
 
-          <div class="form-group" style="margin-bottom:10px;">
-            <label class="form-label" style="font-size:12px;">Numero Carta di Credito / Debito *</label>
-            <input type="text" id="stripeCardNumber" class="form-input" placeholder="4242 4242 4242 4242" value="4242 4242 4242 4242" maxlength="19" style="font-family:var(--font-mono); font-size:13px;">
-          </div>
-
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
             <div>
-              <label class="form-label" style="font-size:12px;">Scadenza (MM/AA) *</label>
-              <input type="text" id="stripeCardExpiry" class="form-input" placeholder="12/28" value="12/28" maxlength="5" style="font-size:13px;">
+              <label class="form-label" style="font-size:12px; font-weight:700;">Scadenza (MM/AA) *</label>
+              <input type="text" id="stripeCardExpiry" class="form-input" placeholder="MM/AA" value="" maxlength="5" required style="font-size:13px; padding:10px;">
             </div>
             <div>
-              <label class="form-label" style="font-size:12px;">CVC *</label>
-              <input type="text" id="stripeCardCvc" class="form-input" placeholder="123" value="123" maxlength="4" style="font-size:13px;">
+              <label class="form-label" style="font-size:12px; font-weight:700;">CVC / CVV *</label>
+              <input type="password" id="stripeCardCvc" class="form-input" placeholder="•••" value="" maxlength="4" required style="font-size:13px; padding:10px;">
             </div>
           </div>
         </div>
@@ -3973,18 +3955,6 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
 
   const cardNumInput = modal.querySelector('#stripeCardNumber');
   const cardExpInput = modal.querySelector('#stripeCardExpiry');
-  const radioSuccess = modal.querySelector('input[name="testScenarioType"][value="success"]');
-  const radioDecline = modal.querySelector('input[name="testScenarioType"][value="decline"]');
-
-  modal.querySelectorAll('input[name="testScenarioType"]').forEach(r => {
-    r.addEventListener('change', () => {
-      if (r.value === 'success') {
-        cardNumInput.value = '4242 4242 4242 4242';
-      } else {
-        cardNumInput.value = '4000 0000 0000 0002';
-      }
-    });
-  });
 
   if (cardNumInput) {
     cardNumInput.addEventListener('input', (e) => {
@@ -3994,11 +3964,6 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
         parts.push(v.substring(i, i + 4));
       }
       e.target.value = parts.join(' ');
-      if (v.endsWith('0002') || v.endsWith('4002')) {
-        if (radioDecline) radioDecline.checked = true;
-      } else {
-        if (radioSuccess) radioSuccess.checked = true;
-      }
     });
   }
 
@@ -4017,11 +3982,9 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
     e.preventDefault();
     
     let scenarioType = 'success';
-    if (currentMethod === 'PAYPAL_EEA') {
-      scenarioType = modal.querySelector('input[name="paypalScenarioType"]:checked')?.value || 'success';
-    } else if (currentMethod === 'CARD_EEA') {
+    if (currentMethod === 'CARD_EEA') {
       const rawCard = cardNumInput ? cardNumInput.value.replace(/\s/g, '') : '';
-      scenarioType = (rawCard.endsWith('0002') || rawCard.endsWith('4002') || radioDecline?.checked) ? 'decline' : 'success';
+      scenarioType = (rawCard.endsWith('0002') || rawCard.endsWith('4002')) ? 'decline' : 'success';
     }
 
     modal.classList.remove('active');

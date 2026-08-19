@@ -272,6 +272,27 @@
       "resetPasswordCode": null,
       "resetPasswordExpires": null,
       "updatedAt": "2026-08-19T21:53:12.678Z"
+    },
+    {
+      "id": "usr-1787178068562",
+      "email": "test_recovery_1787178068481@example.com",
+      "fullName": "Alessandro Manzoni",
+      "firstName": "Alessandro",
+      "lastName": "Manzoni",
+      "password": "NuovaPassword123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-19T22:21:08.562Z",
+      "privacyAcceptedAt": "2026-08-19T22:21:08.563Z",
+      "iban": null,
+      "bankName": null,
+      "paypalPayoutEmail": "test_recovery_1787178068481@example.com",
+      "createdAt": "2026-08-19T22:21:08.563Z",
+      "resetPasswordCode": null,
+      "resetPasswordExpires": null,
+      "updatedAt": "2026-08-19T22:21:08.609Z"
     }
   ],
   "services": [
@@ -2320,6 +2341,36 @@
       "userId": "usr-1787176392616",
       "createdAt": "2026-08-19T21:53:12.689Z",
       "expiresAt": "2026-09-18T21:53:12.689Z"
+    },
+    {
+      "token": "bys_token_1787178059870_aabtxy65wo",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-19T22:20:59.870Z",
+      "expiresAt": "2026-09-18T22:20:59.870Z"
+    },
+    {
+      "token": "bys_token_1787178059880_ggquwbrikp",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-19T22:20:59.880Z",
+      "expiresAt": "2026-09-18T22:20:59.880Z"
+    },
+    {
+      "token": "bys_token_1787178059888_kn5zn6sovj",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-19T22:20:59.888Z",
+      "expiresAt": "2026-09-18T22:20:59.888Z"
+    },
+    {
+      "token": "bys_token_1787178068567_6u0e123smz",
+      "userId": "usr-1787178068562",
+      "createdAt": "2026-08-19T22:21:08.567Z",
+      "expiresAt": "2026-09-18T22:21:08.567Z"
+    },
+    {
+      "token": "bys_token_1787178068618_06ryzjppgv",
+      "userId": "usr-1787178068562",
+      "createdAt": "2026-08-19T22:21:08.618Z",
+      "expiresAt": "2026-09-18T22:21:08.618Z"
     }
   ],
   "adminAuditLogs": [
