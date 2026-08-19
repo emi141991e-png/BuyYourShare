@@ -17,6 +17,7 @@ import { financialAuditService } from './services/financialAuditService.js';
 // =========================================================================
 let currentRoute = window.location.hash || '#home';
 let selectedCategoryFilter = 'ALL';
+let searchKeyword = '';
 let wizardState = {
   serviceId: '',
   customServiceName: '',
