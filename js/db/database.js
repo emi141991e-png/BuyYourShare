@@ -413,6 +413,12 @@ class Database {
       const isOccupied = !!assignedMembership;
       const memberTotalCents = isOwnerSlot ? shareCents : (shareCents + feeCents);
 
+      const assignedUser = isOwnerSlot
+        ? (group.owner || this.data.users.find(u => u.id === group.ownerId) || { fullName: 'Capogruppo' })
+        : (assignedMembership
+            ? (this.data.users.find(u => u.id === assignedMembership.userId) || { fullName: assignedMembership.userName || 'Membro' })
+            : null);
+
       return {
         slotIndex: idx,
         slotNumber,
@@ -421,7 +427,7 @@ class Database {
         baseShareCents: shareCents,
         platformFeeCents: isOwnerSlot ? 0 : feeCents,
         memberTotalCents,
-        assignedUser: assignedMembership ? this.data.users.find(u => u.id === assignedMembership.userId) : null,
+        assignedUser: assignedUser,
         membership: assignedMembership
       };
     });

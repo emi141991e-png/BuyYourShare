@@ -68,9 +68,8 @@ function navigateTo(hash) {
 
 window.addEventListener('hashchange', async () => {
   currentRoute = window.location.hash || '#home';
-  if (currentRoute === '#home' || currentRoute === '#cerca' || currentRoute === '') {
-    await db.syncGroupsFromServer();
-  }
+  const currentUser = authService.getCurrentUser();
+  await db.syncAllFromServer(currentUser);
   renderApp();
 });
 

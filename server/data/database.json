@@ -676,7 +676,7 @@
       "totalSlots": 5,
       "ownerSlots": 1,
       "availableSlots": 4,
-      "occupiedMemberSlots": 1,
+      "occupiedMemberSlots": 2,
       "baseMemberShareCents": 240,
       "platformFeeCents": 149,
       "memberTotalCents": 389,
@@ -724,6 +724,23 @@
       "currentPeriodEnd": "2026-09-19T22:30:00.000Z",
       "nextBillingDate": "2026-09-19T22:30:00.000Z",
       "joinedAt": "2026-08-19T22:30:00.000Z"
+    },
+    {
+      "id": "mem-canva-member-slot3",
+      "groupId": "grp-1787178342100",
+      "userId": "usr-1787178068562",
+      "role": "MEMBER",
+      "slotNumber": 3,
+      "paidShareCents": 240,
+      "paidFeeCents": 149,
+      "memberTotalCents": 389,
+      "paymentMethod": "CARD_EEA",
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-19T22:35:00.000Z",
+      "currentPeriodEnd": "2026-09-19T22:35:00.000Z",
+      "nextBillingDate": "2026-09-19T22:35:00.000Z",
+      "joinedAt": "2026-08-19T22:35:00.000Z"
     },
     {
       "id": "mem-1042-owner",

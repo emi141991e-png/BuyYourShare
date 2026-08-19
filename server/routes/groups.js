@@ -69,7 +69,7 @@ groupsRouter.get('/', async (req, res) => {
     const result = publishedGroups.map(g => {
       const owner = users.find(u => u.id === g.ownerId);
       const safe = sanitizeGroupForPublic(g, owner);
-      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user);
+      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user, users);
       return safe;
     });
 
@@ -106,7 +106,7 @@ groupsRouter.get('/my', requireAuth, async (req, res) => {
         };
       });
 
-      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user);
+      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user, users);
       return safe;
     });
 
@@ -135,8 +135,9 @@ groupsRouter.get('/:id', async (req, res) => {
 
     const owner = await dataRepository.findUserById(group.ownerId);
     const memberships = await dataRepository.getMemberships({ groupId: group.id });
+    const users = dataRepository.data.users;
     const safe = sanitizeGroupForPublic(group, owner);
-    safe.slotsInfo = getGroupSlotsBreakdown(group, memberships, req.user);
+    safe.slotsInfo = getGroupSlotsBreakdown(group, memberships, req.user, users);
 
     return res.json({ group: safe });
   } catch (err) {

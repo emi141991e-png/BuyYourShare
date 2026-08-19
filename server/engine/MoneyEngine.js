@@ -48,7 +48,7 @@ export function calculatePricingBreakdown(realCostCents, totalSlots = 6, platfor
   };
 }
 
-export function getGroupSlotsBreakdown(group, memberships = [], requestingUser = null) {
+export function getGroupSlotsBreakdown(group, memberships = [], requestingUser = null, allUsers = []) {
   const totalSlots = group.totalSlots || 6;
   const ownerSlots = group.ownerSlots || 1;
   const realCostCents = group.realSubscriptionCostCents || 0;
@@ -63,6 +63,7 @@ export function getGroupSlotsBreakdown(group, memberships = [], requestingUser =
     const baseShare = shares[i - 1] || Math.floor(realCostCents / totalSlots);
     const assignedMembership = groupMemberships.find(m => m.slotNumber === i);
     const isOccupied = isOwner || !!assignedMembership;
+    const mUser = assignedMembership && Array.isArray(allUsers) ? allUsers.find(u => u.id === assignedMembership.userId) : null;
 
     slots.push({
       slotNumber: i,
@@ -71,7 +72,8 @@ export function getGroupSlotsBreakdown(group, memberships = [], requestingUser =
       baseShareCents: baseShare,
       platformFeeCents: isOwner ? 0 : feeCents,
       memberTotalCents: isOwner ? baseShare : (baseShare + feeCents),
-      assignedUserId: isOwner ? group.ownerId : (assignedMembership ? assignedMembership.userId : null)
+      assignedUserId: isOwner ? group.ownerId : (assignedMembership ? assignedMembership.userId : null),
+      assignedUser: isOwner ? (group.owner ? { fullName: group.owner.fullName } : null) : (mUser ? { fullName: mUser.fullName } : null)
     });
   }
 
