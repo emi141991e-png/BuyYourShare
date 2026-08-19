@@ -14,13 +14,24 @@ export async function authenticate(req, res, next) {
       token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
     }
 
+    // 1. Fallback resiliente prioritario con header x-user-id o x-session-user-id
+    const fallbackUserId = req.headers['x-user-id'] || req.headers['x-session-user-id'];
+    if (fallbackUserId) {
+      const user = await dataRepository.findUserById(fallbackUserId);
+      if (user && !user.isSuspended) {
+        req.user = user;
+        req.session = { token: token || 'bys_token_' + Date.now(), userId: user.id };
+        return next();
+      }
+    }
+
     if (!token) {
       req.user = null;
       req.session = null;
       return next();
     }
 
-    // 1. Supporto sessioni demo rapide
+    // 2. Supporto sessioni demo rapide
     if (token.startsWith('bys_demo_token_')) {
       const demoUserId = token.replace('bys_demo_token_', '');
       const user = await dataRepository.findUserById(demoUserId);
@@ -31,7 +42,7 @@ export async function authenticate(req, res, next) {
       }
     }
 
-    // 2. Verifica sessione standard nel repository
+    // 3. Verifica sessione standard nel repository
     let session = await dataRepository.findSession(token);
     if (session) {
       if (new Date(session.expiresAt) < new Date()) {
@@ -44,17 +55,6 @@ export async function authenticate(req, res, next) {
       if (user && !user.isSuspended) {
         req.user = user;
         req.session = session;
-        return next();
-      }
-    }
-
-    // 3. Fallback resiliente con header x-user-id o x-session-user-id
-    const fallbackUserId = req.headers['x-user-id'] || req.headers['x-session-user-id'];
-    if (fallbackUserId) {
-      const user = await dataRepository.findUserById(fallbackUserId);
-      if (user && !user.isSuspended) {
-        req.user = user;
-        req.session = { token: token || 'bys_token_' + Date.now(), userId: user.id };
         return next();
       }
     }

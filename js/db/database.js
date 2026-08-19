@@ -117,17 +117,115 @@ class Database {
   }
 
   async syncGroupsFromServer() {
+    return this.syncAllFromServer();
+  }
+
+  async syncAllFromServer(currentUser = null) {
     try {
-      const resp = await fetch('/api/groups');
-      if (resp.ok) {
-        const data = await resp.json();
+      // 1. Sincronizza sempre il catalogo gruppi pubblico
+      const groupsResp = await fetch('/api/groups');
+      if (groupsResp.ok) {
+        const data = await groupsResp.json();
         if (Array.isArray(data.groups)) {
-          this.data.groups = data.groups;
-          this.save();
+          const serverMap = new Map(data.groups.map(g => [g.id, g]));
+          const merged = [...data.groups];
+          (this.data.groups || []).forEach(localG => {
+            if (!serverMap.has(localG.id) && localG.status === 'PUBLISHED') {
+              merged.push(localG);
+            }
+          });
+          this.data.groups = merged;
         }
       }
+
+      // 2. Se l'utente è autenticato, sincronizza dati privati (memberships, my groups, ledger, notif)
+      const token = localStorage.getItem('buyyourshare_session_token');
+      const userId = currentUser?.id || localStorage.getItem('buyyourshare_current_user_id');
+
+      if (token || userId) {
+        const authHeaders = {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...(userId ? { 'X-User-Id': userId } : {})
+        };
+
+        // A. I Miei Abbonamenti (Membership da membro)
+        try {
+          const memResp = await fetch('/api/memberships/my', { headers: authHeaders });
+          if (memResp.ok) {
+            const mData = await memResp.json();
+            if (Array.isArray(mData.memberships)) {
+              mData.memberships.forEach(sMem => {
+                const idx = this.data.memberships.findIndex(m => m.id === sMem.id || (m.groupId === sMem.groupId && m.slotNumber === sMem.slotNumber));
+                if (idx >= 0) {
+                  this.data.memberships[idx] = { ...this.data.memberships[idx], ...sMem };
+                } else {
+                  this.data.memberships.push(sMem);
+                }
+              });
+            }
+          }
+        } catch (e) {}
+
+        // B. I Miei Gruppi Creati (Da Capogruppo con membri associati)
+        try {
+          const myGrpsResp = await fetch('/api/groups/my', { headers: authHeaders });
+          if (myGrpsResp.ok) {
+            const mgData = await myGrpsResp.json();
+            if (Array.isArray(mgData.groups)) {
+              mgData.groups.forEach(serverG => {
+                const idx = this.data.groups.findIndex(g => g.id === serverG.id);
+                if (idx >= 0) {
+                  this.data.groups[idx] = { ...this.data.groups[idx], ...serverG };
+                } else {
+                  this.data.groups.unshift(serverG);
+                }
+                if (Array.isArray(serverG.members)) {
+                  serverG.members.forEach(mem => {
+                    const mIdx = this.data.memberships.findIndex(m => m.id === mem.id || (m.groupId === serverG.id && m.slotNumber === mem.slotNumber));
+                    if (mIdx >= 0) {
+                      this.data.memberships[mIdx] = { ...this.data.memberships[mIdx], ...mem, role: 'MEMBER' };
+                    } else {
+                      this.data.memberships.push({ ...mem, groupId: serverG.id, role: 'MEMBER' });
+                    }
+                  });
+                }
+              });
+            }
+          }
+        } catch (e) {}
+
+        // C. Log Finanziari & Payouts
+        try {
+          const ledgerResp = await fetch('/api/ledger/my', { headers: authHeaders });
+          if (ledgerResp.ok) {
+            const lData = await ledgerResp.json();
+            const allLogs = [...(lData.memberLogs || []), ...(lData.ownerLogs || [])];
+            allLogs.forEach(sLog => {
+              const lIdx = this.data.financialAuditLogs.findIndex(l => l.id === sLog.id || l.idempotencyKey === sLog.idempotencyKey);
+              if (lIdx >= 0) {
+                this.data.financialAuditLogs[lIdx] = { ...this.data.financialAuditLogs[lIdx], ...sLog };
+              } else {
+                this.data.financialAuditLogs.unshift(sLog);
+              }
+            });
+          }
+        } catch (e) {}
+
+        // D. Notifiche
+        try {
+          const notifResp = await fetch('/api/notifications', { headers: authHeaders });
+          if (notifResp.ok) {
+            const nData = await notifResp.json();
+            if (Array.isArray(nData.notifications)) {
+              this.data.notifications = nData.notifications;
+            }
+          }
+        } catch (e) {}
+      }
+
+      this.save();
     } catch (err) {
-      console.warn('[DB] Sync gruppi dal server non riuscita:', err.message);
+      console.warn('[DB] syncAllFromServer warning:', err.message);
     }
   }
 

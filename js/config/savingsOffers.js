@@ -12,6 +12,7 @@
  * - bysMonthlyPrice: Prezzo mensile effettivo proposto da BuyYourShare
  * - description: Breve descrizione dell'offerta/vantaggio
  * - badge: Etichetta opzionale (es. "Più Richiesto", "Super Sconto")
+ */
 // =========================================================================
 // CONFIGURAZIONE LINK DESTINAZIONE BUYYOURSHARE
 // Pagina ufficiale del catalogo abbonamenti BuyYourShare

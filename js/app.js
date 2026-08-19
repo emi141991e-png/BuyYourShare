@@ -4123,8 +4123,17 @@ async function init() {
     btnPaymentHeader.onclick = () => openPaymentAndPayoutSettingsModal(authService.getCurrentUser(), 'payout');
   }
 
-  await db.syncGroupsFromServer();
+  const currentUser = authService.getCurrentUser();
+  await db.syncAllFromServer(currentUser);
   renderApp();
+
+  // Sincronizzazione automatica in background
+  setInterval(async () => {
+    const u = authService.getCurrentUser();
+    await db.syncAllFromServer(u);
+    updateHeader(u);
+    updateBottomNav();
+  }, 15000);
 }
 
 if (document.readyState === 'loading') {
