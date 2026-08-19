@@ -2971,9 +2971,33 @@ function renderNotificationsView(container, currentUser) {
 // =========================================================================
 // MODALS: "IL TUO ACCESSO" & "MODIFICA ACCESSO"
 // =========================================================================
-function openAccessModal(groupId, currentUser) {
-  const instructions = db.getAccessInstructions(groupId, currentUser.id);
+async function openAccessModal(groupId, currentUser) {
+  let instructions = db.getAccessInstructions(groupId, currentUser.id);
   const group = db.getGroupById(groupId);
+
+  if (!instructions) {
+    try {
+      const token = localStorage.getItem('buyyourshare_session_token');
+      const resp = await fetch(`/api/access/${groupId}`, {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-User-Id': currentUser.id
+        }
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.instructions) {
+          instructions = data.instructions;
+          const idx = db.data.accessInstructions.findIndex(a => a.groupId === groupId);
+          if (idx >= 0) db.data.accessInstructions[idx] = instructions;
+          else db.data.accessInstructions.push(instructions);
+          db.save();
+        }
+      }
+    } catch (e) {
+      console.warn('[ACCESS] Fetch error:', e);
+    }
+  }
 
   if (!instructions || !group) {
     alert('Accesso protetto: devi essere un membro attivo o il Capogruppo.');

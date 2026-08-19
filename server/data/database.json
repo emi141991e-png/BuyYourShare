@@ -1212,6 +1212,33 @@
       "accessCode": "",
       "ownerSpotifyAccount": "",
       "additionalInfo": "Musica senza pubblicità inclusa"
+    },
+    {
+      "id": "acc-grp-1787176742344",
+      "groupId": "grp-1787176742344",
+      "accessUrl": "https://families.google.com/familylink/invitation/youtube-premium-bys",
+      "instructions": "Accetta l'invito al gruppo famiglia Google per attivare YouTube Premium senza pubblicità.",
+      "accessCode": "BYS-YOUTUBE",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": "Include YouTube Music Premium e riproduzione in background."
+    },
+    {
+      "id": "acc-grp-1787177542100",
+      "groupId": "grp-1787177542100",
+      "accessUrl": "https://www.capcut.com/team/invite/bys-capcut-pro",
+      "instructions": "Accedi al link per sbloccare l'abbonamento CapCut Pro sul tuo account.",
+      "accessCode": "BYS-CAPCUT",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": "Include effetti speciali Pro e rendering in alta qualità."
+    },
+    {
+      "id": "acc-grp-1787178342100",
+      "groupId": "grp-1787178342100",
+      "accessUrl": "https://www.canva.com/brand/join?token=canva-team-bys-4819",
+      "instructions": "Clicca sul link di invito per entrare nel team Canva Pro di Emilio Caruso.",
+      "accessCode": "BYS-4819",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": "Accesso personale al team di grafica Canva Pro con template ed elementi sbloccati."
     }
   ],
   "chats": [
@@ -1286,6 +1313,24 @@
       "groupId": "grp-1787175324383",
       "status": "ACTIVE",
       "createdAt": "2026-08-19T21:35:24.390Z"
+    },
+    {
+      "id": "cht-grp-1787176742344",
+      "groupId": "grp-1787176742344",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-19T22:00:00.000Z"
+    },
+    {
+      "id": "cht-grp-1787177542100",
+      "groupId": "grp-1787177542100",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-19T22:10:00.000Z"
+    },
+    {
+      "id": "cht-grp-1787178342100",
+      "groupId": "grp-1787178342100",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-19T22:25:00.000Z"
     }
   ],
   "chatMessages": [
