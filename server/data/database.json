@@ -57,6 +57,22 @@
       "createdAt": "2026-01-01T00:00:00Z"
     },
     {
+      "id": "usr-emilio",
+      "email": "emi.141991e@gmail.com",
+      "fullName": "Emilio Caruso",
+      "firstName": "Emilio",
+      "lastName": "Caruso",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "paypalPayoutEmail": "emi.141991e@gmail.com",
+      "termsAcceptedAt": "2026-08-19T20:00:00.000Z",
+      "privacyAcceptedAt": "2026-08-19T20:00:00.000Z",
+      "createdAt": "2026-08-19T20:00:00.000Z"
+    },
+    {
       "id": "usr-1786997624220",
       "email": "test.user.1786997624182@example.com",
       "fullName": "Mario Rossi",
@@ -2232,6 +2248,12 @@
       "userId": "usr-1787175324354",
       "createdAt": "2026-08-19T21:35:24.359Z",
       "expiresAt": "2026-09-18T21:35:24.359Z"
+    },
+    {
+      "token": "bys_token_1787175619483_4ita0xpd4i",
+      "userId": "usr-emilio",
+      "createdAt": "2026-08-19T21:40:19.483Z",
+      "expiresAt": "2026-09-18T21:40:19.484Z"
     }
   ],
   "adminAuditLogs": [

@@ -122,6 +122,15 @@ export const INITIAL_USERS = [
     isVerified: true,
     isSuspended: false,
     createdAt: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'usr-emilio',
+    email: 'emi.141991e@gmail.com',
+    fullName: 'Emilio Caruso',
+    role: 'user',
+    isVerified: true,
+    isSuspended: false,
+    createdAt: '2026-08-19T20:00:00Z'
   }
 ];
 
