@@ -70,15 +70,14 @@ class DataRepository {
       }
     }
 
-    // MIGRAZIONE DI PRODUZIONE: Pulizia definitiva da qualsiasi vecchio gruppo demo legacy
+    // MIGRAZIONE DI PRODUZIONE: Pulizia definitiva da qualsiasi vecchio gruppo demo legacy per ID
     if (this.data && Array.isArray(this.data.groups)) {
       const beforeCount = this.data.groups.length;
       this.data.groups = this.data.groups.filter(g => 
         g.id !== 'grp-1042' && 
         g.id !== 'grp-1089' && 
-        g.id !== 'grp-1120' && 
-        g.planName !== 'Canva for Teams' && 
-        g.planName !== 'YouTube Famiglia'
+        g.id !== 'grp-1120' &&
+        g.id !== 'grp-youtube-famiglia'
       );
       if (this.data.groups.length !== beforeCount) {
         console.log(`[DB] Migrazione: rimossi ${beforeCount - this.data.groups.length} gruppi demo legacy dal database persistente.`);

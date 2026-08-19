@@ -665,6 +665,30 @@
       "description": "Gruppo CapCut Pro gestito da Emilio Caruso (9,00 € / mese).",
       "createdAt": "2026-08-19T22:10:00.000Z",
       "updatedAt": "2026-08-19T22:10:00.000Z"
+    },
+    {
+      "id": "grp-1787178342100",
+      "ownerId": "usr-emilio",
+      "serviceId": "srv-canva",
+      "customServiceName": "Canva Pro",
+      "planName": "Canva Team (5 Account)",
+      "realSubscriptionCostCents": 1200,
+      "totalSlots": 5,
+      "ownerSlots": 1,
+      "availableSlots": 4,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 240,
+      "platformFeeCents": 149,
+      "memberTotalCents": 389,
+      "groupType": "public",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-19T22:25:00.000Z",
+      "inviteCode": "BYS-4819",
+      "rulesAndRequirements": "Accesso personale al team di grafica Canva Pro.",
+      "description": "Gruppo Canva Pro gestito da Emilio Caruso (12,00 € / mese).",
+      "createdAt": "2026-08-19T22:25:00.000Z",
+      "updatedAt": "2026-08-19T22:25:00.000Z"
     }
   ],
   "memberships": [

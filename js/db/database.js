@@ -32,14 +32,12 @@ class Database {
     if (!this.data.connectedAccounts) this.data.connectedAccounts = [];
     if (!this.data.financialAuditLogs) this.data.financialAuditLogs = [];
 
-    // Pulizia rigorosa da qualsiasi vecchio gruppo demo
+    // Pulizia rigorosa da vecchi gruppi demo per ID
     this.data.groups = this.data.groups.filter(g => 
       g.id !== 'grp-1042' && 
       g.id !== 'grp-1089' && 
-      g.id !== 'grp-1120' && 
-      g.planName !== 'Canva for Teams' && 
-      g.planName !== 'YouTube Famiglia' &&
-      g.status !== 'CLOSED'
+      g.id !== 'grp-1120' &&
+      g.id !== 'grp-youtube-famiglia'
     );
 
     if (this.data.connectedAccounts) {
