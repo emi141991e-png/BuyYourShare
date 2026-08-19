@@ -17,14 +17,16 @@ export const config = {
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || 'whsec_placeholder'
   },
 
-  // PayPal Configuration
+  // PayPal Configuration (LIVE / Production Default)
   paypal: {
-    mode: process.env.PAYPAL_MODE || 'sandbox',
-    clientId: process.env.PAYPAL_CLIENT_ID || 'test',
+    mode: (process.env.PAYPAL_MODE || 'live').toLowerCase(),
+    clientId: process.env.PAYPAL_CLIENT_ID || '',
     clientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
     webhookId: process.env.PAYPAL_WEBHOOK_ID || '',
-    apiBaseUrl: process.env.PAYPAL_MODE === 'live' 
-      ? 'https://api-m.paypal.com' 
-      : 'https://api-m.sandbox.paypal.com'
+    // Safety Lock: true per default per impedire qualsiasi addebito reale durante la fase di verifica
+    safetyLockActive: process.env.PAYPAL_SAFETY_LOCK !== 'false',
+    apiBaseUrl: (process.env.PAYPAL_MODE === 'sandbox')
+      ? 'https://api-m.sandbox.paypal.com'
+      : 'https://api-m.paypal.com'
   }
 };

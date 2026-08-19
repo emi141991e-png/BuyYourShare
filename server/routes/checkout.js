@@ -89,6 +89,15 @@ checkoutRouter.get('/paypal/plan', async (req, res) => {
 // 3. Attivazione Server-Side della vera PayPal Subscription (I-...)
 checkoutRouter.post('/paypal/subscription-activate', requireAuth, async (req, res) => {
   try {
+    // Blocco di sicurezza rigoroso: impedisce qualsiasi addebito/sottoscrizione live in fase di test
+    if (config.paypal.safetyLockActive) {
+      console.warn('[PAYPAL SAFETY LOCK] Blocco di sicurezza attivo: transazioni reali bloccate in fase di test.');
+      return res.status(423).json({
+        error: 'PAYPAL_SAFETY_LOCK_ACTIVE',
+        message: 'Modalità di sicurezza attiva: i pagamenti PayPal reali sono protetti e bloccati in attesa della conferma finale.'
+      });
+    }
+
     const { subscriptionId, orderId, sessionData } = req.body || {};
     console.log(`[SUBSCRIPTION-ACTIVATE INVOKED] subscriptionId: ${subscriptionId} - User: ${req.user ? req.user.email : 'N/A'}`);
 
@@ -271,9 +280,17 @@ checkoutRouter.post('/paypal/subscription-activate', requireAuth, async (req, re
   }
 });
 
-// 2. Cattura e Verifica Server-Side Reale PayPal Sandbox
+// 2. Cattura e Verifica Server-Side Reale PayPal
 checkoutRouter.post('/paypal/capture', requireAuth, async (req, res) => {
   try {
+    if (config.paypal.safetyLockActive) {
+      console.warn('[PAYPAL SAFETY LOCK] Blocco di sicurezza attivo: cattura pagamenti bloccata in fase di test.');
+      return res.status(423).json({
+        error: 'PAYPAL_SAFETY_LOCK_ACTIVE',
+        message: 'Modalità di sicurezza attiva: i pagamenti PayPal reali sono protetti e bloccati in attesa della conferma finale.'
+      });
+    }
+
     const { orderId, captureId, sessionData } = req.body || {};
 
     if (!orderId || !captureId || !sessionData) {

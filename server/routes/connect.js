@@ -29,9 +29,9 @@ connectRouter.get('/status', requireAuth, async (req, res) => {
         onboardingStatus: conn.onboardingStatus,
         legalName: conn.legalName || req.user.fullName,
         businessType: conn.businessType || 'individual',
-        bankLast4: conn.bankLast4 || '3456',
-        iban: req.user.iban,
-        bankName: req.user.bankName
+        bankLast4: conn.bankLast4 || null,
+        iban: req.user.iban || null,
+        bankName: req.user.bankName || null
       } : null
     });
   } catch (err) {

@@ -19,14 +19,14 @@ class StripeConnectService {
         id: 'conn-' + Date.now(),
         userId: user.id,
         stripeAccountId: stripeAccountId,
-        payoutsEnabled: user.id === 'usr-owner-1' || user.id === 'usr-owner-2', // Pre-abilitato per i demo owners iniziali
-        chargesEnabled: user.id === 'usr-owner-1' || user.id === 'usr-owner-2',
-        detailsSubmitted: user.id === 'usr-owner-1' || user.id === 'usr-owner-2',
-        onboardingStatus: (user.id === 'usr-owner-1' || user.id === 'usr-owner-2') ? 'completed' : 'pending',
-        bankLast4: '3456',
+        payoutsEnabled: false,
+        chargesEnabled: false,
+        detailsSubmitted: false,
+        onboardingStatus: 'pending',
+        bankLast4: null,
         country: 'IT',
         defaultCurrency: 'eur',
-        onboardedAt: new Date().toISOString()
+        onboardedAt: null
       };
       db.data.connectedAccounts.push(conn);
       db.save();

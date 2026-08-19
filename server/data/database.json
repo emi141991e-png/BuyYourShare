@@ -11,8 +11,6 @@
       "isVerified": true,
       "isEmailVerified": true,
       "isSuspended": false,
-      "iban": "IT60X0542811101000000123456",
-      "bankName": "Intesa Sanpaolo (Conto Corrente)",
       "paypalPayoutEmail": "marco.rossi.paypal@gmail.com",
       "stripeAccountId": "acct_1N42MarcoRossi",
       "createdAt": "2026-08-01T10:00:00Z"
@@ -28,8 +26,6 @@
       "isVerified": true,
       "isEmailVerified": true,
       "isSuspended": false,
-      "iban": "IT40Y030020328000000789012",
-      "bankName": "UniCredit (Conto Smart)",
       "paypalPayoutEmail": "sara.bianchi.paypal@gmail.com",
       "stripeAccountId": "acct_1N43SaraBianchi",
       "createdAt": "2026-08-05T12:00:00Z"
@@ -73,9 +69,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-17T20:13:44.220Z",
       "privacyAcceptedAt": "2026-08-17T20:13:44.220Z",
-      "iban": "IT60X0542811101000000257108",
-      "bankName": "Conto Personale SEPA",
-      "paypalPayoutEmail": "test.user.1786997624182@example.com",
       "createdAt": "2026-08-17T20:13:44.220Z"
     },
     {
@@ -91,9 +84,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-17T20:14:20.328Z",
       "privacyAcceptedAt": "2026-08-17T20:14:20.328Z",
-      "iban": "IT60X0542811101000000465879",
-      "bankName": "Conto Personale SEPA",
-      "paypalPayoutEmail": "test.user.1786997660314@example.com",
       "createdAt": "2026-08-17T20:14:20.328Z"
     },
     {
@@ -109,9 +99,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-17T20:15:14.215Z",
       "privacyAcceptedAt": "2026-08-17T20:15:14.215Z",
-      "iban": "IT60X0542811101000000955841",
-      "bankName": "Conto Personale SEPA",
-      "paypalPayoutEmail": "test.user.1786997714187@example.com",
       "createdAt": "2026-08-17T20:15:14.215Z"
     },
     {
@@ -127,9 +114,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-17T21:27:55.689Z",
       "privacyAcceptedAt": "2026-08-17T21:27:55.689Z",
-      "iban": "IT60X0542811101000000747506",
-      "bankName": "Conto Personale SEPA",
-      "paypalPayoutEmail": "test.user.1787002075655@example.com",
       "createdAt": "2026-08-17T21:27:55.689Z"
     },
     {
@@ -145,9 +129,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-18T15:21:44.869Z",
       "privacyAcceptedAt": "2026-08-18T15:21:44.869Z",
-      "iban": "IT60X0542811101000000361473",
-      "bankName": "Conto Personale SEPA",
-      "paypalPayoutEmail": "test.user.1787066504855@example.com",
       "createdAt": "2026-08-18T15:21:44.869Z"
     },
     {
@@ -163,9 +144,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-18T15:22:15.735Z",
       "privacyAcceptedAt": "2026-08-18T15:22:15.735Z",
-      "iban": "IT60X0542811101000000903402",
-      "bankName": "Conto Personale SEPA",
-      "paypalPayoutEmail": "test.user.1787066535723@example.com",
       "createdAt": "2026-08-18T15:22:15.735Z"
     },
     {
@@ -181,9 +159,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-18T15:22:45.354Z",
       "privacyAcceptedAt": "2026-08-18T15:22:45.354Z",
-      "iban": "IT60X0542811101000000641491",
-      "bankName": "Conto Personale SEPA",
-      "paypalPayoutEmail": "test.user.1787066565343@example.com",
       "createdAt": "2026-08-18T15:22:45.354Z"
     },
     {
@@ -199,9 +174,6 @@
       "isSuspended": false,
       "termsAcceptedAt": "2026-08-18T15:29:52.505Z",
       "privacyAcceptedAt": "2026-08-18T15:29:52.506Z",
-      "iban": "IT60X0542811101000000888999",
-      "bankName": "Banca Intesa Sanpaolo",
-      "paypalPayoutEmail": "sb-439eed52340185@personal.example.com",
       "createdAt": "2026-08-18T15:29:52.506Z",
       "updatedAt": "2026-08-18T15:29:52.559Z"
     }
@@ -1908,6 +1880,48 @@
       "userId": "usr-owner-1",
       "createdAt": "2026-08-18T21:18:29.652Z",
       "expiresAt": "2026-09-17T21:18:29.652Z"
+    },
+    {
+      "token": "bys_token_1787089462254_qro3auya8f",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-18T21:44:22.254Z",
+      "expiresAt": "2026-09-17T21:44:22.254Z"
+    },
+    {
+      "token": "bys_token_1787131945594_a7mop2nrg3",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-19T09:32:25.595Z",
+      "expiresAt": "2026-09-18T09:32:25.595Z"
+    },
+    {
+      "token": "bys_token_1787131945605_v9ct66fcwa",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-19T09:32:25.605Z",
+      "expiresAt": "2026-09-18T09:32:25.605Z"
+    },
+    {
+      "token": "bys_token_1787131945612_oulmoypdbg",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-19T09:32:25.612Z",
+      "expiresAt": "2026-09-18T09:32:25.612Z"
+    },
+    {
+      "token": "bys_token_1787131969835_46nlzgnmrg",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-19T09:32:49.835Z",
+      "expiresAt": "2026-09-18T09:32:49.835Z"
+    },
+    {
+      "token": "bys_token_1787131969843_e0tx47fcdu",
+      "userId": "usr-member-1",
+      "createdAt": "2026-08-19T09:32:49.843Z",
+      "expiresAt": "2026-09-18T09:32:49.843Z"
+    },
+    {
+      "token": "bys_token_1787131969848_l27nhgku93",
+      "userId": "usr-owner-1",
+      "createdAt": "2026-08-19T09:32:49.848Z",
+      "expiresAt": "2026-09-18T09:32:49.848Z"
     }
   ],
   "adminAuditLogs": [

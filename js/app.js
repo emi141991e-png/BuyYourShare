@@ -2531,35 +2531,89 @@ async function renderAdminView(container, currentUser) {
       <!-- ========================================== -->
       <!-- TAB 5: CONFIGURAZIONE GATEWAY              -->
       <!-- ========================================== -->
+      <!-- ========================================== -->
+      <!-- TAB 5: CONFIGURAZIONE GATEWAY & PAYOUTS     -->
+      <!-- ========================================== -->
       ${currentAdminTab === 'gateway' ? `
-        <div style="background:white; border:1px solid #bbf7d0; padding:20px; border-radius:var(--radius-lg); box-shadow:0 2px 8px rgba(34,197,94,0.08); margin-bottom:20px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h3 style="font-size:15px; font-weight:800; color:#003087; margin:0;">🅿️ Configurazione Merchant PayPal Sandbox / Live</h3>
-            <span style="font-size:11px; background:#f0fdf4; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">GATEWAY SETTINGS</span>
+        <!-- Sezione 1: PayPal LIVE Production -->
+        <div style="background:white; border:1px solid #93c5fd; padding:20px; border-radius:var(--radius-lg); box-shadow:0 2px 8px rgba(59,130,246,0.08); margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:20px;">🅿️</span>
+              <h3 style="font-size:16px; font-weight:900; color:#003087; margin:0;">PayPal LIVE / Production</h3>
+            </div>
+            <span style="font-size:11px; background:#dbeafe; color:#1e40af; padding:3px 10px; border-radius:var(--radius-full); font-weight:800;">
+              ENDPOINT: api-m.paypal.com
+            </span>
           </div>
-          <p style="font-size:12.5px; color:var(--text-secondary); margin-bottom:16px;">
-            Inserisci il <strong>Client ID</strong> della tua applicazione PayPal per ricevere i pagamenti degli abbonamenti.
+
+          <p style="font-size:12.5px; color:var(--text-secondary); margin-bottom:14px;">
+            L'applicazione è configurata per operare con le API ufficiali di <strong>PayPal LIVE (Produzione)</strong>.
           </p>
+
           <div style="display:flex; flex-direction:column; gap:12px;">
             <div>
-              <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">PayPal Client ID *</label>
-              <input type="text" id="adminPaypalClientId" class="form-input" placeholder="Incolla il Client ID PayPal..." value="${escapeHtml(localStorage.getItem('paypal_sandbox_client_id') || '')}" style="font-family:var(--font-mono); font-size:12px; padding:10px;">
+              <label style="font-size:12px; font-weight:700; display:block; margin-bottom:4px;">Live Client ID (Utilizzato dal PayPal JS SDK)</label>
+              <input type="text" id="adminPaypalClientId" class="form-input" placeholder="Incolla il tuo Live Client ID PayPal..." value="${escapeHtml(localStorage.getItem('paypal_live_client_id') || '')}" style="font-family:var(--font-mono); font-size:12px; padding:10px;">
             </div>
             <div style="display:flex; align-items:center; gap:10px;">
               <button type="button" id="btnSaveAdminPaypal" class="btn btn-primary btn-sm" style="font-size:12px; font-weight:700; background:#0070ba; padding:8px 16px;">
-                💾 Salva Client ID
+                💾 Salva Live Client ID
               </button>
               <span id="adminPaypalStatus" style="font-size:12px; color:#166534; font-weight:700;"></span>
             </div>
           </div>
+
+          <!-- Box Sicurezza Secrets -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:12px; margin-top:14px; font-size:11.5px; color:var(--text-secondary); line-height:1.5;">
+            🔒 <strong>Protezione Chiavi Private:</strong> Il <strong>Live Client Secret</strong> è conservato esclusivamente come variabile di ambiente protetta (<code>PAYPAL_CLIENT_SECRET</code>) su Railway. Per garantire la massima sicurezza bancaria, non viene mai mostrato a video, né memorizzato nel database o nel browser.
+          </div>
+
+          <!-- Box Safety Lock Test -->
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:var(--radius-md); padding:12px; margin-top:10px; font-size:11.5px; color:#991b1b; line-height:1.5;">
+            🛡️ <strong>Safety Lock Attivo:</strong> I pagamenti e i trasferimenti reali sono congelati a livello di sicurezza finché non viene fornita l'esplicita conferma finale di sblocco da parte dell'amministratore. Nessun addebito reale può essere eseguito durante i test.
+          </div>
         </div>
 
+        <!-- Sezione 2: Dati Bancari Amministratore (IBAN & Ricezione Fondi) -->
+        <div style="background:white; border:1px solid #e2e8f0; padding:20px; border-radius:var(--radius-lg); margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="font-size:15px; font-weight:800; color:var(--text-main); margin:0;">🏦 Dati Bancari & Accredito Piattaforma</h3>
+            <span style="font-size:11px; background:#fff7ed; color:#c2410c; padding:3px 10px; border-radius:var(--radius-full); font-weight:800; border:1px solid #ffedd5;">
+              ⚠️ Non configurato — inserire i dati reali dell'amministratore
+            </span>
+          </div>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">
+            Tutti i dati bancari e IBAN fittizi di esempio sono stati rimossi. Inserisci le tue coordinate reali per ricevere i proventi netti della piattaforma.
+          </p>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:12px;">
+            <div>
+              <label style="font-weight:700; display:block; margin-bottom:4px;">Nome Intestatario Conto</label>
+              <input type="text" class="form-input" placeholder="Non configurato" value="" style="padding:8px 10px;">
+            </div>
+            <div>
+              <label style="font-weight:700; display:block; margin-bottom:4px;">Codice Fiscale / P.IVA</label>
+              <input type="text" class="form-input" placeholder="Non configurato" value="" style="padding:8px 10px;">
+            </div>
+            <div>
+              <label style="font-weight:700; display:block; margin-bottom:4px;">IBAN Italiano (SEPA)</label>
+              <input type="text" class="form-input" placeholder="IT00X0000000000000000000000" value="" style="padding:8px 10px; font-family:var(--font-mono);">
+            </div>
+            <div>
+              <label style="font-weight:700; display:block; margin-bottom:4px;">Istituto Bancario</label>
+              <input type="text" class="form-input" placeholder="es. Intesa Sanpaolo, UniCredit, Poste Italiane..." value="" style="padding:8px 10px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Sezione 3: Parametro Commerciale Fee BYS -->
         <div style="background:white; border:1px solid #e2e8f0; padding:20px; border-radius:var(--radius-lg);">
           <h3 style="font-size:14px; font-weight:800; margin-bottom:6px;">⚙️ Parametro Commerciale Fee Lorda BuyYourShare</h3>
-          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Regola di business approvata: <strong>1,49 € (149 centesimi fissi)</strong> per quota mensile.</p>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Regola di business approvata: <strong>1,49 € (149 centesimi fissi)</strong> per quota mensile a carico del membro.</p>
           <div style="display:flex; gap:10px; align-items:center;">
             <input type="number" step="0.01" class="form-input" style="width:120px;" value="1.49" disabled>
-            <span style="font-size:11.5px; color:var(--text-muted);">🔒 Bloccata su 1,49 € (Garanzia &ge; 1,00 € netto)</span>
+            <span style="font-size:11.5px; color:var(--text-muted);">🔒 Bloccata su 1,49 € (Garanzia &ge; 1,00 € netto piattaforma)</span>
           </div>
         </div>
       ` : ''}

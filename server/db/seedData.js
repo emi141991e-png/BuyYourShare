@@ -89,10 +89,6 @@ export const INITIAL_USERS = [
     isVerified: true,
     isEmailVerified: true,
     isSuspended: false,
-    iban: 'IT60X0542811101000000123456',
-    bankName: 'Intesa Sanpaolo (Conto Corrente)',
-    paypalPayoutEmail: 'sb-439eed52340185@personal.example.com',
-    stripeAccountId: 'acct_1N42MarcoRossi',
     createdAt: '2026-08-01T10:00:00Z'
   },
   {
@@ -106,10 +102,6 @@ export const INITIAL_USERS = [
     isVerified: true,
     isEmailVerified: true,
     isSuspended: false,
-    iban: 'IT40Y030020328000000789012',
-    bankName: 'UniCredit (Conto Smart)',
-    paypalPayoutEmail: 'sara.bianchi.paypal@gmail.com',
-    stripeAccountId: 'acct_1N43SaraBianchi',
     createdAt: '2026-08-05T12:00:00Z'
   },
   {
@@ -123,7 +115,7 @@ export const INITIAL_USERS = [
     isVerified: true,
     isEmailVerified: true,
     isSuspended: false,
-    createdAt: '2026-08-10T14:00:00Z'
+    createdAt: '2026-08-10T09:00:00Z'
   },
   {
     id: 'usr-admin',
@@ -136,42 +128,13 @@ export const INITIAL_USERS = [
     isVerified: true,
     isEmailVerified: true,
     isSuspended: false,
-    createdAt: '2026-01-01T00:00:00Z'
+    createdAt: '2026-08-01T00:00:00Z'
   }
 ];
 
-export const INITIAL_CONNECTED_ACCOUNTS = [
-  {
-    id: 'conn-1',
-    userId: 'usr-owner-1',
-    stripeAccountId: 'acct_1N42MarcoRossi',
-    payoutsEnabled: true,
-    chargesEnabled: true,
-    detailsSubmitted: true,
-    onboardingStatus: 'completed',
-    businessType: 'individual',
-    legalName: 'Marco Rossi',
-    bankLast4: '3456',
-    country: 'IT',
-    defaultCurrency: 'eur',
-    onboardedAt: '2026-08-01T10:00:00Z'
-  },
-  {
-    id: 'conn-2',
-    userId: 'usr-owner-2',
-    stripeAccountId: 'acct_1N43SaraBianchi',
-    payoutsEnabled: true,
-    chargesEnabled: true,
-    detailsSubmitted: true,
-    onboardingStatus: 'completed',
-    businessType: 'individual',
-    legalName: 'Sara Bianchi',
-    bankLast4: '9012',
-    country: 'IT',
-    defaultCurrency: 'eur',
-    onboardedAt: '2026-08-05T12:00:00Z'
-  }
-];
+export const INITIAL_CONNECTED_ACCOUNTS = [];
+
+export const INITIAL_STRIPE_ACCOUNTS = [];
 
 export const INITIAL_GROUPS = [];
 export const INITIAL_ACCESS_INSTRUCTIONS = [];
