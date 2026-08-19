@@ -180,17 +180,12 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
     const pricing = calculatePricingBreakdown(realCostCents, tSlots, feeCents);
     const newGroupId = 'grp-' + Date.now();
 
-    // Verifica prerequisiti payout (Stripe Connect attivo o PayPal Payout configurato)
     const hasStripePayout = conn && conn.payoutsEnabled && conn.chargesEnabled && conn.onboardingStatus === 'completed';
     const hasPaypalPayout = !!(user.paypalPayoutEmail && user.paypalPayoutEmail.includes('@'));
-    const isPayoutReady = hasStripePayout || hasPaypalPayout;
+    const isPayoutReady = !!(hasStripePayout || hasPaypalPayout);
 
-    let initialStatus = 'DRAFT';
-    if (!isPayoutReady) {
-      initialStatus = 'PAYOUT_NOT_READY';
-    } else if (publishImmediately) {
-      initialStatus = 'PUBLISHED';
-    }
+    // Di default il gruppo creato dall'utente viene pubblicato per essere immediatamente visibile
+    const initialStatus = 'PUBLISHED';
 
     const newGroup = {
       id: newGroupId,
@@ -208,8 +203,8 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       memberTotalCents: pricing.memberTotalCents,
       groupType: 'public',
       status: initialStatus,
-      isPublished: initialStatus === 'PUBLISHED',
-      publishedAt: initialStatus === 'PUBLISHED' ? new Date().toISOString() : null,
+      isPublished: true,
+      publishedAt: new Date().toISOString(),
       inviteCode: 'BYS-' + Math.floor(1000 + Math.random() * 9000),
       rulesAndRequirements: (rulesAndRequirements || 'Rispetta le regole della community e del provider.').trim(),
       description: (description || `Gruppo condivisione ${customServiceName}`).trim(),

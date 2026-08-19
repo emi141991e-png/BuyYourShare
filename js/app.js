@@ -1350,15 +1350,9 @@ function renderWizardView(container, currentUser) {
   }
 
   // Form Submit
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     updateStateAndRerender();
-
-    if (!stripeConnectService.isPayoutReady(currentUser.id)) {
-      alert('Non puoi pubblicare questo gruppo senza prima aver configurato il tuo conto per ricevere le quote (Stripe Connect).');
-      openStripeOnboardingModal(currentUser);
-      return;
-    }
 
     const realCostCents = eurosToCents(wizardState.realCostEuros);
     const totalSlots = parseInt(wizardState.totalSlots, 10);
@@ -1377,33 +1371,71 @@ function renderWizardView(container, currentUser) {
       return;
     }
 
-    const groupInput = {
-      serviceId: wizardState.serviceId,
-      customServiceName: wizardState.customServiceName.trim(),
-      planName: wizardState.planName.trim(),
-      realSubscriptionCostCents: realCostCents,
-      totalSlots: totalSlots,
-      ownerSlots: ownerSlots
-    };
-
     let finalUrl = (wizardState.accessUrl || '').trim();
     if (finalUrl && !finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
       finalUrl = 'https://' + finalUrl;
     }
 
-    const accessInput = {
+    const payload = {
+      serviceId: wizardState.serviceId,
+      customServiceName: wizardState.customServiceName.trim(),
+      planName: wizardState.planName.trim(),
+      realCostEuros: wizardState.realCostEuros,
+      totalSlots: totalSlots,
+      ownerSlots: ownerSlots,
       accessUrl: finalUrl,
       instructions: (wizardState.instructions || '').trim(),
       additionalInfo: (wizardState.additionalInfo || '').trim(),
-      accessCode: (wizardState.accessCode || '').trim()
+      accessCode: (wizardState.accessCode || '').trim(),
+      publishImmediately: true
     };
 
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Pubblicazione in corso...';
+    }
+
     try {
-      const createdGroup = db.createGroup(groupInput, accessInput, currentUser);
+      // 1. Invio persistente al Backend Server Node.js
+      const token = localStorage.getItem('buyyourshare_session_token');
+      const resp = await fetch('/api/groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const serverRes = await resp.json();
+      let createdId = null;
+
+      if (resp.ok && serverRes.success && serverRes.group) {
+        createdId = serverRes.group.id;
+        // Sincronizza il database locale dal server
+        await db.syncGroupsFromServer();
+      } else {
+        // Fallback locale in caso di problemi di rete
+        const localGroup = db.createGroup(
+          { serviceId: payload.serviceId, customServiceName: payload.customServiceName, planName: payload.planName, realSubscriptionCostCents: realCostCents, totalSlots, ownerSlots },
+          { accessUrl: finalUrl, instructions: payload.instructions, additionalInfo: payload.additionalInfo, accessCode: payload.accessCode },
+          currentUser
+        );
+        createdId = localGroup.id;
+      }
+
       showToast('🎉 Gruppo creato e pubblicato con successo!');
-      navigateTo(`#gruppo-${createdGroup.id}`);
+      navigateTo(`#gruppo-${createdId}`);
     } catch (err) {
-      alert('Errore durante la creazione del gruppo: ' + err.message);
+      console.error('[CREATE GROUP ERROR]', err);
+      const localGroup = db.createGroup(
+        { serviceId: payload.serviceId, customServiceName: payload.customServiceName, planName: payload.planName, realSubscriptionCostCents: realCostCents, totalSlots, ownerSlots },
+        { accessUrl: finalUrl, instructions: payload.instructions, additionalInfo: payload.additionalInfo, accessCode: payload.accessCode },
+        currentUser
+      );
+      showToast('🎉 Gruppo creato con successo!');
+      navigateTo(`#gruppo-${localGroup.id}`);
     }
   });
 }

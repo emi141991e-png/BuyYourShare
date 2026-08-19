@@ -476,6 +476,30 @@
       "createdAt": "2026-08-18T21:18:29.072Z",
       "updatedAt": "2026-08-18T21:18:29.088Z",
       "closedAt": "2026-08-18T21:18:29.088Z"
+    },
+    {
+      "id": "grp-1787174165672",
+      "ownerId": "usr-admin",
+      "serviceId": "srv-gemini",
+      "customServiceName": "Gemini Advanced",
+      "planName": "Google One AI Premium (2TB)",
+      "realSubscriptionCostCents": 2199,
+      "totalSlots": 5,
+      "ownerSlots": 1,
+      "availableSlots": 4,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 439,
+      "platformFeeCents": 149,
+      "memberTotalCents": 588,
+      "groupType": "public",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-19T21:16:05.672Z",
+      "inviteCode": "BYS-5863",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione Gemini Advanced",
+      "createdAt": "2026-08-19T21:16:05.672Z",
+      "updatedAt": "2026-08-19T21:16:05.672Z"
     }
   ],
   "memberships": [
@@ -798,6 +822,22 @@
       "currentPeriodEnd": "2026-09-17T21:18:29.073Z",
       "nextBillingDate": "2026-09-17T21:18:29.073Z",
       "joinedAt": "2026-08-18T21:18:29.073Z"
+    },
+    {
+      "id": "mem-grp-1787174165672-owner",
+      "groupId": "grp-1787174165672",
+      "userId": "usr-admin",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 440,
+      "paidFeeCents": 0,
+      "memberTotalCents": 440,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-19T21:16:05.674Z",
+      "currentPeriodEnd": "2026-09-18T21:16:05.674Z",
+      "nextBillingDate": "2026-09-18T21:16:05.674Z",
+      "joinedAt": "2026-08-19T21:16:05.674Z"
     }
   ],
   "accessInstructions": [
@@ -881,6 +921,15 @@
       "accessCode": "",
       "ownerSpotifyAccount": "",
       "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787174165676",
+      "groupId": "grp-1787174165672",
+      "accessUrl": "https://gemini.google.com",
+      "instructions": "Invito via gruppo Famiglia Google One.",
+      "accessCode": "",
+      "ownerSpotifyAccount": "",
+      "additionalInfo": "Include 2TB di cloud storage e Gemini 1.5 Pro."
     }
   ],
   "chats": [
@@ -943,6 +992,12 @@
       "groupId": "grp-1787087909072",
       "status": "ACTIVE",
       "createdAt": "2026-08-18T21:18:29.076Z"
+    },
+    {
+      "id": "cht-1787174165680",
+      "groupId": "grp-1787174165672",
+      "status": "ACTIVE",
+      "createdAt": "2026-08-19T21:16:05.680Z"
     }
   ],
   "chatMessages": [
@@ -1105,6 +1160,14 @@
       "messageType": "SYSTEM",
       "messageContent": "⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.",
       "createdAt": "2026-08-18T21:18:29.090Z"
+    },
+    {
+      "id": "msg-1787174165682",
+      "chatId": "cht-1787174165680",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Admin BuyYourShare. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-19T21:16:05.682Z"
     }
   ],
   "connectedAccounts": [
@@ -1959,9 +2022,32 @@
       "userId": "usr-owner-1",
       "createdAt": "2026-08-19T09:38:07.297Z",
       "expiresAt": "2026-09-18T09:38:07.297Z"
+    },
+    {
+      "token": "bys_token_1787174154528_1q0agy73gu",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-19T21:15:54.529Z",
+      "expiresAt": "2026-09-18T21:15:54.536Z"
+    },
+    {
+      "token": "bys_token_1787174165649_2abh0y9pt7",
+      "userId": "usr-admin",
+      "createdAt": "2026-08-19T21:16:05.649Z",
+      "expiresAt": "2026-09-18T21:16:05.650Z"
     }
   ],
   "adminAuditLogs": [
+    {
+      "id": "adm_log_1787174197997_7bxk2",
+      "timestamp": "2026-08-19T21:16:37.997Z",
+      "action": "GROUP_DELETED",
+      "targetType": "GROUP",
+      "targetId": "grp-1787174154570",
+      "targetName": "Gemini Advanced (Google One AI Premium (2TB))",
+      "performedBy": "usr-admin",
+      "performedByName": "Admin BuyYourShare",
+      "details": "Eliminazione fisica definitiva del gruppo Gemini Advanced (Google One AI Premium (2TB)) dal database operativo."
+    },
     {
       "id": "adm_log_1787087909675_afyh6",
       "timestamp": "2026-08-18T21:18:29.675Z",
