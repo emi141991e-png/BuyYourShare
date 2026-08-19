@@ -72,9 +72,16 @@ checkoutRouter.get('/paypal/plan', async (req, res) => {
     const serviceName = req.query.serviceName || 'Spotify Family';
     const amountCents = parseInt(req.query.amountCents, 10) || 499;
 
-    const planId = await paypalBillingService.createOrGetMonthlyPlan(serviceName, amountCents);
+    let planId = null;
+    if (!config.paypal.safetyLockActive && config.paypal.clientSecret && !config.paypal.clientSecret.includes('placeholder')) {
+      planId = await paypalBillingService.createOrGetMonthlyPlan(serviceName, amountCents);
+    }
+
     return res.json({
       success: true,
+      mode: config.paypal.mode,
+      apiBaseUrl: config.paypal.apiBaseUrl,
+      safetyLockActive: config.paypal.safetyLockActive,
       planId: planId,
       clientId: config.paypal.clientId,
       amountCents: amountCents,

@@ -62,6 +62,11 @@ class PayPalPayoutService {
    * @param {string} params.captureId - ID cattura PayPal membro (per sender_batch_id univoco)
    */
   async executePayout({ recipientEmail, amountCents = 350, groupId, slotNumber, captureId, groupName = 'Gruppo' }) {
+    if (config.paypal.safetyLockActive) {
+      console.warn('[PAYPAL PAYOUT BLOCKED] Safety Lock attivo: trasferimenti di denaro reale bloccati in fase di test.');
+      throw new Error('PAYPAL_SAFETY_LOCK_ACTIVE: I trasferimenti di denaro reale sono bloccati dal Safety Lock.');
+    }
+
     if (!recipientEmail || !recipientEmail.includes('@')) {
       throw new Error('Email PayPal del Capogruppo non configurata o non valida.');
     }

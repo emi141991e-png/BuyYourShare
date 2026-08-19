@@ -18,6 +18,10 @@ class PayPalBillingService {
    * Genera o riutilizza il token OAuth2 Bearer server-side in modo sicuro.
    */
   async getAccessToken() {
+    if (config.paypal.safetyLockActive) {
+      throw new Error('PAYPAL_SAFETY_LOCK_ACTIVE: Chiamate alle API PayPal Live bloccate dal Safety Lock di sicurezza.');
+    }
+
     if (this.cachedToken && Date.now() < this.tokenExpiresAt - 60000) {
       return this.cachedToken;
     }

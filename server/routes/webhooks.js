@@ -210,6 +210,11 @@ webhooksRouter.post('/paypal', express.json(), async (req, res) => {
 
           if (!existing) {
             const group = await dataRepository.findGroupById(membership.groupId);
+            if (!group) {
+              console.log(`[PAYPAL WEBHOOK] Gruppo ${membership.groupId} non trovato nel catalogo.`);
+              break;
+            }
+
             const baseShareCents = membership.paidShareCents;
             const grossFeeCents = DEFAULT_PLATFORM_FEE_CENTS;
             const feeAlloc = allocatePaymentTransaction(baseShareCents, totalPaidCents, 'PAYPAL_EEA');
@@ -244,7 +249,7 @@ webhooksRouter.post('/paypal', express.json(), async (req, res) => {
             };
 
             try {
-              if (config.paypal.clientSecret && !config.paypal.clientSecret.includes('placeholder')) {
+              if (!config.paypal.safetyLockActive && config.paypal.clientSecret && !config.paypal.clientSecret.includes('placeholder')) {
                 payoutResult = await paypalPayoutService.executePayout({
                   recipientEmail: recipientEmail,
                   amountCents: baseShareCents,
