@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { dataRepository } from '../repository/DataRepository.js';
+import { dataRepository } from '../db/dataRepository.js';
 
 class EmailService {
   constructor() {
