@@ -2638,6 +2638,17 @@
   ],
   "adminAuditLogs": [
     {
+      "id": "adm_log_1787255510515_wghjx",
+      "timestamp": "2026-08-20T19:51:50.515Z",
+      "action": "GROUP_DELETED",
+      "targetType": "GROUP",
+      "targetId": "grp-test-1787255510476",
+      "targetName": "Dummy Test Service (Test Plan)",
+      "performedBy": "usr-admin",
+      "performedByName": "Admin BuyYourShare",
+      "details": "Eliminazione fisica definitiva del gruppo Dummy Test Service (Test Plan) e di tutte le membership/chat collegate dal database operativo."
+    },
+    {
       "id": "adm_log_1787174197997_7bxk2",
       "timestamp": "2026-08-19T21:16:37.997Z",
       "action": "GROUP_DELETED",

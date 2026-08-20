@@ -122,19 +122,12 @@ class Database {
 
   async syncAllFromServer(currentUser = null) {
     try {
-      // 1. Sincronizza sempre il catalogo gruppi pubblico
+      // 1. Sincronizza sempre il catalogo gruppi pubblico reale dal server
       const groupsResp = await fetch('/api/groups');
       if (groupsResp.ok) {
         const data = await groupsResp.json();
         if (Array.isArray(data.groups)) {
-          const serverMap = new Map(data.groups.map(g => [g.id, g]));
-          const merged = [...data.groups];
-          (this.data.groups || []).forEach(localG => {
-            if (!serverMap.has(localG.id) && localG.status === 'PUBLISHED') {
-              merged.push(localG);
-            }
-          });
-          this.data.groups = merged;
+          this.data.groups = data.groups;
         }
       }
 
@@ -148,20 +141,15 @@ class Database {
           ...(userId ? { 'X-User-Id': userId } : {})
         };
 
-        // A. I Miei Abbonamenti (Membership da membro)
+        // A. I Miei Abbonamenti (Membership da membro: sincronizzazione esatta con il server)
         try {
           const memResp = await fetch('/api/memberships/my', { headers: authHeaders });
           if (memResp.ok) {
             const mData = await memResp.json();
             if (Array.isArray(mData.memberships)) {
-              mData.memberships.forEach(sMem => {
-                const idx = this.data.memberships.findIndex(m => m.id === sMem.id || (m.groupId === sMem.groupId && m.slotNumber === sMem.slotNumber));
-                if (idx >= 0) {
-                  this.data.memberships[idx] = { ...this.data.memberships[idx], ...sMem };
-                } else {
-                  this.data.memberships.push(sMem);
-                }
-              });
+              // Rimuovi tutte le vecchie membership da membro dell'utente corrente e rimpiazzale con quelle certificate dal server
+              this.data.memberships = (this.data.memberships || []).filter(m => !(m.userId === userId && m.role === 'MEMBER'));
+              this.data.memberships.push(...mData.memberships);
             }
           }
         } catch (e) {}
@@ -172,13 +160,13 @@ class Database {
           if (myGrpsResp.ok) {
             const mgData = await myGrpsResp.json();
             if (Array.isArray(mgData.groups)) {
+              // Rimuovi gruppi dell'owner e rimpiazza con quelli server
+              const myGroupIds = new Set(mgData.groups.map(g => g.id));
+              this.data.groups = (this.data.groups || []).filter(g => !myGroupIds.has(g.id));
+              this.data.groups.unshift(...mgData.groups);
+
+              // Sincronizza i membri dei miei gruppi
               mgData.groups.forEach(serverG => {
-                const idx = this.data.groups.findIndex(g => g.id === serverG.id);
-                if (idx >= 0) {
-                  this.data.groups[idx] = { ...this.data.groups[idx], ...serverG };
-                } else {
-                  this.data.groups.unshift(serverG);
-                }
                 if (Array.isArray(serverG.members)) {
                   serverG.members.forEach(mem => {
                     const mIdx = this.data.memberships.findIndex(m => m.id === mem.id || (m.groupId === serverG.id && m.slotNumber === mem.slotNumber));
@@ -193,6 +181,10 @@ class Database {
             }
           }
         } catch (e) {}
+
+        // Pulizia globale: rimuovi membership orfane riferite a gruppi non più esistenti
+        const validGroupIds = new Set((this.data.groups || []).map(g => g.id));
+        this.data.memberships = (this.data.memberships || []).filter(m => validGroupIds.has(m.groupId));
 
         // C. Log Finanziari & Payouts
         try {
@@ -911,14 +903,13 @@ class Database {
 
   getMySubscriptions(memberUserId) {
     this.checkExpirations();
-    const memberships = this.data.memberships.filter(m => m.userId === memberUserId && m.role === 'MEMBER');
-    return memberships.map(m => {
-      const group = this.getGroupById(m.groupId);
-      return {
-        ...m,
-        group
-      };
-    });
+    const memberships = (this.data.memberships || []).filter(m => m.userId === memberUserId && m.role === 'MEMBER');
+    return memberships
+      .map(m => {
+        const group = this.getGroupById(m.groupId);
+        return group ? { ...m, group } : null;
+      })
+      .filter(sub => sub !== null);
   }
 
   // ==========================================

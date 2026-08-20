@@ -2951,7 +2951,7 @@ async function renderAdminView(container, currentUser) {
           throw new Error(data.message || 'Errore durante l\'eliminazione del gruppo.');
         }
         showToast(`🗑️ Gruppo "${gTitle}" eliminato definitivamente.`);
-        await db.syncGroupsFromServer();
+        await db.syncAllFromServer(currentUser);
         renderAdminView(container, currentUser);
       } catch (err) {
         alert('❌ ' + err.message);

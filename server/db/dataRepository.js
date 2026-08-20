@@ -540,6 +540,17 @@ class DataRepository {
 
     const groupTitle = `${group.customServiceName} (${group.planName})`;
 
+    // 0. Se esistono subscriptions PayPal collegate a questo gruppo, richiedi la terminazione al provider
+    const groupMemberships = (this.data.memberships || []).filter(m => m.groupId === groupId);
+    for (const m of groupMemberships) {
+      if (m.paypalSubscriptionId && m.paypalSubscriptionId.startsWith('I-')) {
+        try {
+          const { paypalBillingService } = await import('../services/paypalBillingService.js');
+          await paypalBillingService.cancelSubscription(m.paypalSubscriptionId, `Gruppo ${groupTitle} chiuso/eliminato`);
+        } catch (e) {}
+      }
+    }
+
     // 1. Rimuovi il gruppo dal catalogo operativo
     this.data.groups = this.data.groups.filter(g => g.id !== groupId);
 
@@ -549,17 +560,20 @@ class DataRepository {
     // 3. Rimuovi istruzioni di accesso
     this.data.accessInstructions = (this.data.accessInstructions || []).filter(a => a.groupId !== groupId);
 
-    // 4. Rimuovi chat operativa associata
+    // 4. Rimuovi chat operativa associata e messaggi
     const chat = (this.data.chats || []).find(c => c.groupId === groupId);
     if (chat) {
       this.data.chats = this.data.chats.filter(c => c.id !== chat.id);
       this.data.chatMessages = (this.data.chatMessages || []).filter(m => m.chatId !== chat.id);
     }
 
-    // 5. PRESERVAZIONE RIGOROSA DEI DATI FINANZIARI:
-    // Non tocca mai this.data.financialAuditLogs, this.data.activeSubscriptions, this.data.recordedCycles
+    // 5. Rimuovi notifiche collegate al gruppo
+    this.data.notifications = (this.data.notifications || []).filter(n => !(n.actionUrl && (n.actionUrl.includes(groupId) || n.actionUrl.includes(chat?.id || '---'))));
 
-    // 6. Registra l'azione nel registro Audit Amministrativo
+    // 6. PRESERVAZIONE RIGOROSA DEI DATI FINANZIARI:
+    // Non tocca mai this.data.financialAuditLogs (il Ledger contabile rimane intatto e immutabile)
+
+    // 7. Registra l'azione nel registro Audit Amministrativo
     await this.logAdminAction({
       action: 'GROUP_DELETED',
       targetType: 'GROUP',
@@ -567,7 +581,7 @@ class DataRepository {
       targetName: groupTitle,
       performedBy: adminUser ? adminUser.id : 'usr-admin',
       performedByName: adminUser ? adminUser.fullName : 'Admin BuyYourShare',
-      details: `Eliminazione fisica definitiva del gruppo ${groupTitle} dal database operativo.`
+      details: `Eliminazione fisica definitiva del gruppo ${groupTitle} e di tutte le membership/chat collegate dal database operativo.`
     });
 
     await this.save();

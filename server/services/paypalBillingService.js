@@ -195,6 +195,35 @@ class PayPalBillingService {
 
     return data;
   }
+
+  /**
+   * Cancella/termina una Subscription attiva su PayPal
+   * POST /v1/billing/subscriptions/{id}/cancel
+   */
+  async cancelSubscription(subscriptionId, reason = 'Gruppo eliminato dall\'amministratore') {
+    if (!subscriptionId || !subscriptionId.startsWith('I-')) return null;
+    if (config.paypal.safetyLockActive) return null;
+
+    try {
+      const token = await this.getAccessToken();
+      const url = `${config.paypal.apiBaseUrl}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`;
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      console.log(`[PAYPAL BILLING] Subscription ${subscriptionId} cancellata su PayPal (Status: ${resp.status})`);
+      return { success: resp.ok, status: resp.status };
+    } catch (err) {
+      console.warn(`[PAYPAL BILLING] Avviso cancellazione subscription ${subscriptionId}: ${err.message}`);
+      return null;
+    }
+  }
 }
 
 export const paypalBillingService = new PayPalBillingService();
