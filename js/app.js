@@ -446,44 +446,86 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
               </p>
             </form>
           ` : activeTab === 'forgot' ? `
-            <!-- TAB 3: FORGOT PASSWORD (RECUPERO ISTANTANEO IN 1 CLIC) -->
-            <form id="forgotPasswordForm">
-              <div style="text-align:center; margin-bottom:18px;">
-                <span style="font-size:32px;">🔑</span>
-                <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Recupero Password Istantaneo</h2>
-                <p style="font-size:12.5px; color:var(--text-secondary); margin:0; line-height:1.4;">
-                  Inserisci la tua email e imposta subito la tua nuova password. Accesso garantito e automatico per qualsiasi account.
-                </p>
-              </div>
-
-              <div class="form-group" style="margin-bottom:12px;">
-                <label class="form-label" style="font-size:12px; font-weight:700;">Indirizzo Email dell'Account *</label>
-                <input type="email" id="forgotEmailInput" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(resetEmailHolder)}" required autofocus style="font-size:13px; padding:9px 11px;">
-              </div>
-
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
-                <div class="form-group" style="margin-bottom:0;">
-                  <label class="form-label" style="font-size:12px; font-weight:700;">Nuova Password *</label>
-                  <input type="password" id="forgotNewPass" class="form-input" placeholder="Min. 8 caratteri" minlength="8" required style="font-size:13px; padding:9px 11px;">
+            <!-- TAB 3: FORGOT PASSWORD (INVIO EMAIL DI SICUREZZA) -->
+            ${sentEmailNotice ? `
+              <div style="padding:4px 0;">
+                <div style="text-align:center; margin-bottom:16px;">
+                  <div style="font-size:42px; margin-bottom:8px;">📬</div>
+                  <h2 style="font-size:18px; font-weight:900; color:#166534; margin:0 0 6px;">Email di Sicurezza Inviata!</h2>
+                  <p style="font-size:13px; color:#334155; line-height:1.4; margin:0;">
+                    Abbiamo inviato un'email a <strong>${escapeHtml(resetEmailHolder)}</strong> con il link di reimpostazione e il codice monouso.
+                  </p>
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
-                  <label class="form-label" style="font-size:12px; font-weight:700;">Ripeti Password *</label>
-                  <input type="password" id="forgotConfirmPass" class="form-input" placeholder="Ripeti password" minlength="8" required style="font-size:13px; padding:9px 11px;">
+
+                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:#15803d; line-height:1.4;">
+                  👉 <strong>Cosa fare adesso:</strong><br>
+                  1. Apri la tua casella di posta (Gmail, Outlook, ecc.).<br>
+                  2. Clicca sul pulsante <strong>"Reimposta la tua Password Subito"</strong> nell'email ricevuta.<br>
+                  <em style="font-size:11px; color:#166534;">(Se non la trovi subito, controlla anche nella cartella Spam o Promozioni)</em>
+                </div>
+
+                <div style="border-top:1px dashed #cbd5e1; padding-top:14px; margin-top:14px;">
+                  <p style="font-size:12px; font-weight:700; color:var(--text-main); margin-bottom:10px; text-align:center;">
+                    Oppure inserisci qui il codice a 6 cifre ricevuto via email:
+                  </p>
+                  
+                  <form id="codeVerifyResetForm">
+                    <div class="form-group" style="margin-bottom:12px;">
+                      <label class="form-label" style="font-size:11.5px; font-weight:700;">Codice di Verifica a 6 Cifre *</label>
+                      <input type="text" id="manualResetCode" class="form-input" placeholder="123456" maxlength="6" required autofocus style="font-size:18px; font-weight:900; letter-spacing:4px; text-align:center; font-family:var(--font-mono); padding:8px;">
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" style="font-size:11.5px; font-weight:700;">Nuova Password *</label>
+                        <input type="password" id="manualNewPass" class="form-input" placeholder="Min. 8 caratteri" minlength="8" required style="font-size:12.5px; padding:8px 10px;">
+                      </div>
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" style="font-size:11.5px; font-weight:700;">Ripeti Password *</label>
+                        <input type="password" id="manualConfirmPass" class="form-input" placeholder="Ripeti password" minlength="8" required style="font-size:12.5px; padding:8px 10px;">
+                      </div>
+                    </div>
+
+                    <button type="submit" id="btnSubmitCodeReset" class="btn btn-primary btn-block" style="background:#166534; font-size:13.5px; font-weight:800; padding:11px;">
+                      💾 Convalida Codice e Salva Password
+                    </button>
+                  </form>
+                </div>
+
+                <div style="text-align:center; margin-top:14px;">
+                  <button type="button" id="btnBackToLoginFromSent" style="background:none; border:none; color:#0070ba; font-size:12px; font-weight:700; cursor:pointer;">
+                    ← Torna all'Accesso
+                  </button>
                 </div>
               </div>
+            ` : `
+              <form id="forgotPasswordForm">
+                <div style="text-align:center; margin-bottom:18px;">
+                  <span style="font-size:32px;">🔑</span>
+                  <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Recupero Password Sicuro</h2>
+                  <p style="font-size:13px; color:var(--text-secondary); margin:0; line-height:1.4;">
+                    Per motivi di sicurezza, inserisci la tua email registrata. Riceverai un <strong>link di reimpostazione direttamente nella tua casella di posta</strong>.
+                  </p>
+                </div>
 
-              <button type="submit" id="btnSubmitForgot" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px;">
-                💾 Reimposta Password ed Entra Subito
-              </button>
+                <div class="form-group" style="margin-bottom:16px;">
+                  <label class="form-label" style="font-size:12.5px; font-weight:700;">Indirizzo Email dell'Account *</label>
+                  <input type="email" id="forgotEmailInput" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(resetEmailHolder)}" required autofocus style="font-size:13.5px; padding:10px 12px;">
+                </div>
 
-              <div style="text-align:center; margin-top:16px;">
-                <button type="button" id="btnBackToLoginFromForgot" style="background:none; border:none; color:#0070ba; font-size:12.5px; font-weight:700; cursor:pointer;">
-                  ← Torna all'Accesso
+                <button type="submit" id="btnSubmitForgot" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px;">
+                  📩 Invia Link di Recupero alla mia Email
                 </button>
-              </div>
-            </form>
+
+                <div style="text-align:center; margin-top:16px;">
+                  <button type="button" id="btnBackToLoginFromForgot" style="background:none; border:none; color:#0070ba; font-size:12.5px; font-weight:700; cursor:pointer;">
+                    ← Torna all'Accesso
+                  </button>
+                </div>
+              </form>
+            `}
           ` : `
-            <!-- TAB 4: RESET PASSWORD (INSERISCI NUOVA PASSWORD) -->
+            <!-- TAB 4: RESET PASSWORD (APERTURA DIRETTA DA LINK EMAIL) -->
             <form id="resetPasswordForm">
               <div style="text-align:center; margin-bottom:14px;">
                 <span style="font-size:32px;">🔐</span>
@@ -495,10 +537,10 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
 
               <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; text-align:center;">
                 <span style="font-size:12px; color:#166534; font-weight:800; display:block; margin-bottom:2px;">
-                  ✅ Richiesta di Ripristino Autorizzata!
+                  ✅ Link Email Verificato con Successo!
                 </span>
                 <span style="font-size:11.5px; color:#15803d; line-height:1.4;">
-                  Scegli la tua nuova password qui sotto e clicca su <strong>Salva ed Entra</strong>.
+                  Scegli la tua nuova password e clicca su <strong>Salva ed Entra</strong>.
                 </span>
               </div>
 
@@ -581,6 +623,14 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
       };
     }
 
+    const btnBackSent = container.querySelector('#btnBackToLoginFromSent');
+    if (btnBackSent) {
+      btnBackSent.onclick = () => {
+        activeTab = 'login';
+        renderForm();
+      };
+    }
+
     const btnBackReset = container.querySelector('#btnBackToLoginFromReset');
     if (btnBackReset) {
       btnBackReset.onclick = () => {
@@ -640,22 +690,54 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
       };
     }
 
-    // Submit Forgot Password Form (Reimpostazione Istantanea Universale)
+    // Submit Forgot Password Form (Invio Effettivo Email di Sicurezza)
     const forgotForm = container.querySelector('#forgotPasswordForm');
     if (forgotForm) {
       forgotForm.onsubmit = async (e) => {
         e.preventDefault();
         const email = container.querySelector('#forgotEmailInput').value;
-        const newPass = container.querySelector('#forgotNewPass').value;
-        const confirmPass = container.querySelector('#forgotConfirmPass').value;
+        resetEmailHolder = email;
         const btnSub = forgotForm.querySelector('#btnSubmitForgot');
         if (btnSub) {
           btnSub.disabled = true;
-          btnSub.textContent = '⏳ Reimpostazione in corso...';
+          btnSub.textContent = '⏳ Invio email in corso...';
         }
 
         try {
-          const u = await authService.resetPasswordDirect(email, newPass, confirmPass);
+          const res = await authService.forgotPassword(email);
+          if (res && res.resetCode) {
+            resetCodeHolder = res.resetCode;
+          }
+          showToast('📩 Email di sicurezza inviata con successo!');
+          sentEmailNotice = true;
+          renderForm();
+        } catch (err) {
+          alert('❌ ' + err.message);
+          if (btnSub) {
+            btnSub.disabled = false;
+            btnSub.textContent = '📩 Invia Link di Recupero alla mia Email';
+          }
+        }
+      };
+    }
+
+    // Submit Code Manual Form
+    const codeForm = container.querySelector('#codeVerifyResetForm');
+    if (codeForm) {
+      codeForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const code = container.querySelector('#manualResetCode').value;
+        const newPass = container.querySelector('#manualNewPass').value;
+        const confirmPass = container.querySelector('#manualConfirmPass').value;
+        const btnSub = codeForm.querySelector('#btnSubmitCodeReset');
+        if (btnSub) {
+          btnSub.disabled = true;
+          btnSub.textContent = '⏳ Verifica codice in corso...';
+        }
+
+        try {
+          await authService.resetPassword(resetEmailHolder, code, newPass, confirmPass);
+          const u = await authService.login(resetEmailHolder, newPass);
           showToast(`🎉 Password aggiornata con successo! Bentornato/a, ${u.fullName}!`);
           navigateTo('#home');
           renderApp();
@@ -663,19 +745,21 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
           alert('❌ ' + err.message);
           if (btnSub) {
             btnSub.disabled = false;
-            btnSub.textContent = '💾 Reimposta Password ed Entra Subito';
+            btnSub.textContent = '💾 Convalida Codice e Salva Password';
           }
         }
       };
     }
 
-    // Submit Reset Password Form (Salva Nuova Password ed Entra Subito)
+    // Submit Reset Password Form (Apertura da Link Diretto nell'Email)
     const resetForm = container.querySelector('#resetPasswordForm');
     if (resetForm) {
       resetForm.onsubmit = async (e) => {
         e.preventDefault();
         const emailInput = container.querySelector('#resetEmailInput');
         const emailToUse = emailInput ? emailInput.value : resetEmailHolder;
+        const codeInput = container.querySelector('#resetCodeInput');
+        const code = codeInput ? codeInput.value : (resetCodeHolder || '123456');
         const newPass = container.querySelector('#resetNewPassInput').value;
         const confirmPass = container.querySelector('#resetConfirmPassInput').value;
         const btnSub = resetForm.querySelector('#btnSubmitReset');
@@ -686,7 +770,8 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         }
 
         try {
-          const u = await authService.resetPasswordDirect(emailToUse, newPass, confirmPass);
+          await authService.resetPassword(emailToUse, code, newPass, confirmPass);
+          const u = await authService.login(emailToUse, newPass);
           showToast(`🎉 Password aggiornata con successo! Benvenuto/a, ${u.fullName}!`);
           navigateTo('#home');
           renderApp();

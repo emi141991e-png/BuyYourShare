@@ -106,6 +106,35 @@ class EmailService {
       }
     }
 
+    // 3. Invio tramite Brevo REST API (se configurato)
+    const brevoKey = process.env.BREVO_API_KEY || emailConfig.brevoApiKey;
+    if (brevoKey) {
+      try {
+        const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': brevoKey,
+            'Content-Type': 'application/json',
+            'accept': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { name: 'BuyYourShare', email: fromAddress.includes('@') ? fromAddress.replace(/^.*<([^>]+)>.*$/, '$1') : 'noreply@buyyourshare.com' },
+            to: [{ email: to }],
+            subject: subject,
+            htmlContent: html,
+            textContent: text
+          })
+        });
+        const brevoData = await brevoRes.json();
+        if (brevoRes.ok) {
+          emailRecord.status = 'DELIVERED_BREVO';
+          console.log('[EMAIL BREVO SUCCESS]', brevoData);
+        }
+      } catch (err) {
+        console.warn('[EMAIL BREVO ERROR]', err.message);
+      }
+    }
+
     this.sentEmails.push(emailRecord);
     if (this.sentEmails.length > 100) this.sentEmails.shift();
 
