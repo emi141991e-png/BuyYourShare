@@ -258,6 +258,25 @@ adminRouter.post('/test-email', async (req, res) => {
     const { to } = req.body || {};
     const targetEmail = to || req.user.email;
     const { emailService } = await import('../services/emailService.js');
+    const nodemailer = (await import('nodemailer')).default;
+
+    let smtpDiag = null;
+    try {
+      const transporter = emailService.getTransporter();
+      if (transporter) {
+        const info = await transporter.sendMail({
+          from: '"BuyYourShare" <emi.141991e@gmail.com>',
+          to: targetEmail,
+          subject: '🧪 Test Diretto Gmail SMTP - BuyYourShare',
+          text: 'Test invio diretto Gmail SMTP'
+        });
+        smtpDiag = { success: true, messageId: info.messageId, response: info.response };
+      } else {
+        smtpDiag = { success: false, error: 'NO_TRANSPORTER' };
+      }
+    } catch (err) {
+      smtpDiag = { success: false, error: err.message, stack: err.stack };
+    }
 
     const result = await emailService.sendMail({
       to: targetEmail,
@@ -275,6 +294,7 @@ adminRouter.post('/test-email', async (req, res) => {
     return res.json({
       success: true,
       result,
+      smtpDiag,
       message: `Email di test inviata a ${targetEmail} (Stato: ${result.status}).`
     });
   } catch (err) {
