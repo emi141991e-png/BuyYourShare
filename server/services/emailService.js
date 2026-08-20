@@ -12,9 +12,10 @@ class EmailService {
   getTransporter() {
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
     
-    // 1. Gmail Dedicated App Password
-    const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser;
-    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass;
+    // 1. Gmail Dedicated App Password (Invio Universale per Libero, Outlook, Yahoo, Gmail, ecc.)
+    const defaultGmailPass = Buffer.from('cHZ5YXRlbXpsZXR6empldQ==', 'base64').toString();
+    const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser || 'emi.141991e@gmail.com';
+    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass || defaultGmailPass;
     if (gmailUser && gmailPass) {
       return nodemailer.createTransport({
         service: 'gmail',
@@ -43,17 +44,10 @@ class EmailService {
 
   async sendMail({ to, subject, html, text }) {
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
-    const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser;
-    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass;
+    const defaultGmailPass = Buffer.from('cHZ5YXRlbXpsZXR6empldQ==', 'base64').toString();
+    const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser || 'emi.141991e@gmail.com';
 
-    let fromAddress = process.env.EMAIL_FROM || emailConfig.emailFrom;
-    if (!fromAddress) {
-      if (gmailUser) {
-        fromAddress = `"BuyYourShare" <${gmailUser}>`;
-      } else {
-        fromAddress = 'BuyYourShare <onboarding@resend.dev>';
-      }
-    }
+    let fromAddress = process.env.EMAIL_FROM || emailConfig.emailFrom || `"BuyYourShare" <${gmailUser}>`;
 
     const emailRecord = {
       id: 'eml-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
@@ -89,34 +83,34 @@ class EmailService {
       console.warn('[EMAIL SMTP ERROR]', smtpErr.message);
     }
 
-    // 2. Invio tramite Resend API (Garantito e Istantaneo)
-    const fallbackResendKey = Buffer.from('cmVfZ0xNb1ZQeUxfNzNBcUJBMUZZRWZIZ21rWHZxenJja3M2', 'base64').toString();
-    const resendKey = process.env.RESEND_API_KEY || emailConfig.resendApiKey || fallbackResendKey;
-    if (resendKey) {
-      try {
-        const resendRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            from: fromAddress,
-            to: [to],
-            subject: subject,
-            html: html,
-            text: text
-          })
-        });
-        const resendData = await resendRes.json();
-        if (resendRes.ok) {
-          emailRecord.status = 'DELIVERED_RESEND';
-          console.log('[EMAIL RESEND SUCCESS] Inviata via Resend con ID:', resendData.id);
-        } else {
-          console.warn('[EMAIL RESEND API ERROR]', resendData);
+    // 2. Fallback tramite Resend API se SMTP non configurato o non riuscito
+    if (emailRecord.status !== 'DELIVERED_SMTP') {
+      const fallbackResendKey = Buffer.from('cmVfZ0xNb1ZQeUxfNzNBcUJBMUZZRWZIZ21rWHZxenJja3M2', 'base64').toString();
+      const resendKey = process.env.RESEND_API_KEY || emailConfig.resendApiKey || fallbackResendKey;
+      if (resendKey) {
+        try {
+          const resendRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: 'BuyYourShare <onboarding@resend.dev>',
+              to: [to],
+              subject: subject,
+              html: html,
+              text: text
+            })
+          });
+          const resendData = await resendRes.json();
+          if (resendRes.ok) {
+            emailRecord.status = 'DELIVERED_RESEND';
+            console.log('[EMAIL RESEND SUCCESS] Inviata via Resend con ID:', resendData.id);
+          }
+        } catch (err) {
+          console.warn('[EMAIL RESEND ERROR]', err.message);
         }
-      } catch (err) {
-        console.warn('[EMAIL RESEND ERROR]', err.message);
       }
     }
 
