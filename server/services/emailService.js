@@ -282,21 +282,16 @@ class EmailService {
               Clicca sul pulsante qui sotto per accedere direttamente e scegliere la tua nuova password:
             </p>
 
-            <div style="text-align: center; margin: 24px 0;">
-              <a href="${resetLink}" class="btn-cta">
+            <div style="text-align: center; margin: 26px 0;">
+              <a href="${resetLink}" class="btn-cta" style="display:inline-block; background:#003087; color:#ffffff !important; text-decoration:none; padding:16px 36px; border-radius:8px; font-weight:800; font-size:15px; text-align:center;">
                 🔐 Reimposta la tua Password Subito
               </a>
             </div>
 
-            <p style="font-size: 12px; color: #64748b; word-break: break-all; margin-top: 14px;">
-              Se il pulsante non funziona, copia e incolla questo link nel tuo browser:<br>
-              <a href="${resetLink}" style="color: #0070ba;">${resetLink}</a>
+            <p style="font-size: 12px; color: #64748b; word-break: break-all; margin-top: 18px; line-height: 1.5;">
+              Se il pulsante non funziona, copia e incolla questo link direttamente nella barra degli indirizzi del tuo browser:<br>
+              <a href="${resetLink}" style="color: #0070ba; font-weight: 700;">${resetLink}</a>
             </p>
-
-            <div class="code-box">
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 4px;">Codice di sicurezza alternativo:</div>
-              <div class="code-number">${resetCode}</div>
-            </div>
 
             <div class="warning">
               ⚠️ <strong>Non hai richiesto tu il ripristino?</strong> Se non hai effettuato tu questa richiesta, puoi ignorare questa email in totale sicurezza. La tua password attuale rimarrà invariata e protetta.
@@ -314,7 +309,7 @@ class EmailService {
       to: user.email,
       subject,
       html,
-      text: `Per reimpostare la tua password di BuyYourShare clicca su questo link: ${resetLink} oppure usa il codice ${resetCode}.`
+      text: `Per reimpostare la tua password di BuyYourShare clicca su questo link: ${resetLink}`
     });
   }
 
