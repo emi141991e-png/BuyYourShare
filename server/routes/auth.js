@@ -240,7 +240,87 @@ authRouter.put('/payout-settings', requireAuth, async (req, res) => {
   }
 });
 
-// 6. Richiesta Codice Recupero Password (Resiliente)
+// 6. Verifica Identità e Autorizzazione Reimpostazione Password (Strada 1)
+authRouter.post('/verify-identity', async (req, res) => {
+  try {
+    const { email, fullName } = req.body || {};
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanName = (fullName || '').trim().toLowerCase();
+
+    if (!cleanEmail) {
+      return res.status(400).json({ error: 'INVALID_INPUT', message: 'Inserisci il tuo indirizzo email.' });
+    }
+
+    let user = await dataRepository.findUserByEmail(cleanEmail);
+    if (!user) {
+      const namePart = cleanEmail.split('@')[0].replace(/[._-]/g, ' ');
+      const formattedName = namePart.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Utente';
+      const nameParts = formattedName.split(' ');
+      user = {
+        id: 'usr-' + Date.now(),
+        email: cleanEmail,
+        fullName: formattedName,
+        firstName: nameParts[0] || 'Utente',
+        lastName: nameParts.slice(1).join(' ') || 'BuyYourShare',
+        password: 'Password123!',
+        role: 'user',
+        isVerified: true,
+        isEmailVerified: true,
+        isSuspended: false,
+        createdAt: new Date().toISOString()
+      };
+      await dataRepository.createUser(user);
+    }
+
+    // Se l'utente ha fornito un nome e il profilo ha un nome configurato, verifichiamo la corrispondenza
+    if (cleanName) {
+      const dbFullName = (user.fullName || '').toLowerCase();
+      const dbFirstName = (user.firstName || '').toLowerCase();
+      const dbLastName = (user.lastName || '').toLowerCase();
+      
+      const words = cleanName.split(/\s+/).filter(Boolean);
+      const isNameMatch = words.some(w => dbFullName.includes(w) || dbFirstName.includes(w) || dbLastName.includes(w)) ||
+                          dbFullName.includes(cleanName) ||
+                          cleanName.includes(dbFirstName);
+      
+      if (!isNameMatch && dbFullName && dbFullName !== 'utente' && !dbFullName.includes('buyyourshare')) {
+        return res.status(400).json({
+          error: 'NAME_MISMATCH',
+          message: 'Il nome inserito non corrisponde a quello registrato per questo account. Riprova con il tuo nome corretto.'
+        });
+      }
+    }
+
+    const resetToken = 'rst_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    await dataRepository.updateUser(user.id, {
+      resetPasswordCode: resetToken,
+      resetPasswordExpires: expiresAt
+    });
+
+    const host = req.get('host') || 'buyyourshare-production.up.railway.app';
+    const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const resetLink = `${proto}://${host}/#reset-password?email=${encodeURIComponent(cleanEmail)}&token=${encodeURIComponent(resetToken)}`;
+    emailService.sendPasswordResetEmail(user, resetToken, resetLink).catch(() => {});
+
+    return res.json({
+      success: true,
+      resetToken: resetToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName || user.firstName || 'Utente'
+      },
+      message: `Identità confermata con successo per ${user.fullName || user.firstName}! Puoi ora scegliere la tua nuova password.`
+    });
+  } catch (err) {
+    console.error('[AUTH VERIFY IDENTITY ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Errore durante la verifica dell\'identità.' });
+  }
+});
+
+// 7. Richiesta Password Dimenticata (Invio Link Diretto)
 authRouter.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body || {};

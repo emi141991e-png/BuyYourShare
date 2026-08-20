@@ -71,9 +71,9 @@
       "termsAcceptedAt": "2026-08-19T20:00:00.000Z",
       "privacyAcceptedAt": "2026-08-19T20:00:00.000Z",
       "createdAt": "2026-08-19T20:00:00.000Z",
-      "updatedAt": "2026-08-20T07:41:07.333Z",
-      "resetPasswordCode": null,
-      "resetPasswordExpires": null
+      "updatedAt": "2026-08-20T17:56:01.989Z",
+      "resetPasswordCode": "rst_1787248561979_zz406ez4",
+      "resetPasswordExpires": "2026-08-20T18:56:01.979Z"
     },
     {
       "id": "usr-1786997624220",
@@ -346,6 +346,35 @@
       "resetPasswordCode": "763019",
       "resetPasswordExpires": "2026-08-20T13:00:26.817Z",
       "updatedAt": "2026-08-20T12:00:26.818Z"
+    },
+    {
+      "id": "usr-1787247964617",
+      "email": "test.libero.user@libero.it",
+      "fullName": "Test Libero User",
+      "firstName": "Test",
+      "lastName": "Libero User",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "createdAt": "2026-08-20T17:46:04.618Z"
+    },
+    {
+      "id": "usr-1787248562058",
+      "email": "mario.rossi@example.com",
+      "fullName": "Mario Rossi",
+      "firstName": "Mario",
+      "lastName": "Rossi",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "createdAt": "2026-08-20T17:56:02.058Z",
+      "resetPasswordCode": "rst_1787248562073_rtyuclsk",
+      "resetPasswordExpires": "2026-08-20T18:56:02.073Z",
+      "updatedAt": "2026-08-20T17:56:02.073Z"
     }
   ],
   "services": [

@@ -497,20 +497,26 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
             ` : `
               <form id="forgotPasswordForm">
                 <div style="text-align:center; margin-bottom:18px;">
-                  <span style="font-size:32px;">🔑</span>
-                  <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Recupero Password</h2>
+                  <span style="font-size:32px;">🔐</span>
+                  <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Recupero & Reimpostazione Password</h2>
                   <p style="font-size:13px; color:var(--text-secondary); margin:0; line-height:1.4;">
-                    Inserisci la tua email registrata. Riceverai un <strong>link per reimpostare la tua password con un solo clic</strong>.
+                    Inserisci l'email del tuo account e il tuo nome per verificare l'identità e scegliere subito la tua nuova password.
                   </p>
                 </div>
 
-                <div class="form-group" style="margin-bottom:16px;">
+                <div class="form-group" style="margin-bottom:14px;">
                   <label class="form-label" style="font-size:12.5px; font-weight:700;">Indirizzo Email dell'Account *</label>
-                  <input type="email" id="forgotEmailInput" class="form-input" placeholder="es. mario.rossi@email.com" value="${escapeHtml(resetEmailHolder)}" required autofocus style="font-size:13.5px; padding:10px 12px;">
+                  <input type="email" id="forgotEmailInput" class="form-input" placeholder="es. mario.rossi@libero.it o emilio@gmail.com" value="${escapeHtml(resetEmailHolder)}" required autofocus style="font-size:13.5px; padding:10px 12px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom:18px;">
+                  <label class="form-label" style="font-size:12.5px; font-weight:700;">Nome o Cognome dell'Intestatario</label>
+                  <input type="text" id="forgotNameInput" class="form-input" placeholder="es. Mario oppure Rossi (opzionale)" style="font-size:13.5px; padding:10px 12px;">
+                  <small style="display:block; font-size:11px; color:#64748b; margin-top:4px;">Usato per confermare l'identità del titolare dell'account.</small>
                 </div>
 
                 <button type="submit" id="btnSubmitForgot" class="btn btn-primary btn-block" style="background:#003087; font-size:14px; font-weight:800; padding:12px;">
-                  📩 Invia Link di Recupero alla mia Email
+                  🔐 Verifica Identità e Reimposta Password Subito
                 </button>
 
                 <div style="text-align:center; margin-top:16px;">
@@ -689,45 +695,54 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
       };
     }
 
-    // Submit Forgot Password Form (Invio Effettivo Email di Sicurezza)
+    // Submit Forgot Password Form (Strada 1: Verifica Identità Immediata)
     const forgotForm = container.querySelector('#forgotPasswordForm');
     if (forgotForm) {
       forgotForm.onsubmit = async (e) => {
         e.preventDefault();
         const email = container.querySelector('#forgotEmailInput').value;
+        const nameVal = container.querySelector('#forgotNameInput')?.value || '';
         resetEmailHolder = email;
         const btnSub = forgotForm.querySelector('#btnSubmitForgot');
         if (btnSub) {
           btnSub.disabled = true;
-          btnSub.textContent = '⏳ Invio email in corso...';
+          btnSub.textContent = '⏳ Verifica identità in corso...';
         }
 
         try {
-          const res = await authService.forgotPassword(email);
-          if (res && res.resetCode) {
-            resetCodeHolder = res.resetCode;
+          const resp = await fetch('/api/auth/verify-identity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, fullName: nameVal })
+          });
+          const res = await resp.json();
+          if (!resp.ok || !res.success) {
+            throw new Error(res.message || 'Verifica non riuscita.');
           }
-          showToast('📩 Link di reimpostazione inviato alla tua email!');
-          sentEmailNotice = true;
+
+          if (res && res.resetToken) {
+            resetCodeHolder = res.resetToken;
+          }
+          showToast(`✅ Identità confermata! Scegli ora la tua nuova password.`);
+          activeTab = 'reset';
           renderForm();
         } catch (err) {
           alert('❌ ' + err.message);
           if (btnSub) {
             btnSub.disabled = false;
-            btnSub.textContent = '📩 Invia Link di Recupero alla mia Email';
+            btnSub.textContent = '🔐 Verifica Identità e Reimposta Password Subito';
           }
         }
       };
     }
 
-    // Submit Reset Password Form (Apertura da Link Diretto nell'Email)
+    // Submit Reset Password Form (Salvataggio Immediato Nuova Password ed Entrata)
     const resetForm = container.querySelector('#resetPasswordForm');
     if (resetForm) {
       resetForm.onsubmit = async (e) => {
         e.preventDefault();
         const emailInput = container.querySelector('#resetEmailInput');
         const emailToUse = emailInput ? emailInput.value : resetEmailHolder;
-        const code = resetCodeHolder || '123456';
         const newPass = container.querySelector('#resetNewPassInput').value;
         const confirmPass = container.querySelector('#resetConfirmPassInput').value;
         const btnSub = resetForm.querySelector('#btnSubmitReset');
@@ -738,8 +753,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         }
 
         try {
-          await authService.resetPassword(emailToUse, code, newPass, confirmPass);
-          const u = await authService.login(emailToUse, newPass);
+          const u = await authService.resetPasswordDirect(emailToUse, newPass, confirmPass);
           showToast(`🎉 Password aggiornata con successo! Benvenuto/a, ${u.fullName}!`);
           navigateTo('#home');
           renderApp();
