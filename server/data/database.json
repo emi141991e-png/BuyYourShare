@@ -2636,5 +2636,10 @@
       "performedByName": "Admin BuyYourShare",
       "details": "Eliminazione fisica definitiva del gruppo Servizio Temporaneo Test Admin (Piano Test Cancellazione) dal database operativo."
     }
-  ]
+  ],
+  "systemConfig": {
+    "emailSettings": {
+      "emailFrom": "BuyYourShare <onboarding@resend.dev>"
+    }
+  }
 }
