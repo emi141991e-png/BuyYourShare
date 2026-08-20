@@ -282,11 +282,12 @@ authRouter.post('/forgot-password', async (req, res) => {
     const host = req.get('host') || 'buyyourshare-production.up.railway.app';
     const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
     const baseUrl = `${proto}://${host}`;
-    const resetLink = `${baseUrl}/#reset-password?email=${encodeURIComponent(cleanEmail)}&token=${encodeURIComponent(resetCode)}`;
-
-    emailService.sendPasswordResetEmail(user, resetCode, resetLink).catch(err => {
+    try {
+      await emailService.sendPasswordResetEmail(user, resetCode, resetLink);
+      console.log(`[AUTH FORGOT PASSWORD] Email inviata con successo a ${cleanEmail}`);
+    } catch (err) {
       console.warn('[EMAIL WARNING] Invio email reset fallita:', err.message);
-    });
+    }
 
     return res.json({
       success: true,
