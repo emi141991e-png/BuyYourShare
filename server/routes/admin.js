@@ -202,3 +202,83 @@ adminRouter.get('/audit-logs', async (req, res) => {
     return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
   }
 });
+
+// 8. Configurazione Email / SMTP Gateway
+adminRouter.get('/email-config', async (req, res) => {
+  const emailSettings = dataRepository.data.systemConfig?.emailSettings || {};
+  return res.json({
+    success: true,
+    emailSettings: {
+      emailFrom: emailSettings.emailFrom || process.env.EMAIL_FROM || '"BuyYourShare" <noreply@buyyourshare.com>',
+      gmailUser: emailSettings.gmailUser || process.env.GMAIL_USER || '',
+      hasGmailPass: !!(emailSettings.gmailPass || process.env.GMAIL_APP_PASSWORD),
+      smtpHost: emailSettings.smtpHost || process.env.SMTP_HOST || '',
+      smtpPort: emailSettings.smtpPort || process.env.SMTP_PORT || 587,
+      smtpUser: emailSettings.smtpUser || process.env.SMTP_USER || '',
+      hasSmtpPass: !!(emailSettings.smtpPass || process.env.SMTP_PASS),
+      hasResendApiKey: !!(emailSettings.resendApiKey || process.env.RESEND_API_KEY)
+    }
+  });
+});
+
+adminRouter.post('/email-config', async (req, res) => {
+  try {
+    const { emailFrom, gmailUser, gmailPass, smtpHost, smtpPort, smtpUser, smtpPass, resendApiKey } = req.body || {};
+    if (!dataRepository.data.systemConfig) {
+      dataRepository.data.systemConfig = {};
+    }
+    if (!dataRepository.data.systemConfig.emailSettings) {
+      dataRepository.data.systemConfig.emailSettings = {};
+    }
+
+    const current = dataRepository.data.systemConfig.emailSettings;
+    if (emailFrom !== undefined) current.emailFrom = emailFrom;
+    if (gmailUser !== undefined) current.gmailUser = gmailUser;
+    if (gmailPass) current.gmailPass = gmailPass;
+    if (smtpHost !== undefined) current.smtpHost = smtpHost;
+    if (smtpPort !== undefined) current.smtpPort = smtpPort;
+    if (smtpUser !== undefined) current.smtpUser = smtpUser;
+    if (smtpPass) current.smtpPass = smtpPass;
+    if (resendApiKey) current.resendApiKey = resendApiKey;
+
+    await dataRepository.save();
+
+    return res.json({
+      success: true,
+      message: 'Configurazione email e SMTP salvata con successo.'
+    });
+  } catch (err) {
+    console.error('[ADMIN EMAIL CONFIG SAVE ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+  }
+});
+
+adminRouter.post('/test-email', async (req, res) => {
+  try {
+    const { to } = req.body || {};
+    const targetEmail = to || req.user.email;
+    const { emailService } = await import('../services/emailService.js');
+
+    const result = await emailService.sendMail({
+      to: targetEmail,
+      subject: '🧪 Test Invio Email - BuyYourShare Platform',
+      html: `
+        <div style="font-family:sans-serif; padding:20px; border:1px solid #003087; border-radius:8px;">
+          <h2 style="color:#003087;">BuyYourShare Email Gateway Funzionante!</h2>
+          <p>Questa è un'email di prova inviata con successo dal server di produzione BuyYourShare.</p>
+          <p>Stato invio: <strong>${new Date().toLocaleString('it-IT')}</strong></p>
+        </div>
+      `,
+      text: 'Test invio email da BuyYourShare completato con successo.'
+    });
+
+    return res.json({
+      success: true,
+      result,
+      message: `Email di test inviata a ${targetEmail} (Stato: ${result.status}).`
+    });
+  } catch (err) {
+    console.error('[ADMIN TEST EMAIL ERROR]', err);
+    return res.status(500).json({ error: 'SEND_FAILED', message: err.message });
+  }
+});

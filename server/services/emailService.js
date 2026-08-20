@@ -1,18 +1,49 @@
-/**
- * BuyYourShare - Server Email Service (Dependency-Free / Native REST & SMTP Gateway)
- * Gestione invio email transazionali automatiche:
- * - Email di avvenuta registrazione (Welcome Email)
- * - Email di recupero password con codice di verifica a 6 cifre
- * - Email di conferma cambio password
- */
+import nodemailer from 'nodemailer';
+import { dataRepository } from '../repository/DataRepository.js';
 
 class EmailService {
   constructor() {
     this.sentEmails = [];
   }
 
+  /**
+   * Restituisce il transporter nodemailer configurato (da env o da systemConfig)
+   */
+  getTransporter() {
+    const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
+    
+    // 1. Gmail Dedicated App Password
+    const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser;
+    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass;
+    if (gmailUser && gmailPass) {
+      return nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: gmailUser, pass: gmailPass }
+      });
+    }
+
+    // 2. Generic SMTP Server (Brevo, SendGrid, Mailgun, Aruba, OVH, etc.)
+    const smtpHost = process.env.SMTP_HOST || emailConfig.smtpHost;
+    const smtpUser = process.env.SMTP_USER || emailConfig.smtpUser;
+    const smtpPass = process.env.SMTP_PASS || emailConfig.smtpPass;
+    const smtpPort = Number(process.env.SMTP_PORT || emailConfig.smtpPort || 587);
+    const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+
+    if (smtpHost && smtpUser && smtpPass) {
+      return nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: { user: smtpUser, pass: smtpPass }
+      });
+    }
+
+    return null;
+  }
+
   async sendMail({ to, subject, html, text }) {
-    const fromAddress = process.env.EMAIL_FROM || '"BuyYourShare" <noreply@buyyourshare.com>';
+    const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
+    const fromAddress = process.env.EMAIL_FROM || emailConfig.emailFrom || '"BuyYourShare" <noreply@buyyourshare.com>';
     const emailRecord = {
       id: 'eml-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
       to,
@@ -28,13 +59,33 @@ class EmailService {
     console.log(`📋 Oggetto: ${subject}`);
     console.log(`============================================================\n`);
 
-    // Se è configurato un provider API esterno come Resend
-    if (process.env.RESEND_API_KEY) {
+    // 1. Invio tramite Nodemailer (SMTP o Gmail)
+    try {
+      const transporter = this.getTransporter();
+      if (transporter) {
+        const info = await transporter.sendMail({
+          from: fromAddress,
+          to,
+          subject,
+          text: text || '',
+          html
+        });
+        emailRecord.status = 'DELIVERED_SMTP';
+        emailRecord.messageId = info.messageId;
+        console.log(`[EMAIL SMTP SUCCESS] Inviata con successo tramite SMTP (MessageID: ${info.messageId})`);
+      }
+    } catch (smtpErr) {
+      console.warn('[EMAIL SMTP ERROR]', smtpErr.message);
+    }
+
+    // 2. Invio tramite Resend API (se configurato)
+    const resendKey = process.env.RESEND_API_KEY || emailConfig.resendApiKey;
+    if (resendKey) {
       try {
-        await fetch('https://api.resend.com/emails', {
+        const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            'Authorization': `Bearer ${resendKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -45,7 +96,11 @@ class EmailService {
             text: text
           })
         });
-        emailRecord.status = 'DELIVERED_RESEND';
+        const resendData = await resendRes.json();
+        if (resendRes.ok) {
+          emailRecord.status = 'DELIVERED_RESEND';
+          console.log('[EMAIL RESEND SUCCESS]', resendData);
+        }
       } catch (err) {
         console.warn('[EMAIL RESEND ERROR]', err.message);
       }

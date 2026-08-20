@@ -496,12 +496,21 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
           ` : `
             <!-- TAB 4: RESET PASSWORD (INSERISCI NUOVA PASSWORD) -->
             <form id="resetPasswordForm">
-              <div style="text-align:center; margin-bottom:18px;">
+              <div style="text-align:center; margin-bottom:14px;">
                 <span style="font-size:32px;">🔐</span>
                 <h2 style="font-size:18px; font-weight:900; color:var(--text-main); margin:6px 0 4px;">Reimposta la tua Password</h2>
                 <p style="font-size:12.5px; color:var(--text-secondary); margin:0;">
                   Account: <strong>${escapeHtml(resetEmailHolder || 'Il tuo Account')}</strong>
                 </p>
+              </div>
+
+              <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; text-align:center;">
+                <span style="font-size:12px; color:#166534; font-weight:800; display:block; margin-bottom:2px;">
+                  ✅ Richiesta di Ripristino Autorizzata!
+                </span>
+                <span style="font-size:11.5px; color:#15803d; line-height:1.4;">
+                  Scegli la tua nuova password qui sotto e clicca su <strong>Salva ed Entra</strong>.
+                </span>
               </div>
 
               ${!resetEmailHolder ? `
