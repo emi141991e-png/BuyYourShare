@@ -279,14 +279,20 @@ authRouter.post('/forgot-password', async (req, res) => {
       resetPasswordExpires: expiresAt
     });
 
-    emailService.sendPasswordResetEmail(user, resetCode).catch(err => {
+    const host = req.get('host') || 'buyyourshare-production.up.railway.app';
+    const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const baseUrl = `${proto}://${host}`;
+    const resetLink = `${baseUrl}/#reset-password?email=${encodeURIComponent(cleanEmail)}&token=${encodeURIComponent(resetCode)}`;
+
+    emailService.sendPasswordResetEmail(user, resetCode, resetLink).catch(err => {
       console.warn('[EMAIL WARNING] Invio email reset fallita:', err.message);
     });
 
     return res.json({
       success: true,
       resetCode: resetCode,
-      message: `Codice di recupero (${resetCode}) generato per l'indirizzo ${cleanEmail}. Inseriscilo per impostare la nuova password.`
+      resetLink: resetLink,
+      message: `Link di recupero inviato con successo all'email ${cleanEmail}. Clicca sul link ricevuto per reimpostare la tua password.`
     });
   } catch (err) {
     console.error('[AUTH FORGOT PASSWORD ERROR]', err);

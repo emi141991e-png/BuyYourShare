@@ -131,10 +131,12 @@ class EmailService {
   }
 
   /**
-   * 2. Email per Recupero Password con Codice di Verifica
+   * 2. Email per Recupero Password con Link Diretto Cliccabile
    */
-  async sendPasswordResetEmail(user, resetCode) {
-    const subject = '🔐 Codice di Recupero Password - BuyYourShare';
+  async sendPasswordResetEmail(user, resetCode, customResetLink = null) {
+    const baseUrl = process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://buyyourshare-production.up.railway.app');
+    const resetLink = customResetLink || `${baseUrl}/#reset-password?email=${encodeURIComponent(user.email)}&token=${encodeURIComponent(resetCode)}`;
+    const subject = '🔐 Link per Reimpostare la Password - BuyYourShare';
     const html = `
       <!DOCTYPE html>
       <html>
@@ -146,8 +148,9 @@ class EmailService {
           .header { background: #003087; padding: 24px; text-align: center; color: #ffffff; }
           .header h1 { margin: 0; font-size: 22px; font-weight: 800; }
           .content { padding: 28px 24px; }
-          .code-box { background: #f1f5f9; border: 2px dashed #0070ba; border-radius: 8px; padding: 18px; text-align: center; margin: 20px 0; }
-          .code-number { font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #003087; font-family: monospace; }
+          .btn-cta { display: inline-block; background: #003087; color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 800; font-size: 15px; margin: 20px 0; text-align: center; }
+          .code-box { background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; margin: 16px 0; }
+          .code-number { font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #003087; font-family: monospace; }
           .warning { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; font-size: 12px; color: #991b1b; margin-top: 18px; }
           .footer { background: #f1f5f9; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; }
         </style>
@@ -158,22 +161,32 @@ class EmailService {
             <h1>BuyYourShare</h1>
           </div>
           <div class="content">
-            <h2 style="font-size: 17px; font-weight: 700; color: #0f172a; margin-top: 0;">Recupero della Password</h2>
-            <p style="font-size: 13.5px; line-height: 1.6; color: #475569;">
-              Abbiamo ricevuto una richiesta di ripristino password per il tuo account associato a <strong>${escapeHtml(user.email)}</strong>.
+            <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 0;">Reimposta la tua Password</h2>
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+              Ciao <strong>${escapeHtml(user.fullName || user.firstName || 'Utente')}</strong>, abbiamo ricevuto una richiesta di ripristino password per il tuo account <strong>${escapeHtml(user.email)}</strong>.
             </p>
-            <p style="font-size: 13px; color: #475569;">
-              Inserisci il seguente codice di sicurezza a 6 cifre nella pagina di ripristino per impostare la tua nuova password:
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+              Clicca sul pulsante qui sotto per accedere direttamente e scegliere la tua nuova password:
+            </p>
+
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${resetLink}" class="btn-cta">
+                🔐 Reimposta la tua Password Subito
+              </a>
+            </div>
+
+            <p style="font-size: 12px; color: #64748b; word-break: break-all; margin-top: 14px;">
+              Se il pulsante non funziona, copia e incolla questo link nel tuo browser:<br>
+              <a href="${resetLink}" style="color: #0070ba;">${resetLink}</a>
             </p>
 
             <div class="code-box">
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 6px;">Il tuo codice di verifica</div>
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 4px;">Codice di sicurezza alternativo:</div>
               <div class="code-number">${resetCode}</div>
-              <div style="font-size: 11px; color: #64748b; margin-top: 6px;">Valido per 15 minuti</div>
             </div>
 
             <div class="warning">
-              ⚠️ <strong>Non hai richiesto tu il ripristino?</strong> Se non hai effettuato tu questa richiesta, puoi ignorare questa email. La tua password rimarrà invariata e protetta.
+              ⚠️ <strong>Non hai richiesto tu il ripristino?</strong> Se non hai effettuato tu questa richiesta, puoi ignorare questa email in totale sicurezza. La tua password attuale rimarrà invariata e protetta.
             </div>
           </div>
           <div class="footer">
@@ -188,7 +201,7 @@ class EmailService {
       to: user.email,
       subject,
       html,
-      text: `Il tuo codice per recuperare la password di BuyYourShare è: ${resetCode} (valido per 15 minuti).`
+      text: `Per reimpostare la tua password di BuyYourShare clicca su questo link: ${resetLink} oppure usa il codice ${resetCode}.`
     });
   }
 
