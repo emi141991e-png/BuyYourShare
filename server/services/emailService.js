@@ -18,13 +18,11 @@ class EmailService {
     const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass || defaultGmailPass;
     if (gmailUser && gmailPass) {
       return nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
+        service: 'gmail',
         auth: { user: gmailUser, pass: gmailPass },
-        connectionTimeout: 4000,
-        greetingTimeout: 4000,
-        socketTimeout: 5000
+        connectionTimeout: 6000,
+        greetingTimeout: 6000,
+        socketTimeout: 8000
       });
     }
 

@@ -486,6 +486,10 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
                   </a>
                 ` : ''}
 
+                <button type="button" id="btnGoToDirectResetForm" class="btn btn-primary btn-block" style="background:#166534; font-size:13.5px; font-weight:800; padding:12px; margin-bottom:10px;">
+                  🔑 Imposta Nuova Password Subito qui
+                </button>
+
                 <button type="button" id="btnBackToLoginFromSent" class="btn btn-secondary btn-block" style="font-size:13px; font-weight:700;">
                   ← Torna alla Pagina di Accesso
                 </button>
@@ -529,7 +533,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
 
               <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; text-align:center;">
                 <span style="font-size:12px; color:#166534; font-weight:800; display:block; margin-bottom:2px;">
-                  ✅ Link Email Verificato con Successo!
+                  ✅ Richiesta di Ripristino Autorizzata!
                 </span>
                 <span style="font-size:11.5px; color:#15803d; line-height:1.4;">
                   Scegli la tua nuova password e clicca su <strong>Salva ed Entra</strong>.
@@ -614,6 +618,14 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
     if (btnBackSent) {
       btnBackSent.onclick = () => {
         activeTab = 'login';
+        renderForm();
+      };
+    }
+
+    const btnGoDirect = container.querySelector('#btnGoToDirectResetForm');
+    if (btnGoDirect) {
+      btnGoDirect.onclick = () => {
+        activeTab = 'reset';
         renderForm();
       };
     }
