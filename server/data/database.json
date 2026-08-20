@@ -62,7 +62,7 @@
       "fullName": "Emilio Caruso",
       "firstName": "Emilio",
       "lastName": "Caruso",
-      "password": "SuperPassword2026!",
+      "password": "Password123!",
       "role": "user",
       "isVerified": true,
       "isEmailVerified": true,
@@ -71,7 +71,7 @@
       "termsAcceptedAt": "2026-08-19T20:00:00.000Z",
       "privacyAcceptedAt": "2026-08-19T20:00:00.000Z",
       "createdAt": "2026-08-19T20:00:00.000Z",
-      "updatedAt": "2026-08-20T07:26:52.921Z",
+      "updatedAt": "2026-08-20T07:41:07.333Z",
       "resetPasswordCode": null,
       "resetPasswordExpires": null
     },
@@ -317,6 +317,19 @@
       "resetPasswordCode": "800117",
       "resetPasswordExpires": "2026-08-20T08:21:33.821Z",
       "updatedAt": "2026-08-20T07:21:33.821Z"
+    },
+    {
+      "id": "usr-1787211667381",
+      "email": "qualunque.email.nuova@libero.it",
+      "fullName": "Qualunque Email Nuova",
+      "firstName": "Qualunque",
+      "lastName": "Email Nuova",
+      "password": "MiaPasswordSicura123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "createdAt": "2026-08-20T07:41:07.381Z"
     }
   ],
   "services": [
@@ -2564,6 +2577,18 @@
       "userId": "usr-emilio",
       "createdAt": "2026-08-20T07:26:52.931Z",
       "expiresAt": "2026-09-19T07:26:52.931Z"
+    },
+    {
+      "token": "bys_token_1787211667352_bc1c8ueder",
+      "userId": "usr-emilio",
+      "createdAt": "2026-08-20T07:41:07.352Z",
+      "expiresAt": "2026-09-19T07:41:07.352Z"
+    },
+    {
+      "token": "bys_token_1787211667384_ca80cjqbum",
+      "userId": "usr-1787211667381",
+      "createdAt": "2026-08-20T07:41:07.384Z",
+      "expiresAt": "2026-09-19T07:41:07.384Z"
     }
   ],
   "adminAuditLogs": [

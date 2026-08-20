@@ -256,6 +256,47 @@ class AuthService {
   }
 
   /**
+   * Reimpostazione Istantanea Universale (Zero-Delay, Zero-Dependency)
+   */
+  async resetPasswordDirect(email, newPassword, confirmPassword) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPass = (newPassword || '').trim();
+    const cleanConfirm = (confirmPassword || '').trim();
+
+    const resp = await fetch('/api/auth/reset-password-direct', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        newPassword: cleanPass,
+        confirmPassword: cleanConfirm
+      })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.message || 'Errore durante la modifica della password.');
+    }
+
+    this.sessionToken = data.token;
+    this.currentUserId = data.user.id;
+    localStorage.setItem(SESSION_TOKEN_KEY, this.sessionToken);
+    localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
+    localStorage.setItem(CACHED_EMAIL_KEY, data.user.email);
+    localStorage.setItem(CACHED_NAME_KEY, data.user.fullName);
+
+    let localUser = db.data.users.find(u => u.id === data.user.id || u.email.toLowerCase() === cleanEmail);
+    if (!localUser) {
+      db.data.users.push(data.user);
+    } else {
+      Object.assign(localUser, data.user);
+    }
+    db.save();
+
+    return data.user;
+  }
+
+  /**
    * Logout utente corrente
    */
   async logout() {
