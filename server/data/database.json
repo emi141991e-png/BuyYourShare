@@ -62,7 +62,7 @@
       "fullName": "Emilio Caruso",
       "firstName": "Emilio",
       "lastName": "Caruso",
-      "password": "Password123!",
+      "password": "MiaNuovaPassword2026!",
       "role": "user",
       "isVerified": true,
       "isEmailVerified": true,
@@ -70,7 +70,8 @@
       "paypalPayoutEmail": "emi.141991e@gmail.com",
       "termsAcceptedAt": "2026-08-19T20:00:00.000Z",
       "privacyAcceptedAt": "2026-08-19T20:00:00.000Z",
-      "createdAt": "2026-08-19T20:00:00.000Z"
+      "createdAt": "2026-08-19T20:00:00.000Z",
+      "updatedAt": "2026-08-20T07:21:33.797Z"
     },
     {
       "id": "usr-1786997624220",
@@ -293,6 +294,27 @@
       "resetPasswordCode": null,
       "resetPasswordExpires": null,
       "updatedAt": "2026-08-19T22:21:08.609Z"
+    },
+    {
+      "id": "usr-1787210493808",
+      "email": "test.nuovo.account@example.com",
+      "fullName": "Test Nuovo Account",
+      "firstName": "Test",
+      "lastName": "Nuovo Account",
+      "password": "PasswordNuova123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "termsAcceptedAt": "2026-08-20T07:21:33.808Z",
+      "privacyAcceptedAt": "2026-08-20T07:21:33.808Z",
+      "iban": null,
+      "bankName": null,
+      "paypalPayoutEmail": "test.nuovo.account@example.com",
+      "createdAt": "2026-08-20T07:21:33.808Z",
+      "resetPasswordCode": "800117",
+      "resetPasswordExpires": "2026-08-20T08:21:33.821Z",
+      "updatedAt": "2026-08-20T07:21:33.821Z"
     }
   ],
   "services": [
@@ -2516,6 +2538,24 @@
       "userId": "usr-1787178068562",
       "createdAt": "2026-08-19T22:21:08.618Z",
       "expiresAt": "2026-09-18T22:21:08.618Z"
+    },
+    {
+      "token": "bys_token_1787210493767_1evd2eq2d5",
+      "userId": "usr-emilio",
+      "createdAt": "2026-08-20T07:21:33.768Z",
+      "expiresAt": "2026-09-19T07:21:33.769Z"
+    },
+    {
+      "token": "bys_token_1787210493799_ss2fas7nmt",
+      "userId": "usr-emilio",
+      "createdAt": "2026-08-20T07:21:33.799Z",
+      "expiresAt": "2026-09-19T07:21:33.799Z"
+    },
+    {
+      "token": "bys_token_1787210493810_2tk5f0u6td",
+      "userId": "usr-1787210493808",
+      "createdAt": "2026-08-20T07:21:33.810Z",
+      "expiresAt": "2026-09-19T07:21:33.810Z"
     }
   ],
   "adminAuditLogs": [
