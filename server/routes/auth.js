@@ -282,6 +282,8 @@ authRouter.post('/forgot-password', async (req, res) => {
     const host = req.get('host') || 'buyyourshare-production.up.railway.app';
     const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
     const baseUrl = `${proto}://${host}`;
+    const resetLink = `${baseUrl}/#reset-password?email=${encodeURIComponent(cleanEmail)}&token=${encodeURIComponent(resetCode)}`;
+
     try {
       await emailService.sendPasswordResetEmail(user, resetCode, resetLink);
       console.log(`[AUTH FORGOT PASSWORD] Email inviata con successo a ${cleanEmail}`);

@@ -330,6 +330,22 @@
       "isEmailVerified": true,
       "isSuspended": false,
       "createdAt": "2026-08-20T07:41:07.381Z"
+    },
+    {
+      "id": "usr-1787227209309",
+      "email": "emi.141991e@libero.it",
+      "fullName": "Emi 141991e",
+      "firstName": "Emi",
+      "lastName": "141991e",
+      "password": "Password123!",
+      "role": "user",
+      "isVerified": true,
+      "isEmailVerified": true,
+      "isSuspended": false,
+      "createdAt": "2026-08-20T12:00:09.310Z",
+      "resetPasswordCode": "763019",
+      "resetPasswordExpires": "2026-08-20T13:00:26.817Z",
+      "updatedAt": "2026-08-20T12:00:26.818Z"
     }
   ],
   "services": [
