@@ -43,7 +43,18 @@ class EmailService {
 
   async sendMail({ to, subject, html, text }) {
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
-    const fromAddress = process.env.EMAIL_FROM || emailConfig.emailFrom || 'BuyYourShare <onboarding@resend.dev>';
+    const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser;
+    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass;
+
+    let fromAddress = process.env.EMAIL_FROM || emailConfig.emailFrom;
+    if (!fromAddress) {
+      if (gmailUser) {
+        fromAddress = `"BuyYourShare" <${gmailUser}>`;
+      } else {
+        fromAddress = 'BuyYourShare <onboarding@resend.dev>';
+      }
+    }
+
     const emailRecord = {
       id: 'eml-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
       to,
