@@ -21,7 +21,10 @@ class EmailService {
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
-        auth: { user: gmailUser, pass: gmailPass }
+        auth: { user: gmailUser, pass: gmailPass },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 5000
       });
     }
 

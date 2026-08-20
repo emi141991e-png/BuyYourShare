@@ -284,12 +284,12 @@ authRouter.post('/forgot-password', async (req, res) => {
     const baseUrl = `${proto}://${host}`;
     const resetLink = `${baseUrl}/#reset-password?email=${encodeURIComponent(cleanEmail)}&token=${encodeURIComponent(resetCode)}`;
 
-    try {
-      await emailService.sendPasswordResetEmail(user, resetCode, resetLink);
+    // Invio email in background resiliente
+    emailService.sendPasswordResetEmail(user, resetCode, resetLink).then(() => {
       console.log(`[AUTH FORGOT PASSWORD] Email inviata con successo a ${cleanEmail}`);
-    } catch (err) {
+    }).catch(err => {
       console.warn('[EMAIL WARNING] Invio email reset fallita:', err.message);
-    }
+    });
 
     return res.json({
       success: true,
