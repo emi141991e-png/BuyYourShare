@@ -463,12 +463,28 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
                 <p style="font-size:13.5px; color:#334155; line-height:1.5; margin-bottom:16px;">
                   Abbiamo inviato un'email a <strong>${escapeHtml(resetEmailHolder)}</strong>.
                 </p>
-                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:14px 16px; margin-bottom:20px; font-size:13px; color:#15803d; text-align:left; line-height:1.5;">
+                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-md); padding:14px 16px; margin-bottom:16px; font-size:13px; color:#15803d; text-align:left; line-height:1.5;">
                   👉 <strong>Cosa fare adesso:</strong><br>
-                  1. Apri la tua casella di posta (Gmail, Outlook, Yahoo, Libero, ecc.).<br>
-                  2. Clicca sul pulsante <strong>"🔐 Reimposta la tua Password Subito"</strong> per scegliere la tua nuova password.<br>
-                  <em style="font-size:11.5px; color:#166534; display:block; margin-top:6px;">(Se non la trovi subito, controlla anche nella cartella Spam o Promozioni)</em>
+                  1. Apri la tua casella di posta.<br>
+                  2. Clicca sul pulsante <strong>"🔐 Reimposta la tua Password Subito"</strong> per scegliere la nuova password.<br>
+                  <strong style="font-size:12px; color:#b91c1c; display:block; margin-top:8px; background:#fef2f2; padding:6px 8px; border-radius:4px; border:1px solid #fecaca;">
+                    ⚠️ ATTENZIONE: Se non la trovi in Posta in Arrivo, controlla nella cartella SPAM o POSTA INDESIDERATA.
+                  </strong>
                 </div>
+
+                ${resetEmailHolder.toLowerCase().includes('@libero.it') ? `
+                  <a href="https://mail.libero.it" target="_blank" class="btn btn-primary btn-block" style="background:#f59e0b; color:#ffffff !important; font-weight:800; padding:12px; margin-bottom:10px; font-size:13.5px; text-decoration:none; display:block;">
+                    📧 Apri Libero Mail
+                  </a>
+                ` : resetEmailHolder.toLowerCase().includes('@gmail.com') ? `
+                  <a href="https://mail.google.com" target="_blank" class="btn btn-primary btn-block" style="background:#ea4335; color:#ffffff !important; font-weight:800; padding:12px; margin-bottom:10px; font-size:13.5px; text-decoration:none; display:block;">
+                    📧 Apri Gmail
+                  </a>
+                ` : resetEmailHolder.toLowerCase().includes('@outlook.') || resetEmailHolder.toLowerCase().includes('@hotmail.') ? `
+                  <a href="https://outlook.live.com" target="_blank" class="btn btn-primary btn-block" style="background:#0078d4; color:#ffffff !important; font-weight:800; padding:12px; margin-bottom:10px; font-size:13.5px; text-decoration:none; display:block;">
+                    📧 Apri Outlook
+                  </a>
+                ` : ''}
 
                 <button type="button" id="btnBackToLoginFromSent" class="btn btn-secondary btn-block" style="font-size:13px; font-weight:700;">
                   ← Torna alla Pagina di Accesso
