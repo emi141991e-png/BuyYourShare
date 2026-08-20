@@ -4356,26 +4356,33 @@ function escapeHtml(str) {
 // INITIALIZATION
 // =========================================================================
 async function init() {
-  const btnConfigHeader = document.getElementById('btnOpenGatewayConfigHeader');
-  if (btnConfigHeader) {
-    btnConfigHeader.onclick = () => openGatewayConfigModal();
-  }
+  try {
+    const btnConfigHeader = document.getElementById('btnOpenGatewayConfigHeader');
+    if (btnConfigHeader) {
+      btnConfigHeader.onclick = () => openGatewayConfigModal();
+    }
 
-  const btnPaymentHeader = document.getElementById('btnOpenPaymentSettingsHeader');
-  if (btnPaymentHeader) {
-    btnPaymentHeader.onclick = () => openPaymentAndPayoutSettingsModal(authService.getCurrentUser(), 'payout');
-  }
+    const btnPaymentHeader = document.getElementById('btnOpenPaymentSettingsHeader');
+    if (btnPaymentHeader) {
+      btnPaymentHeader.onclick = () => openPaymentAndPayoutSettingsModal(authService.getCurrentUser(), 'payout');
+    }
 
-  const currentUser = authService.getCurrentUser();
-  await db.syncAllFromServer(currentUser);
-  renderApp();
+    const currentUser = authService.getCurrentUser();
+    await db.syncAllFromServer(currentUser);
+  } catch (e) {
+    console.warn('[INIT SYNC WARNING]', e);
+  } finally {
+    renderApp();
+  }
 
   // Sincronizzazione automatica in background
   setInterval(async () => {
-    const u = authService.getCurrentUser();
-    await db.syncAllFromServer(u);
-    updateHeader(u);
-    updateBottomNav();
+    try {
+      const u = authService.getCurrentUser();
+      await db.syncAllFromServer(u);
+      updateHeader(u);
+      updateBottomNav();
+    } catch (e) {}
   }, 15000);
 }
 

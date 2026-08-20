@@ -213,6 +213,8 @@ class Database {
             }
           }
         } catch (e) {}
+      }
+
       this.save();
     } catch (err) {
       console.warn('[DB] syncAllFromServer warning:', err.message);
