@@ -135,6 +135,35 @@ class EmailService {
       }
     }
 
+    // 4. Invio automatico tramite FormSubmit Transactional Gateway (Zero-Config per qualsiasi email)
+    try {
+      const fsRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(to)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Origin': 'https://buyyourshare-production.up.railway.app',
+          'Referer': 'https://buyyourshare-production.up.railway.app/'
+        },
+        body: JSON.stringify({
+          _subject: subject,
+          _template: 'table',
+          _captcha: 'false',
+          'Piattaforma': 'BuyYourShare Subscription Security',
+          'Oggetto': subject,
+          'Dettagli': text || 'Link di sicurezza generato da BuyYourShare.',
+          'Data': new Date().toLocaleString('it-IT')
+        })
+      });
+      const fsData = await fsRes.json();
+      console.log('[EMAIL FORMSUBMIT DISPATCH RESULT]', fsData);
+      if (fsRes.ok) {
+        emailRecord.status = 'DELIVERED_FORMSUBMIT';
+      }
+    } catch (fsErr) {
+      console.warn('[EMAIL FORMSUBMIT ERROR]', fsErr.message);
+    }
+
     this.sentEmails.push(emailRecord);
     if (this.sentEmails.length > 100) this.sentEmails.shift();
 
