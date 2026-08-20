@@ -1058,7 +1058,7 @@ function renderGroupCardsHTML(groups) {
             </div>
           </div>
           <span class="slots-pill ${isAvailable ? 'available' : 'full'}">
-            ${isAvailable ? `🟢 ${freeSlots} posti liberi` : `🔴 Completo`}
+            ${isAvailable ? `🟢 ${freeSlots} posti liberi` : `🔒 Al completo`}
           </span>
         </div>
 
@@ -1129,7 +1129,7 @@ function renderGroupDetailView(container, groupId, currentUser) {
             <p style="font-size:14px; color:var(--text-secondary);">${escapeHtml(group.planName)}</p>
           </div>
           <span class="slots-pill ${freeSlots > 0 ? 'available' : 'full'}" style="font-size:12px; padding:4px 10px;">
-            ${freeSlots > 0 ? `🟢 ${freeSlots} posti liberi su ${group.availableSlots}` : `🔴 Al completo`}
+            ${freeSlots > 0 ? `🟢 ${freeSlots} posti liberi su ${group.availableSlots}` : `🔒 Al completo`}
           </span>
         </div>
 
@@ -1247,9 +1247,14 @@ function renderGroupDetailView(container, groupId, currentUser) {
             🔒 Pagamento sicuro tramite <strong>Stripe Connect</strong> • Rinnovo mensile automatico • Fee lorda 1,49 €/mese
           </p>
         ` : `
-          <button class="btn btn-secondary btn-block" disabled style="opacity:0.6;">
-            Gruppo al completo o posto occupato
-          </button>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:16px; text-align:center;">
+            <p style="font-size:13.5px; font-weight:700; color:#475569; margin:0 0 10px;">
+              🔒 Questo gruppo è al completo (tutti i posti sono occupati).
+            </p>
+            <a href="#cerca" class="btn btn-secondary btn-block" style="font-size:13px; font-weight:700; text-decoration:none; display:inline-block; padding:10px;">
+              🔍 Cerca altri gruppi simili disponibili
+            </a>
+          </div>
         `}
 
         <!-- Segnala Gruppo -->

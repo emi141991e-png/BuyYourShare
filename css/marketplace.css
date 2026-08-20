@@ -303,8 +303,9 @@
 }
 
 .slots-pill.full {
-  background: var(--badge-danger-bg);
-  color: var(--badge-danger-text);
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
 }
 
 /* Transparent Price Decomposition Box */
