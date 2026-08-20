@@ -229,6 +229,9 @@ function updateHeader(currentUser) {
       <button id="btnOpenGatewayConfigHeader" class="btn btn-sm" style="font-size:11px; padding:4px 8px; background:#f0fdf4; border:1px solid #86efac; color:#166534; font-weight:700;" title="Configura PayPal Sandbox Client ID">
         🅿️ Config PayPal
       </button>
+      <button id="btnOpenEmailConfigHeader" class="btn btn-sm" style="font-size:11px; padding:4px 8px; background:#eff6ff; border:1px solid #93c5fd; color:#1d4ed8; font-weight:700;" title="Configura Gateway Email (Gmail / Resend / Brevo / SMTP)">
+        📧 Config Email
+      </button>
     ` : ''}
 
     <!-- Payment and Payout Settings Button -->
@@ -252,6 +255,12 @@ function updateHeader(currentUser) {
   const btnGateway = document.getElementById('btnOpenGatewayConfigHeader');
   if (btnGateway) {
     btnGateway.onclick = () => openGatewayConfigModal();
+  }
+
+  // Bind Email Config (Admin only)
+  const btnEmail = document.getElementById('btnOpenEmailConfigHeader');
+  if (btnEmail) {
+    btnEmail.onclick = () => openEmailConfigModal();
   }
 
   // Bind Logout
@@ -4209,6 +4218,139 @@ function openGatewayConfigModal() {
     }
     modal.classList.remove('active');
     renderApp();
+  };
+
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  };
+
+  modal.classList.add('active');
+}
+
+async function openEmailConfigModal() {
+  let modal = document.getElementById('emailConfigModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'emailConfigModalOverlay';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+
+  let currentConfig = {};
+  try {
+    const res = await fetch('/api/admin/email-config', {
+      headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+    });
+    const d = await res.json();
+    if (d.success && d.emailSettings) currentConfig = d.emailSettings;
+  } catch (e) {}
+
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:520px; padding:24px;">
+      <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:24px;">📧</span>
+          <div>
+            <h2 class="modal-title" style="font-size:18px; font-weight:900; color:#003087;">Gateway Email Transazionali</h2>
+            <p style="font-size:12px; color:var(--text-secondary);">Configura l'invio per tutte le caselle email (Gmail, Resend, Brevo, SMTP)</p>
+          </div>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('emailConfigModalOverlay').classList.remove('active')">&times;</button>
+      </div>
+
+      <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-md); padding:12px; margin-bottom:16px; font-size:12px; color:#1e40af; line-height:1.4;">
+        💡 <strong>Invio per TUTTE le email:</strong><br>
+        Puoi inserire una chiave <strong>Resend</strong> (gratuita su <a href="https://resend.com" target="_blank" style="font-weight:700; color:#003087;">resend.com</a>) o una <strong>Password per le app di Gmail</strong>. Il server invierà all'istante le email di recupero e benvenuto a qualsiasi cliente.
+      </div>
+
+      <form id="formEmailConfig">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" style="font-size:12px; font-weight:700;">Resend API Key (re_...)</label>
+          <input type="text" id="cfgResendApiKey" class="form-input" placeholder="re_123456789..." value="" style="font-family:var(--font-mono); font-size:12px; padding:8px 10px;">
+          <span style="font-size:11px; color:var(--text-muted);">Consigliato: invia a qualsiasi email in 500ms.</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:12px; font-weight:700;">Gmail User (es. emi...@gmail.com)</label>
+            <input type="email" id="cfgGmailUser" class="form-input" placeholder="il_tuo_account@gmail.com" value="${escapeHtml(currentConfig.gmailUser || '')}" style="font-size:12px; padding:8px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:12px; font-weight:700;">Gmail App Password (16 lettere)</label>
+            <input type="password" id="cfgGmailPass" class="form-input" placeholder="••••••••••••••••" value="" style="font-size:12px; padding:8px 10px;">
+          </div>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-sm); padding:10px; margin-bottom:14px;">
+          <span style="font-size:11.5px; font-weight:800; color:var(--text-main); display:block; margin-bottom:6px;">🧪 Test Invio Immediato:</span>
+          <div style="display:flex; gap:8px;">
+            <input type="email" id="testEmailInput" class="form-input" placeholder="Inserisci email di test..." value="${escapeHtml(authService.getCurrentUser()?.email || '')}" style="font-size:12px; padding:6px 8px; flex:1;">
+            <button type="button" id="btnSendTestEmail" class="btn btn-secondary btn-sm" style="font-size:11px; font-weight:700; white-space:nowrap;">
+              📨 Invia Prova
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button type="submit" id="btnSaveEmailConfig" class="btn btn-primary btn-block" style="background:#003087; font-weight:800; padding:11px;">
+            💾 Salva Configurazione Email
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('emailConfigModalOverlay').classList.remove('active')">
+            Chiudi
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  const btnTest = modal.querySelector('#btnSendTestEmail');
+  if (btnTest) {
+    btnTest.onclick = async () => {
+      const target = modal.querySelector('#testEmailInput').value.trim();
+      if (!target) return alert('Inserisci un indirizzo email per il test.');
+      btnTest.disabled = true;
+      btnTest.textContent = '⏳ Invio...';
+      try {
+        const res = await fetch('/api/admin/test-email', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authService.getToken()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ to: target })
+        });
+        const d = await res.json();
+        alert(d.message || 'Email di prova inviata!');
+      } catch (err) {
+        alert('Errore test: ' + err.message);
+      } finally {
+        btnTest.disabled = false;
+        btnTest.textContent = '📨 Invia Prova';
+      }
+    };
+  }
+
+  modal.querySelector('#formEmailConfig').onsubmit = async (e) => {
+    e.preventDefault();
+    const resendApiKey = modal.querySelector('#cfgResendApiKey').value.trim();
+    const gmailUser = modal.querySelector('#cfgGmailUser').value.trim();
+    const gmailPass = modal.querySelector('#cfgGmailPass').value.trim();
+
+    try {
+      const res = await fetch('/api/admin/email-config', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authService.getToken()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ resendApiKey, gmailUser, gmailPass })
+      });
+      const d = await res.json();
+      showToast(d.message || 'Configurazione email salvata!');
+      modal.classList.remove('active');
+    } catch (err) {
+      alert('Errore salvataggio: ' + err.message);
+    }
   };
 
   modal.onclick = (e) => {
