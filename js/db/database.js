@@ -213,12 +213,17 @@ class Database {
             }
           }
         } catch (e) {}
-      }
-
       this.save();
     } catch (err) {
       console.warn('[DB] syncAllFromServer warning:', err.message);
     }
+  }
+
+  clearUserData() {
+    this.data.memberships = [];
+    this.data.notifications = [];
+    this.data.financialAuditLogs = [];
+    this.save();
   }
 
   load() {

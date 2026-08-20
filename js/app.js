@@ -268,6 +268,8 @@ function updateHeader(currentUser) {
   if (btnLogout) {
     btnLogout.onclick = async () => {
       await authService.logout();
+      db.clearUserData();
+      await db.syncAllFromServer(null);
       showToast('Disconnessione effettuata.');
       navigateTo('#login');
       renderApp();
@@ -654,6 +656,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         try {
           const u = await authService.login(email, password);
           showToast(`🎉 Bentornato/a, ${u.fullName}!`);
+          await db.syncAllFromServer(u);
           navigateTo('#home');
           renderApp();
         } catch (err) {
@@ -687,6 +690,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
           });
 
           showToast(`🎉 Benvenuto/a ${newUser.fullName}! Accesso completato.`);
+          await db.syncAllFromServer(newUser);
           navigateTo('#home');
           renderApp();
         } catch (err) {
