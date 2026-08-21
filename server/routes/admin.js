@@ -302,3 +302,58 @@ adminRouter.post('/test-email', async (req, res) => {
     return res.status(500).json({ error: 'SEND_FAILED', message: err.message });
   }
 });
+
+// 9. Configurazione Gateway di Pagamento (Stripe & PayPal)
+adminRouter.get('/gateway-config', async (req, res) => {
+  const stripeSecret = process.env.STRIPE_SECRET_KEY || dataRepository.data.systemConfig?.stripe?.secretKey || '';
+  const stripePublishable = process.env.STRIPE_PUBLISHABLE_KEY || dataRepository.data.systemConfig?.stripe?.publishableKey || '';
+  const stripeMode = process.env.STRIPE_MODE || dataRepository.data.systemConfig?.stripe?.mode || 'live';
+
+  return res.json({
+    success: true,
+    stripe: {
+      hasSecretKey: !!(stripeSecret && stripeSecret.startsWith('sk_')),
+      publishableKey: stripePublishable || '',
+      mode: stripeMode
+    },
+    paypal: {
+      mode: process.env.PAYPAL_MODE || 'live',
+      hasClientId: !!(process.env.PAYPAL_CLIENT_ID),
+      hasClientSecret: !!(process.env.PAYPAL_CLIENT_SECRET)
+    }
+  });
+});
+
+adminRouter.post('/gateway-config', async (req, res) => {
+  try {
+    const { stripeSecretKey, stripePublishableKey, stripeMode } = req.body || {};
+    
+    if (!dataRepository.data.systemConfig) {
+      dataRepository.data.systemConfig = {};
+    }
+    if (!dataRepository.data.systemConfig.stripe) {
+      dataRepository.data.systemConfig.stripe = {};
+    }
+
+    const s = dataRepository.data.systemConfig.stripe;
+    if (stripeSecretKey) s.secretKey = stripeSecretKey.trim();
+    if (stripePublishableKey) s.publishableKey = stripePublishableKey.trim();
+    if (stripeMode) s.mode = stripeMode;
+
+    await dataRepository.save();
+
+    return res.json({
+      success: true,
+      message: 'Configurazione Gateway Stripe salvata con successo nel database persistente.',
+      stripe: {
+        hasSecretKey: !!(s.secretKey && s.secretKey.startsWith('sk_')),
+        publishableKey: s.publishableKey || '',
+        mode: s.mode || 'live'
+      }
+    });
+  } catch (err) {
+    console.error('[ADMIN GATEWAY CONFIG SAVE ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+  }
+});
+

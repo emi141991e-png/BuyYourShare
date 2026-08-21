@@ -4175,7 +4175,7 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
   modal.classList.add('active');
 }
 
-function openGatewayConfigModal() {
+async function openGatewayConfigModal() {
   let modal = document.getElementById('gatewayConfigModalOverlay');
   if (!modal) {
     modal = document.createElement('div');
@@ -4185,38 +4185,76 @@ function openGatewayConfigModal() {
   }
 
   const currentClientId = localStorage.getItem('paypal_sandbox_client_id') || '';
+  const currentStripePub = localStorage.getItem('stripe_publishable_key') || '';
+  
+  let serverConfig = { stripe: { hasSecretKey: true, mode: 'live', publishableKey: '' } };
+  try {
+    const token = localStorage.getItem('buyyourshare_session_token');
+    const r = await fetch('/api/admin/gateway-config', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (r.ok) {
+      serverConfig = await r.json();
+    }
+  } catch (err) {
+    console.warn('Errore lettura gateway-config server:', err);
+  }
+
+  const isStripeActive = serverConfig.stripe?.hasSecretKey;
 
   modal.innerHTML = `
-    <div class="modal-content" style="max-width:480px; padding:24px;">
+    <div class="modal-content" style="max-width:520px; padding:24px;">
       <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:24px;">🅿️</span>
+          <span style="font-size:24px;">⚙️</span>
           <div>
-            <h2 class="modal-title" style="font-size:18px; font-weight:900; color:#003087;">Configura PayPal Sandbox</h2>
-            <p style="font-size:12px; color:var(--text-secondary);">Collega la tua App Merchant Sandbox (es. BYS-Platform)</p>
+            <h2 class="modal-title" style="font-size:18px; font-weight:900; color:#003087;">Gateway di Pagamento Reali & API</h2>
+            <p style="font-size:12px; color:var(--text-secondary);">Configurazione Stripe Live (Apple Pay / Google Pay / Carte) e PayPal</p>
           </div>
         </div>
         <button class="btn-close" onclick="document.getElementById('gatewayConfigModalOverlay').classList.remove('active')">&times;</button>
       </div>
 
-      <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-md); padding:12px; margin-bottom:16px; font-size:12px; color:#1e40af;">
-        ℹ️ Inserendo il <strong>Client ID</strong> della tua Sandbox App, i pagamenti di <strong>4,99 €</strong> effettuati dal Personal Buyer verranno realmente accreditati al tuo conto Business Sandbox su <strong>sandbox.paypal.com</strong>.
-      </div>
-
       <form id="formGatewayConfig">
-        <div class="form-group" style="margin-bottom:14px;">
-          <label class="form-label" style="font-size:12px; font-weight:800;">
-            PayPal Sandbox Client ID (App BYS-Platform) *
-          </label>
-          <input type="text" id="popupPaypalClientId" class="form-input" placeholder="Incolla il tuo Client ID (es. AX... / AaB1Cc...)" value="${escapeHtml(currentClientId)}" style="font-family:var(--font-mono); font-size:12.5px; padding:10px;" required>
-          <span style="font-size:11px; color:var(--text-muted); margin-top:4px; display:block;">
-            Copialo da <a href="https://developer.paypal.com/dashboard/applications/sandbox" target="_blank" style="color:var(--primary); font-weight:700;">developer.paypal.com $\rightarrow$ Apps $\rightarrow$ BYS-Platform</a>
-          </span>
+        <!-- SEZIONE STRIPE LIVE -->
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:var(--radius-md); padding:14px; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:18px;">💳</span>
+              <strong style="font-size:13.5px; color:#0f172a;">Stripe Payments (Live / Produzione)</strong>
+            </div>
+            <span style="font-size:11px; padding:2px 8px; border-radius:var(--radius-full); font-weight:800; ${isStripeActive ? 'background:#dcfce7; color:#166534;' : 'background:#fee2e2; color:#991b1b;'}">
+              ${isStripeActive ? '🟢 ATTIVO LIVE' : '⚪ DA CONFIGURARE'}
+            </span>
+          </div>
+
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label" style="font-size:11.5px; font-weight:700;">Publishable Key (pk_live_... / pk_test_...)</label>
+            <input type="text" id="popupStripePubKey" class="form-input" placeholder="pk_live_..." value="${escapeHtml(serverConfig.stripe?.publishableKey || currentStripePub)}" style="font-family:var(--font-mono); font-size:11.5px; padding:8px 10px;">
+          </div>
+
+          <div class="form-group" style="margin-bottom:6px;">
+            <label class="form-label" style="font-size:11.5px; font-weight:700;">Secret Key (sk_live_... / sk_test_...)</label>
+            <input type="password" id="popupStripeSecKey" class="form-input" placeholder="${isStripeActive ? '•••••••••••••••••••••••••••••••• (Configurata)' : 'sk_live_...'}" value="" style="font-family:var(--font-mono); font-size:11.5px; padding:8px 10px;">
+          </div>
+        </div>
+
+        <!-- SEZIONE PAYPAL -->
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:var(--radius-md); padding:14px; margin-bottom:16px;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+            <span style="font-size:18px;">🅿️</span>
+            <strong style="font-size:13.5px; color:#003087;">PayPal Gateway (Sandbox / Live)</strong>
+          </div>
+
+          <div class="form-group" style="margin-bottom:6px;">
+            <label class="form-label" style="font-size:11.5px; font-weight:700;">Client ID (App BYS-Platform)</label>
+            <input type="text" id="popupPaypalClientId" class="form-input" placeholder="Incolla Client ID PayPal" value="${escapeHtml(currentClientId)}" style="font-family:var(--font-mono); font-size:11.5px; padding:8px 10px;">
+          </div>
         </div>
 
         <div style="display:flex; gap:10px;">
           <button type="submit" class="btn btn-primary btn-block" style="background:#0070ba; font-weight:800; padding:12px;">
-            💾 Salva e Attiva Client ID
+            💾 Salva e Applica Configurazione
           </button>
           <button type="button" class="btn btn-secondary" onclick="document.getElementById('gatewayConfigModalOverlay').classList.remove('active')">
             Annulla
@@ -4226,16 +4264,43 @@ function openGatewayConfigModal() {
     </div>
   `;
 
-  modal.querySelector('#formGatewayConfig').onsubmit = (e) => {
+  modal.querySelector('#formGatewayConfig').onsubmit = async (e) => {
     e.preventDefault();
-    const val = document.getElementById('popupPaypalClientId').value.trim();
-    if (val) {
-      localStorage.setItem('paypal_sandbox_client_id', val);
-      showToast('✅ Client ID PayPal Sandbox salvato con successo!');
-    } else {
-      localStorage.removeItem('paypal_sandbox_client_id');
-      showToast('Client ID reimpostato.');
+    const ppVal = document.getElementById('popupPaypalClientId').value.trim();
+    const strPub = document.getElementById('popupStripePubKey').value.trim();
+    const strSec = document.getElementById('popupStripeSecKey').value.trim();
+
+    if (ppVal) {
+      localStorage.setItem('paypal_sandbox_client_id', ppVal);
     }
+    if (strPub) {
+      localStorage.setItem('stripe_publishable_key', strPub);
+    }
+
+    try {
+      const token = localStorage.getItem('buyyourshare_session_token');
+      const resp = await fetch('/api/admin/gateway-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          stripePublishableKey: strPub || undefined,
+          stripeSecretKey: strSec || undefined,
+          stripeMode: 'live'
+        })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        showToast('✅ Configurazione Gateway salvata con successo!');
+      } else {
+        showToast('Configurazione salvata localmente.');
+      }
+    } catch (err) {
+      showToast('Configurazione salvata localmente.');
+    }
+
     modal.classList.remove('active');
     renderApp();
   };
