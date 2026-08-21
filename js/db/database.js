@@ -263,31 +263,10 @@ class Database {
       memberships: [...INITIAL_MEMBERSHIPS],
       chats: [...INITIAL_CHATS],
       chatMessages: [...INITIAL_CHAT_MESSAGES],
-      connectedAccounts: [
-        {
-          id: 'conn-1',
-          userId: 'usr-owner-1',
-          stripeAccountId: 'acct_test_owner1',
-          payoutsEnabled: true,
-          chargesEnabled: true,
-          defaultCurrency: 'eur',
-          onboardedAt: new Date().toISOString()
-        }
-      ],
+      connectedAccounts: [],
       financialAuditLogs: [],
       joinRequests: [],
-      notifications: [
-        {
-          id: 'notif-1',
-          userId: 'usr-member-1',
-          type: 'access_ready',
-          title: '🎉 Il tuo accesso Spotify è pronto!',
-          message: 'Sei entrata nel gruppo Spotify Family. Apri "Il Tuo Accesso" per vedere il link di invito.',
-          actionUrl: '#miei-abbonamenti',
-          isRead: false,
-          createdAt: new Date().toISOString()
-        }
-      ],
+      notifications: [],
       reports: []
     };
     this.data = initial;

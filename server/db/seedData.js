@@ -79,45 +79,6 @@ export const INITIAL_SERVICES = [
 
 export const INITIAL_USERS = [
   {
-    id: 'usr-owner-1',
-    email: 'marco.rossi@example.com',
-    fullName: 'Marco Rossi',
-    firstName: 'Marco',
-    lastName: 'Rossi',
-    password: 'Password123!',
-    role: 'user',
-    isVerified: true,
-    isEmailVerified: true,
-    isSuspended: false,
-    createdAt: '2026-08-01T10:00:00Z'
-  },
-  {
-    id: 'usr-owner-2',
-    email: 'sara.bianchi@example.com',
-    fullName: 'Sara Bianchi',
-    firstName: 'Sara',
-    lastName: 'Bianchi',
-    password: 'Password123!',
-    role: 'user',
-    isVerified: true,
-    isEmailVerified: true,
-    isSuspended: false,
-    createdAt: '2026-08-05T12:00:00Z'
-  },
-  {
-    id: 'usr-member-1',
-    email: 'elena.conti@example.com',
-    fullName: 'Elena Conti',
-    firstName: 'Elena',
-    lastName: 'Conti',
-    password: 'Password123!',
-    role: 'user',
-    isVerified: true,
-    isEmailVerified: true,
-    isSuspended: false,
-    createdAt: '2026-08-10T09:00:00Z'
-  },
-  {
     id: 'usr-admin',
     email: 'admin@buyyourshare.com',
     fullName: 'Admin BuyYourShare',
@@ -128,7 +89,7 @@ export const INITIAL_USERS = [
     isVerified: true,
     isEmailVerified: true,
     isSuspended: false,
-    createdAt: '2026-08-01T00:00:00Z'
+    createdAt: '2026-01-01T00:00:00Z'
   },
   {
     id: 'usr-emilio',
@@ -141,7 +102,22 @@ export const INITIAL_USERS = [
     isVerified: true,
     isEmailVerified: true,
     isSuspended: false,
+    paypalPayoutEmail: 'emi.141991e@gmail.com',
     createdAt: '2026-08-19T20:00:00Z'
+  },
+  {
+    id: 'usr-emilio-libero',
+    email: 'emi.141991e@libero.it',
+    fullName: 'Emi 141991e',
+    firstName: 'Emi',
+    lastName: '141991e',
+    password: 'Password123!',
+    role: 'user',
+    isVerified: true,
+    isEmailVerified: true,
+    isSuspended: false,
+    paypalPayoutEmail: 'emi.141991e@libero.it',
+    createdAt: '2026-08-20T12:00:00Z'
   }
 ];
 

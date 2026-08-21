@@ -80,41 +80,6 @@ export const INITIAL_SERVICES = [
 
 export const INITIAL_USERS = [
   {
-    id: 'usr-owner-1',
-    email: 'marco.rossi@example.com',
-    fullName: 'Marco Rossi',
-    role: 'user',
-    isVerified: true,
-    isSuspended: false,
-    iban: null,
-    bankName: null,
-    paypalPayoutEmail: 'marco.rossi.paypal@gmail.com',
-    stripeAccountId: 'acct_1N42MarcoRossi',
-    createdAt: '2026-08-01T10:00:00Z'
-  },
-  {
-    id: 'usr-owner-2',
-    email: 'sara.bianchi@example.com',
-    fullName: 'Sara Bianchi',
-    role: 'user',
-    isVerified: true,
-    isSuspended: false,
-    iban: 'IT40Y030020328000000789012',
-    bankName: 'UniCredit (Conto Smart)',
-    paypalPayoutEmail: 'sara.bianchi.paypal@gmail.com',
-    stripeAccountId: 'acct_1N43SaraBianchi',
-    createdAt: '2026-08-05T12:00:00Z'
-  },
-  {
-    id: 'usr-member-1',
-    email: 'elena.conti@example.com',
-    fullName: 'Elena Conti',
-    role: 'user',
-    isVerified: true,
-    isSuspended: false,
-    createdAt: '2026-08-10T14:00:00Z'
-  },
-  {
     id: 'usr-admin',
     email: 'admin@buyyourshare.com',
     fullName: 'Admin BuyYourShare',
@@ -130,7 +95,18 @@ export const INITIAL_USERS = [
     role: 'user',
     isVerified: true,
     isSuspended: false,
+    paypalPayoutEmail: 'emi.141991e@gmail.com',
     createdAt: '2026-08-19T20:00:00Z'
+  },
+  {
+    id: 'usr-emilio-libero',
+    email: 'emi.141991e@libero.it',
+    fullName: 'Emi 141991e',
+    role: 'user',
+    isVerified: true,
+    isSuspended: false,
+    paypalPayoutEmail: 'emi.141991e@libero.it',
+    createdAt: '2026-08-20T12:00:00Z'
   }
 ];
 
