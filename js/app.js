@@ -1821,21 +1821,16 @@ function renderMySubscriptionsView(container, currentUser) {
       <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-lg); padding:16px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <div>
-            <h2 style="font-size:15px; font-weight:800; color:var(--text-main);">💳 Metodo di Pagamento & Ricezione Quote</h2>
+            <h2 style="font-size:15px; font-weight:800; color:var(--text-main);">💳 Dati Pagamento & Ricezione Quote</h2>
             <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
-              <span>Rinnovo Predefinito: <strong style="color:var(--primary);">${paymentMethod.type === 'PAYPAL' ? '🅿️ PayPal (' + escapeHtml(paymentMethod.paypalEmail || currentUser.email) + ')' : '💳 Carta (' + escapeHtml(paymentMethod.cardBrand || 'Visa') + ' •••• ' + escapeHtml(paymentMethod.cardLast4 || '4242') + ')'}</strong></span>
+              <span>Intestatario: <strong>${escapeHtml(payoutSettings.legalName || currentUser.fullName)}</strong></span>
               <span style="margin:0 8px;">•</span>
-              <span>IBAN Personale: <strong style="font-family:var(--font-mono); color:#003087;">${escapeHtml(payoutSettings.iban)}</strong></span>
+              <span>IBAN / Carta: <strong style="font-family:var(--font-mono); color:#003087;">${escapeHtml(payoutSettings.iban || 'Non configurato')}</strong></span>
             </div>
           </div>
-          <div style="display:flex; gap:8px;">
-            <button id="btnMemberEditPayment" class="btn btn-secondary btn-sm" style="font-size:11.5px; font-weight:700;">
-              💳 Cambia Carta / PayPal
-            </button>
-            <button id="btnMemberEditIban" class="btn btn-secondary btn-sm" style="font-size:11.5px; font-weight:700;">
-              🏦 Modifica IBAN
-            </button>
-          </div>
+          <button id="btnMemberEditPayment" class="btn btn-secondary btn-sm" style="font-size:12px; font-weight:700;">
+            ✏️ Modifica Dati Pagamento & Ricezione
+          </button>
         </div>
       </div>
 
@@ -2072,15 +2067,10 @@ function renderMySubscriptionsView(container, currentUser) {
       });
   }
 
-  // Member payment & IBAN settings modal triggers
+  // Member payment & IBAN settings modal trigger
   const btnMemPay = container.querySelector('#btnMemberEditPayment');
   if (btnMemPay) {
-    btnMemPay.onclick = () => openPaymentAndPayoutSettingsModal(currentUser, 'payment');
-  }
-
-  const btnMemIb = container.querySelector('#btnMemberEditIban');
-  if (btnMemIb) {
-    btnMemIb.onclick = () => openPaymentAndPayoutSettingsModal(currentUser, 'payout');
+    btnMemPay.onclick = () => openPaymentAndPayoutSettingsModal(currentUser);
   }
 
   // Event handlers
@@ -3476,11 +3466,9 @@ function openTransactionReceiptModal(txId, currentUser) {
   modal.classList.add('active');
 }
 
-function openPaymentAndPayoutSettingsModal(currentUser, initialTab = 'payout') {
-  const payoutSettings = db.getUserPayoutSettings(currentUser.id);
-  const paymentMethod = db.getUserPaymentMethod(currentUser.id);
-  const conn = db.data.connectedAccounts.find(c => c.userId === currentUser.id) || {};
-  const isReady = stripeConnectService.isPayoutReady(currentUser.id);
+function openPaymentAndPayoutSettingsModal(currentUser) {
+  const payoutSettings = db.getUserPayoutSettings(currentUser.id) || {};
+  const paymentMethod = db.getUserPaymentMethod(currentUser.id) || {};
 
   let modal = document.getElementById('paymentSettingsModalOverlay');
   if (!modal) {
@@ -3490,219 +3478,95 @@ function openPaymentAndPayoutSettingsModal(currentUser, initialTab = 'payout') {
     document.body.appendChild(modal);
   }
 
-  let activeTab = initialTab;
-
-  const renderModalContent = () => {
-    modal.innerHTML = `
-      <div class="modal-content" style="max-width:560px; padding:24px;">
-        <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-start;">
-          <div>
-            <span style="font-size:11px; font-weight:800; color:#0070ba; text-transform:uppercase; letter-spacing:0.5px;">Impostazioni Finanziarie</span>
-            <h2 class="modal-title" style="font-size:18px; font-weight:900; margin-top:2px;">💳 Pagamenti, IBAN & Ricezione Quote</h2>
-            <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Gestisci l'IBAN per ricevere denaro e il metodo di pagamento per i rinnovi.</p>
-          </div>
-          <button class="btn-close" id="btnClosePaymentModal">&times;</button>
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width:500px; padding:24px;">
+      <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span style="font-size:11px; font-weight:800; color:#0070ba; text-transform:uppercase; letter-spacing:0.5px;">Impostazioni Finanziarie Unificate</span>
+          <h2 class="modal-title" style="font-size:18px; font-weight:900; margin-top:2px;">💳 Pagamenti & Ricezione Fondi</h2>
+          <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Unico conto per inviare pagamenti e ricevere gli accrediti delle tue quote.</p>
         </div>
-
-        <!-- Tab Selector -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:16px; background:#f1f5f9; padding:4px; border-radius:var(--radius-md);">
-          <button type="button" id="tabBtnPayout" class="btn btn-sm" style="font-size:12px; font-weight:800; border:none; padding:8px; border-radius:6px; ${activeTab === 'payout' ? 'background:white; color:#003087; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'background:transparent; color:var(--text-secondary);'}">
-            🏦 Ricezione Quote & IBAN
-          </button>
-          <button type="button" id="tabBtnPayment" class="btn btn-sm" style="font-size:12px; font-weight:800; border:none; padding:8px; border-radius:6px; ${activeTab === 'payment' ? 'background:white; color:#003087; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'background:transparent; color:var(--text-secondary);'}">
-            💳 Metodo di Pagamento (Rinnovi)
-          </button>
-        </div>
-
-        ${activeTab === 'payout' ? `
-          <!-- TAB 1: RICEZIONE QUOTE & IBAN -->
-          <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px; font-size:12px; color:#166534;">
-            🛡️ <strong>Regola 100% Esente Commissioni:</strong> Come Capogruppo ricevi sempre il 100% della quota del piano (es. 3,50 € su Spotify) senza alcuna trattenuta.
-          </div>
-
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:10px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <span style="font-size:11px; color:var(--text-muted); display:block;">Stato Conto Stripe Connect</span>
-              <strong style="color:${isReady ? '#166534' : '#c2410c'}; font-size:13px;">
-                ${isReady ? '🟢 Conto Verificato & Abilitato ai Payouts' : '⚠️ Onboarding Incompleto'}
-              </strong>
-            </div>
-            <span style="font-size:11px; font-family:var(--font-mono); background:#e2e8f0; padding:2px 8px; border-radius:4px; color:#334155;">
-              ${escapeHtml(payoutSettings.stripeAccountId)}
-            </span>
-          </div>
-
-          <form id="formSavePayoutIban">
-            <div class="form-group" style="margin-bottom:12px;">
-              <label class="form-label" style="font-size:12px; font-weight:800;">Intestatario del Conto (Nome e Cognome o Ragione Sociale) *</label>
-              <input type="text" id="inputSettingsLegalName" class="form-input" placeholder="es. Mario Rossi" value="${escapeHtml(payoutSettings.legalName || currentUser.fullName)}" style="font-size:12.5px;" required>
-            </div>
-
-            <div class="form-group" style="margin-bottom:12px;">
-              <label class="form-label" style="font-size:12px; font-weight:800;">Codice IBAN (SEPA) *</label>
-              <input type="text" id="inputSettingsIban" class="form-input" placeholder="IT00X0000000000000000000000" value="${escapeHtml(payoutSettings.iban)}" style="font-family:var(--font-mono); font-size:13px; text-transform:uppercase; font-weight:700;" required>
-              <span style="font-size:11px; color:var(--text-muted); margin-top:2px; display:block;">I bonifici delle quote vengono erogati su questo IBAN tramite Stripe Connect Express.</span>
-            </div>
-
-            <div class="form-group" style="margin-bottom:16px;">
-              <label class="form-label" style="font-size:12px; font-weight:800;">Nome Banca / Istituto Finanziario (Opzionale)</label>
-              <input type="text" id="inputSettingsBankName" class="form-input" placeholder="es. Intesa Sanpaolo, UniCredit, Revolut, BBVA" value="${escapeHtml(payoutSettings.bankName)}" style="font-size:12.5px;">
-            </div>
-
-            <div style="display:flex; gap:10px;">
-              <button type="submit" class="btn btn-primary btn-block" style="font-weight:800; padding:12px; font-size:13.5px;">
-                💾 Salva & Aggiorna IBAN di Ricezione
-              </button>
-              <button type="button" class="btn btn-secondary" id="btnCancelPayoutSettings">
-                Annulla
-              </button>
-            </div>
-          </form>
-        ` : `
-          <!-- TAB 2: METODO DI PAGAMENTO PER I RINNOVI -->
-          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:14px; font-size:12px; color:#1e40af;">
-            ℹ️ Questo metodo viene utilizzato per addebitare la quota mensile dell'abbonamento (es. 4,99 €) a ogni rinnovo.
-          </div>
-
-          <form id="formSavePaymentMethod">
-            <div class="form-group" style="margin-bottom:12px;">
-              <label class="form-label" style="font-size:12px; font-weight:800;">Scegli Metodo di Pagamento Predefinito *</label>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <label style="border:1.5px solid ${paymentMethod.type === 'CARD' ? 'var(--primary)' : '#cbd5e1'}; background:${paymentMethod.type === 'CARD' ? '#f0fdf4' : '#fff'}; border-radius:var(--radius-md); padding:10px; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700;">
-                  <input type="radio" name="paymentTypeRadio" value="CARD" ${paymentMethod.type === 'CARD' ? 'checked' : ''}>
-                  💳 Carta di Credito / Debito
-                </label>
-                <label style="border:1.5px solid ${paymentMethod.type === 'PAYPAL' ? '#0070ba' : '#cbd5e1'}; background:${paymentMethod.type === 'PAYPAL' ? '#eff6ff' : '#fff'}; border-radius:var(--radius-md); padding:10px; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700;">
-                  <input type="radio" name="paymentTypeRadio" value="PAYPAL" ${paymentMethod.type === 'PAYPAL' ? 'checked' : ''}>
-                  🅿️ Conto PayPal
-                </label>
-              </div>
-            </div>
-
-            <div id="cardFieldsWrap" style="display:${paymentMethod.type === 'CARD' ? 'block' : 'none'};">
-              <div class="form-group" style="margin-bottom:12px;">
-                <label class="form-label" style="font-size:12px; font-weight:800;">Numero Carta (16 Cifre) *</label>
-                <input type="text" id="inputCardNumber" class="form-input" placeholder="4242 •••• •••• 4242" value="•••• •••• •••• ${escapeHtml(paymentMethod.cardLast4 || '4242')}" style="font-family:var(--font-mono); font-size:13px;" required>
-              </div>
-
-              <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
-                <div class="form-group">
-                  <label class="form-label" style="font-size:12px; font-weight:800;">Scadenza (MM/YY) *</label>
-                  <input type="text" id="inputCardExpiry" class="form-input" placeholder="12/28" value="${escapeHtml(paymentMethod.cardExpiry || '12/28')}" style="font-family:var(--font-mono); font-size:12.5px;" required>
-                </div>
-                <div class="form-group">
-                  <label class="form-label" style="font-size:12px; font-weight:800;">CVC / CVV *</label>
-                  <input type="password" id="inputCardCvc" class="form-input" placeholder="•••" value="123" maxlength="4" style="font-family:var(--font-mono); font-size:12.5px;" required>
-                </div>
-              </div>
-            </div>
-
-            <div id="paypalFieldsWrap" style="display:${paymentMethod.type === 'PAYPAL' ? 'block' : 'none'}; margin-bottom:12px;">
-              <div class="form-group" style="margin-bottom:12px;">
-                <label class="form-label" style="font-size:12px; font-weight:800;">Email Account PayPal *</label>
-                <input type="email" id="inputPaypalEmail" class="form-input" placeholder="nome@esempio.com" value="${escapeHtml(paymentMethod.paypalEmail || currentUser.email)}" style="font-size:12.5px;">
-              </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom:16px;">
-              <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer;">
-                <input type="checkbox" id="inputAutoRenewCheck" ${paymentMethod.autoRenewEnabled !== false ? 'checked' : ''}>
-                <span>Rinnovo automatico mensile abilitato per i miei abbonamenti attivi</span>
-              </label>
-            </div>
-
-            <div style="display:flex; gap:10px;">
-              <button type="submit" class="btn btn-primary btn-block" style="font-weight:800; padding:12px; font-size:13.5px;">
-                💾 Salva Metodo di Pagamento
-              </button>
-              <button type="button" class="btn btn-secondary" id="btnCancelPaymentSettings">
-                Annulla
-              </button>
-            </div>
-          </form>
-        `}
+        <button class="btn-close" id="btnClosePaymentModal">&times;</button>
       </div>
-    `;
 
-    // Event listeners
-    const closeBtn = modal.querySelector('#btnClosePaymentModal');
-    if (closeBtn) closeBtn.onclick = () => modal.classList.remove('active');
+      <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:16px; font-size:12px; color:#166534; line-height:1.4;">
+        🛡️ <strong>Conto Unificato:</strong> Utilizza questo conto/carta sia per ricevere le quote che ti spettano come Capogruppo, sia per gestire i tuoi pagamenti e rinnovi.
+      </div>
 
-    const cancelPayout = modal.querySelector('#btnCancelPayoutSettings');
-    if (cancelPayout) cancelPayout.onclick = () => modal.classList.remove('active');
+      <form id="formUnifiedPaymentSettings">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label" style="font-size:12px; font-weight:800;">Intestatario del Conto / Carta *</label>
+          <input type="text" id="inputUnifiedLegalName" class="form-input" placeholder="es. Mario Rossi" value="${escapeHtml(payoutSettings.legalName || currentUser.fullName || '')}" style="font-size:13px; padding:10px;" required>
+        </div>
 
-    const cancelPayment = modal.querySelector('#btnCancelPaymentSettings');
-    if (cancelPayment) cancelPayment.onclick = () => modal.classList.remove('active');
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label" style="font-size:12px; font-weight:800;">Codice IBAN (SEPA) / Carta *</label>
+          <input type="text" id="inputUnifiedIban" class="form-input" placeholder="IT00X0000000000000000000000" value="${escapeHtml(payoutSettings.iban || '')}" style="font-family:var(--font-mono); font-size:13.5px; text-transform:uppercase; font-weight:700; padding:10px;" required>
+          <span style="font-size:11px; color:var(--text-muted); margin-top:3px; display:block;">I bonifici delle quote e gli accrediti automatici vengono erogati su questo codice.</span>
+        </div>
 
-    const tabPayout = modal.querySelector('#tabBtnPayout');
-    if (tabPayout) tabPayout.onclick = () => { activeTab = 'payout'; renderModalContent(); };
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label" style="font-size:12px; font-weight:800;">Banca / Istituto (Opzionale)</label>
+          <input type="text" id="inputUnifiedBankName" class="form-input" placeholder="es. Intesa Sanpaolo, UniCredit, Revolut, BBVA, Postepay" value="${escapeHtml(payoutSettings.bankName || '')}" style="font-size:12.5px; padding:10px;">
+        </div>
 
-    const tabPayment = modal.querySelector('#tabBtnPayment');
-    if (tabPayment) tabPayment.onclick = () => { activeTab = 'payment'; renderModalContent(); };
+        <div class="form-group" style="margin-bottom:18px;">
+          <label class="form-label" style="font-size:12px; font-weight:800;">Email di Riferimento Notifiche</label>
+          <input type="email" id="inputUnifiedEmail" class="form-input" placeholder="nome@esempio.com" value="${escapeHtml(currentUser.email || '')}" style="font-size:12.5px; padding:10px;" readonly>
+        </div>
 
-    // Radio switcher in payment tab
-    modal.querySelectorAll('input[name="paymentTypeRadio"]').forEach(radio => {
-      radio.onchange = (e) => {
-        const val = e.target.value;
-        const cardWrap = modal.querySelector('#cardFieldsWrap');
-        const ppWrap = modal.querySelector('#paypalFieldsWrap');
-        if (cardWrap) cardWrap.style.display = val === 'CARD' ? 'block' : 'none';
-        if (ppWrap) ppWrap.style.display = val === 'PAYPAL' ? 'block' : 'none';
-      };
-    });
+        <div style="display:flex; gap:10px;">
+          <button type="submit" class="btn btn-primary btn-block" style="font-weight:800; padding:12px; font-size:13.5px; background:#003087;">
+            💾 Salva Dati Pagamento & Ricezione
+          </button>
+          <button type="button" class="btn btn-secondary" id="btnCancelUnifiedSettings" style="font-size:13px;">
+            Annulla
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
 
-    // Submit Payout Form
-    const formPayout = modal.querySelector('#formSavePayoutIban');
-    if (formPayout) {
-      formPayout.onsubmit = async (e) => {
-        e.preventDefault();
-        const ibanVal = document.getElementById('inputSettingsIban').value;
-        const bankNameVal = document.getElementById('inputSettingsBankName').value;
-        await stripeConnectService.completeOnboarding(currentUser, {
-          legalName: legalNameVal,
-          iban: ibanVal,
-          simulatedStatus: 'success'
-        });
+  const closeBtn = modal.querySelector('#btnClosePaymentModal');
+  if (closeBtn) closeBtn.onclick = () => modal.classList.remove('active');
 
-        db.updateUserPayoutSettings(currentUser.id, {
-          iban: ibanVal,
-          bankName: bankNameVal || '',
-          legalName: legalNameVal
-        }, currentUser);
+  const cancelBtn = modal.querySelector('#btnCancelUnifiedSettings');
+  if (cancelBtn) cancelBtn.onclick = () => modal.classList.remove('active');
 
-        modal.classList.remove('active');
-        showToast('✅ Dati bancari e IBAN aggiornati con successo!');
-        renderApp();
-      };
-    }
+  const form = modal.querySelector('#formUnifiedPaymentSettings');
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const legalNameVal = document.getElementById('inputUnifiedLegalName').value.trim();
+      const ibanVal = document.getElementById('inputUnifiedIban').value.trim().toUpperCase();
+      const bankNameVal = document.getElementById('inputUnifiedBankName').value.trim();
 
-    // Submit Payment Method Form
-    const formPayment = modal.querySelector('#formSavePaymentMethod');
-    if (formPayment) {
-      formPayment.onsubmit = (e) => {
-        e.preventDefault();
-        const selectedType = modal.querySelector('input[name="paymentTypeRadio"]:checked')?.value || 'CARD';
-        const cardNum = document.getElementById('inputCardNumber')?.value || '';
-        const cardExp = document.getElementById('inputCardExpiry')?.value || '12/28';
-        const ppEmail = document.getElementById('inputPaypalEmail')?.value || currentUser.email;
-        const autoRenew = document.getElementById('inputAutoRenewCheck')?.checked !== false;
+      await stripeConnectService.completeOnboarding(currentUser, {
+        legalName: legalNameVal,
+        iban: ibanVal,
+        simulatedStatus: 'success'
+      });
 
-        db.updateUserPaymentMethod(currentUser.id, {
-          type: selectedType,
-          cardNumber: cardNum,
-          cardExpiry: cardExp,
-          paypalEmail: ppEmail,
-          autoRenewEnabled: autoRenew
-        }, currentUser);
+      db.updateUserPayoutSettings(currentUser.id, {
+        iban: ibanVal,
+        bankName: bankNameVal || '',
+        legalName: legalNameVal
+      }, currentUser);
 
-        modal.classList.remove('active');
-        showToast('✅ Metodo di pagamento aggiornato con successo!');
-        renderApp();
-      };
-    }
-  };
+      db.updateUserPaymentMethod(currentUser.id, {
+        type: 'CARD',
+        cardBrand: bankNameVal || 'Carta / IBAN',
+        cardLast4: ibanVal.length >= 4 ? ibanVal.slice(-4) : '4242',
+        cardExpiry: '12/28',
+        paypalEmail: currentUser.email,
+        autoRenewEnabled: true
+      }, currentUser);
 
-  renderModalContent();
+      modal.classList.remove('active');
+      showToast('✅ Dati di pagamento e ricezione salvati con successo!');
+      renderApp();
+    };
+  }
 
   modal.onclick = (e) => {
     if (e.target === modal) modal.classList.remove('active');
