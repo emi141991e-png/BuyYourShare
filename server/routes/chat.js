@@ -13,8 +13,24 @@ async function verifyChatAccess(groupId, user) {
   if (!group) return false;
   if (group.ownerId === user.id || user.role === 'admin') return true;
 
-  const memberships = await dataRepository.getMemberships({ groupId, userId: user.id });
-  return memberships.some(m => m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED');
+  const allMems = await dataRepository.getMemberships({ groupId });
+  const matching = allMems.filter(m => {
+    if (m.userId === user.id) return true;
+    if (m.memberEmail && m.memberEmail.toLowerCase() === user.email.toLowerCase()) return true;
+    const memUser = dataRepository.data.users.find(u => u.id === m.userId);
+    return memUser && memUser.email && memUser.email.toLowerCase() === user.email.toLowerCase();
+  });
+
+  const isMember = matching.some(m => m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED' || m.status === 'active');
+  if (isMember) {
+    matching.forEach(m => {
+      if (m.userId !== user.id) {
+        m.userId = user.id;
+        dataRepository.save();
+      }
+    });
+  }
+  return isMember;
 }
 
 // 1. Messaggi Chat del Gruppo

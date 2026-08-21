@@ -3133,9 +3133,18 @@ async function openAccessModal(groupId, currentUser) {
     }
   }
 
-  if (!instructions || !group) {
-    alert('Accesso protetto: devi essere un membro attivo o il Capogruppo.');
-    return;
+  if (!instructions || !instructions.accessUrl) {
+    if (group) {
+      instructions = {
+        accessUrl: group.accessUrl || 'https://buyyourshare-production.up.railway.app/#chat-' + groupId,
+        instructions: group.instructions || 'Accedi alla chat privata del gruppo per ricevere il link di invito e le credenziali dal Capogruppo.',
+        accessCode: group.inviteCode || '',
+        ownerSpotifyAccount: group.ownerSpotifyAccount || ''
+      };
+    } else {
+      showToast('⚠️ Informazioni di accesso non ancora disponibili. Contatta il Capogruppo in chat.');
+      return;
+    }
   }
 
   const isSpotify = group.serviceId === 'srv-spotify' || group.customServiceName.toLowerCase().includes('spotify');
