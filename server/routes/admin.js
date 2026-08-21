@@ -32,14 +32,51 @@ adminRouter.post('/sync-database-clean', async (req, res) => {
       }
       dataRepository.data = cleanDb;
       await dataRepository.save();
-      return res.json({ success: true, message: 'Database sincronizzato con successo', groupsCount: dataRepository.data.groups.length });
+// Endpoint per riassegnare/collegare una membership a un gruppo
+adminRouter.post('/assign-membership', async (req, res) => {
+  try {
+    const { membershipId, memberEmail, targetGroupId, slotNumber } = req.body;
+    let mem = dataRepository.data.memberships.find(m => m.id === membershipId || (m.memberEmail && m.memberEmail.toLowerCase() === (memberEmail||'').toLowerCase()));
+    if (!mem && memberEmail) {
+      mem = {
+        id: 'mem-' + Date.now(),
+        userId: 'usr-1787319996013',
+        memberEmail: memberEmail,
+        groupId: targetGroupId,
+        slotNumber: slotNumber || 2,
+        role: 'MEMBER',
+        paidShareCents: 120,
+        paidFeeCents: 149,
+        memberTotalCents: 269,
+        paymentMethod: 'CARD_EEA',
+        status: 'ACTIVE',
+        autoRenew: true,
+        stripeSubscriptionId: 'pi_3U6rmN1JpLY88mRL0jCOeuja',
+        currentPeriodStart: new Date().toISOString(),
+        currentPeriodEnd: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+        nextBillingDate: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+        joinedAt: new Date().toISOString()
+      };
+      dataRepository.data.memberships.push(mem);
+    } else if (mem) {
+      mem.groupId = targetGroupId;
+      if (slotNumber) mem.slotNumber = slotNumber;
     }
-    return res.status(404).json({ error: 'FILE_NOT_FOUND' });
+    
+    // Aggiorna posti occupati di tutti i gruppi
+    dataRepository.data.groups.forEach(g => {
+      const occ = dataRepository.data.memberships.filter(m => m.groupId === g.id && m.role === 'MEMBER' && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED')).length;
+      g.occupiedMemberSlots = occ;
+    });
+
+    await dataRepository.save();
+    return res.json({ success: true, mem, groups: dataRepository.data.groups });
   } catch (err) {
-    console.error('[ADMIN SYNC ERROR]', err);
-    return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+    console.error('[ASSIGN MEMBERSHIP ERROR]', err);
+    return res.status(500).json({ error: err.message });
   }
 });
+
 
 // 1. Dashboard KPI e Metriche Globali
 adminRouter.get('/dashboard', async (req, res) => {
