@@ -78,18 +78,23 @@ checkoutRouter.get('/paypal/plan', async (req, res) => {
     const serviceName = req.query.serviceName || 'Spotify Family';
     const amountCents = parseInt(req.query.amountCents, 10) || 499;
 
+    const clientId = dataRepository.getPayPalClientId() || config.paypal.clientId;
+    const clientSecret = dataRepository.getPayPalClientSecret() || config.paypal.clientSecret;
+    const mode = dataRepository.getPayPalMode() || config.paypal.mode;
+    const isLocked = process.env.PAYPAL_SAFETY_LOCK === 'true';
+
     let planId = null;
-    if (!config.paypal.safetyLockActive && config.paypal.clientSecret && !config.paypal.clientSecret.includes('placeholder')) {
+    if (!isLocked && clientSecret && !clientSecret.includes('placeholder')) {
       planId = await paypalBillingService.createOrGetMonthlyPlan(serviceName, amountCents);
     }
 
     return res.json({
       success: true,
-      mode: config.paypal.mode,
-      apiBaseUrl: config.paypal.apiBaseUrl,
-      safetyLockActive: config.paypal.safetyLockActive,
+      mode: mode,
+      apiBaseUrl: paypalBillingService.getApiBaseUrl(),
+      safetyLockActive: isLocked,
       planId: planId,
-      clientId: config.paypal.clientId,
+      clientId: clientId,
       amountCents: amountCents,
       currency: 'EUR'
     });
@@ -102,8 +107,8 @@ checkoutRouter.get('/paypal/plan', async (req, res) => {
 // 3. Attivazione Server-Side della vera PayPal Subscription (I-...)
 checkoutRouter.post('/paypal/subscription-activate', requireAuth, async (req, res) => {
   try {
-    // Blocco di sicurezza rigoroso: impedisce qualsiasi addebito/sottoscrizione live in fase di test
-    if (config.paypal.safetyLockActive) {
+    const isLocked = process.env.PAYPAL_SAFETY_LOCK === 'true';
+    if (isLocked) {
       console.warn('[PAYPAL SAFETY LOCK] Blocco di sicurezza attivo: transazioni reali bloccate in fase di test.');
       return res.status(423).json({
         error: 'PAYPAL_SAFETY_LOCK_ACTIVE',

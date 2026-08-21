@@ -305,9 +305,13 @@ adminRouter.post('/test-email', async (req, res) => {
 
 // 9. Configurazione Gateway di Pagamento (Stripe & PayPal)
 adminRouter.get('/gateway-config', async (req, res) => {
-  const stripeSecret = process.env.STRIPE_SECRET_KEY || dataRepository.data.systemConfig?.stripe?.secretKey || '';
-  const stripePublishable = process.env.STRIPE_PUBLISHABLE_KEY || dataRepository.data.systemConfig?.stripe?.publishableKey || '';
+  const stripeSecret = dataRepository.getStripeSecretKey();
+  const stripePublishable = dataRepository.getStripePublishableKey();
   const stripeMode = process.env.STRIPE_MODE || dataRepository.data.systemConfig?.stripe?.mode || 'live';
+
+  const ppClient = dataRepository.getPayPalClientId();
+  const ppSecret = dataRepository.getPayPalClientSecret();
+  const ppMode = dataRepository.getPayPalMode();
 
   return res.json({
     success: true,
@@ -317,16 +321,17 @@ adminRouter.get('/gateway-config', async (req, res) => {
       mode: stripeMode
     },
     paypal: {
-      mode: process.env.PAYPAL_MODE || 'live',
-      hasClientId: !!(process.env.PAYPAL_CLIENT_ID),
-      hasClientSecret: !!(process.env.PAYPAL_CLIENT_SECRET)
+      mode: ppMode,
+      clientId: ppClient || '',
+      hasClientId: !!ppClient,
+      hasClientSecret: !!(ppSecret && !ppSecret.includes('placeholder'))
     }
   });
 });
 
 adminRouter.post('/gateway-config', async (req, res) => {
   try {
-    const { stripeSecretKey, stripePublishableKey, stripeMode } = req.body || {};
+    const { stripeSecretKey, stripePublishableKey, stripeMode, paypalClientId, paypalClientSecret, paypalMode } = req.body || {};
     
     if (!dataRepository.data.systemConfig) {
       dataRepository.data.systemConfig = {};
@@ -334,21 +339,34 @@ adminRouter.post('/gateway-config', async (req, res) => {
     if (!dataRepository.data.systemConfig.stripe) {
       dataRepository.data.systemConfig.stripe = {};
     }
+    if (!dataRepository.data.systemConfig.paypal) {
+      dataRepository.data.systemConfig.paypal = {};
+    }
 
     const s = dataRepository.data.systemConfig.stripe;
     if (stripeSecretKey) s.secretKey = stripeSecretKey.trim();
     if (stripePublishableKey) s.publishableKey = stripePublishableKey.trim();
     if (stripeMode) s.mode = stripeMode;
 
+    const p = dataRepository.data.systemConfig.paypal;
+    if (paypalClientId) p.clientId = paypalClientId.trim();
+    if (paypalClientSecret) p.clientSecret = paypalClientSecret.trim();
+    if (paypalMode) p.mode = paypalMode;
+
     await dataRepository.save();
 
     return res.json({
       success: true,
-      message: 'Configurazione Gateway Stripe salvata con successo nel database persistente.',
+      message: 'Configurazione Gateway Stripe & PayPal salvata con successo nel database persistente.',
       stripe: {
         hasSecretKey: !!(s.secretKey && s.secretKey.startsWith('sk_')),
         publishableKey: s.publishableKey || '',
         mode: s.mode || 'live'
+      },
+      paypal: {
+        hasClientId: !!p.clientId,
+        hasClientSecret: !!p.clientSecret,
+        mode: p.mode || 'live'
       }
     });
   } catch (err) {

@@ -4241,14 +4241,24 @@ async function openGatewayConfigModal() {
 
         <!-- SEZIONE PAYPAL -->
         <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:var(--radius-md); padding:14px; margin-bottom:16px;">
-          <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-            <span style="font-size:18px;">🅿️</span>
-            <strong style="font-size:13.5px; color:#003087;">PayPal Gateway (Sandbox / Live)</strong>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:18px;">🅿️</span>
+              <strong style="font-size:13.5px; color:#003087;">PayPal Gateway (Live / Produzione)</strong>
+            </div>
+            <span style="font-size:11px; padding:2px 8px; border-radius:var(--radius-full); font-weight:800; ${serverConfig.paypal?.hasClientId && serverConfig.paypal?.hasClientSecret ? 'background:#dcfce7; color:#166534;' : 'background:#fee2e2; color:#991b1b;'}">
+              ${serverConfig.paypal?.hasClientId && serverConfig.paypal?.hasClientSecret ? '🟢 ATTIVO LIVE' : '⚪ DA CONFIGURARE'}
+            </span>
+          </div>
+
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label" style="font-size:11.5px; font-weight:700;">Client ID (App BYS-Platform)</label>
+            <input type="text" id="popupPaypalClientId" class="form-input" placeholder="Incolla Client ID PayPal" value="${escapeHtml(serverConfig.paypal?.clientId || currentClientId)}" style="font-family:var(--font-mono); font-size:11.5px; padding:8px 10px;">
           </div>
 
           <div class="form-group" style="margin-bottom:6px;">
-            <label class="form-label" style="font-size:11.5px; font-weight:700;">Client ID (App BYS-Platform)</label>
-            <input type="text" id="popupPaypalClientId" class="form-input" placeholder="Incolla Client ID PayPal" value="${escapeHtml(currentClientId)}" style="font-family:var(--font-mono); font-size:11.5px; padding:8px 10px;">
+            <label class="form-label" style="font-size:11.5px; font-weight:700;">Secret Key (App BYS-Platform)</label>
+            <input type="password" id="popupPaypalClientSec" class="form-input" placeholder="${serverConfig.paypal?.hasClientSecret ? '•••••••••••••••••••••••••••••••• (Configurata)' : 'Incolla Secret Key PayPal'}" value="" style="font-family:var(--font-mono); font-size:11.5px; padding:8px 10px;">
           </div>
         </div>
 
@@ -4267,6 +4277,7 @@ async function openGatewayConfigModal() {
   modal.querySelector('#formGatewayConfig').onsubmit = async (e) => {
     e.preventDefault();
     const ppVal = document.getElementById('popupPaypalClientId').value.trim();
+    const ppSec = document.getElementById('popupPaypalClientSec').value.trim();
     const strPub = document.getElementById('popupStripePubKey').value.trim();
     const strSec = document.getElementById('popupStripeSecKey').value.trim();
 
@@ -4288,7 +4299,10 @@ async function openGatewayConfigModal() {
         body: JSON.stringify({
           stripePublishableKey: strPub || undefined,
           stripeSecretKey: strSec || undefined,
-          stripeMode: 'live'
+          stripeMode: 'live',
+          paypalClientId: ppVal || undefined,
+          paypalClientSecret: ppSec || undefined,
+          paypalMode: 'live'
         })
       });
       const data = await resp.json();

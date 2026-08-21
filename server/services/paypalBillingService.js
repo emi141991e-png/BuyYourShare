@@ -5,6 +5,7 @@
  */
 
 import { config } from '../config/env.js';
+import { dataRepository } from '../db/dataRepository.js';
 
 class PayPalBillingService {
   constructor() {
@@ -14,11 +15,17 @@ class PayPalBillingService {
     this.cachedProductId = null;
   }
 
+  getApiBaseUrl() {
+    const mode = dataRepository.getPayPalMode() || config.paypal.mode;
+    return mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+  }
+
   /**
    * Genera o riutilizza il token OAuth2 Bearer server-side in modo sicuro.
    */
   async getAccessToken() {
-    if (config.paypal.safetyLockActive) {
+    const isLocked = process.env.PAYPAL_SAFETY_LOCK === 'true';
+    if (isLocked) {
       throw new Error('PAYPAL_SAFETY_LOCK_ACTIVE: Chiamate alle API PayPal Live bloccate dal Safety Lock di sicurezza.');
     }
 
@@ -26,15 +33,15 @@ class PayPalBillingService {
       return this.cachedToken;
     }
 
-    const clientId = config.paypal.clientId;
-    const clientSecret = config.paypal.clientSecret;
+    const clientId = dataRepository.getPayPalClientId() || config.paypal.clientId;
+    const clientSecret = dataRepository.getPayPalClientSecret() || config.paypal.clientSecret;
 
     if (!clientSecret || clientSecret.includes('placeholder')) {
-      throw new Error('PAYPAL_CLIENT_SECRET non configurato nel file .env.');
+      throw new Error('PAYPAL_CLIENT_SECRET non configurato.');
     }
 
     const auth = Buffer.from(`${clientId.trim()}:${clientSecret.trim()}`).toString('base64');
-    const tokenUrl = `${config.paypal.apiBaseUrl}/v1/oauth2/token`;
+    const tokenUrl = `${this.getApiBaseUrl()}/v1/oauth2/token`;
 
     const resp = await fetch(tokenUrl, {
       method: 'POST',
@@ -64,7 +71,7 @@ class PayPalBillingService {
     if (this.cachedProductId) return this.cachedProductId;
 
     const token = await this.getAccessToken();
-    const url = `${config.paypal.apiBaseUrl}/v1/catalogs/products`;
+    const url = `${this.getApiBaseUrl()}/v1/catalogs/products`;
 
     const payload = {
       name: name,
@@ -143,7 +150,7 @@ class PayPalBillingService {
       }
     };
 
-    const url = `${config.paypal.apiBaseUrl}/v1/billing/plans`;
+    const url = `${this.getApiBaseUrl()}/v1/billing/plans`;
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
@@ -177,7 +184,7 @@ class PayPalBillingService {
     }
 
     const token = await this.getAccessToken();
-    const url = `${config.paypal.apiBaseUrl}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`;
+    const url = `${this.getApiBaseUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`;
 
     const resp = await fetch(url, {
       method: 'GET',
@@ -206,7 +213,7 @@ class PayPalBillingService {
 
     try {
       const token = await this.getAccessToken();
-      const url = `${config.paypal.apiBaseUrl}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`;
+      const url = `${this.getApiBaseUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`;
 
       const resp = await fetch(url, {
         method: 'POST',

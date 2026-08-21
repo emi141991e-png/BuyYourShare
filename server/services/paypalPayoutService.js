@@ -5,11 +5,17 @@
  */
 
 import { config } from '../config/env.js';
+import { dataRepository } from '../db/dataRepository.js';
 
 class PayPalPayoutService {
   constructor() {
     this.cachedToken = null;
     this.tokenExpiresAt = 0;
+  }
+
+  getApiBaseUrl() {
+    const mode = dataRepository.getPayPalMode() || config.paypal.mode;
+    return mode === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
   }
 
   /**
@@ -21,15 +27,15 @@ class PayPalPayoutService {
       return this.cachedToken;
     }
 
-    const clientId = config.paypal.clientId;
-    const clientSecret = config.paypal.clientSecret;
+    const clientId = dataRepository.getPayPalClientId() || config.paypal.clientId;
+    const clientSecret = dataRepository.getPayPalClientSecret() || config.paypal.clientSecret;
 
     if (!clientSecret || clientSecret.includes('placeholder')) {
-      throw new Error('PAYPAL_CLIENT_SECRET non configurato nel file .env del server.');
+      throw new Error('PAYPAL_CLIENT_SECRET non configurato.');
     }
 
-    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const tokenUrl = `${config.paypal.apiBaseUrl}/v1/oauth2/token`;
+    const auth = Buffer.from(`${clientId.trim()}:${clientSecret.trim()}`).toString('base64');
+    const tokenUrl = `${this.getApiBaseUrl()}/v1/oauth2/token`;
 
     const resp = await fetch(tokenUrl, {
       method: 'POST',
@@ -100,7 +106,7 @@ class PayPalPayoutService {
 
     console.log(`[PAYPAL PAYOUT] Invio richiesta payout reale verso ${recipientEmail} (Importo: ${amountEuros} €)...`);
 
-    const payoutUrl = `${config.paypal.apiBaseUrl}/v1/payments/payouts`;
+    const payoutUrl = `${this.getApiBaseUrl()}/v1/payments/payouts`;
     const resp = await fetch(payoutUrl, {
       method: 'POST',
       headers: {
@@ -170,7 +176,7 @@ class PayPalPayoutService {
    */
   async getPayoutDetails(payoutBatchId) {
     const token = await this.getAccessToken();
-    const url = `${config.paypal.apiBaseUrl}/v1/payments/payouts/${encodeURIComponent(payoutBatchId)}`;
+    const url = `${this.getApiBaseUrl()}/v1/payments/payouts/${encodeURIComponent(payoutBatchId)}`;
 
     const resp = await fetch(url, {
       method: 'GET',

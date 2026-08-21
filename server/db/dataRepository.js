@@ -613,6 +613,18 @@ class DataRepository {
   getStripePublishableKey() {
     return process.env.STRIPE_PUBLISHABLE_KEY || this.data.systemConfig?.stripe?.publishableKey || '';
   }
+
+  getPayPalClientId() {
+    return process.env.PAYPAL_CLIENT_ID || this.data.systemConfig?.paypal?.clientId || '';
+  }
+
+  getPayPalClientSecret() {
+    return process.env.PAYPAL_CLIENT_SECRET || this.data.systemConfig?.paypal?.clientSecret || '';
+  }
+
+  getPayPalMode() {
+    return process.env.PAYPAL_MODE || this.data.systemConfig?.paypal?.mode || 'live';
+  }
 }
 
 export const dataRepository = new DataRepository();
