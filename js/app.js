@@ -1506,7 +1506,9 @@ function renderWizardView(container, currentUser) {
             </div>
 
             <div class="form-group" style="margin-bottom:12px;">
-              <label class="form-label" style="font-size:12.5px; font-weight:700;">Link di Invito / Accesso Diretto (Opzionale o Consigliato)</label>
+              <label id="lblWizAccessUrl" class="form-label" style="font-size:12.5px; font-weight:700;">
+                ${(wizardState.serviceId === 'srv-spotify' || (wizardState.customServiceName && wizardState.customServiceName.toLowerCase().includes('spotify'))) ? '🔗 Link di Invito Diretto Spotify Family <span style="color:#dc2626;">*</span>' : 'Link di Invito / Accesso Diretto (Opzionale o Consigliato)'}
+              </label>
               <input type="text" id="wizAccessUrl" class="form-input" placeholder="https://..." value="${escapeHtml(wizardState.accessUrl)}">
             </div>
 
@@ -1596,6 +1598,17 @@ function renderWizardView(container, currentUser) {
 
       const isSpotify = sId === 'srv-spotify' || (card.dataset.name && card.dataset.name.toLowerCase().includes('spotify'));
       if (spotifyWrap) spotifyWrap.style.display = isSpotify ? 'block' : 'none';
+      const urlLabel = document.getElementById('lblWizAccessUrl');
+      if (urlLabel) {
+        urlLabel.innerHTML = isSpotify 
+          ? '🔗 Link di Invito Diretto Spotify Family <span style="color:#dc2626;">*</span>' 
+          : 'Link di Invito / Accesso Diretto (Opzionale o Consigliato)';
+      }
+      const instrInput = document.getElementById('wizInstructions');
+      if (isSpotify && instrInput && (!instrInput.value || instrInput.value.includes('Clicca sul link di invito'))) {
+        instrInput.value = '1. Clicca sul link di invito ufficiale di Spotify fornito qui sopra.\n2. Accedi con il tuo account Spotify personale.\n3. Quando Spotify richiede di confermare la residenza, inserisci esattamente l\'indirizzo del Capogruppo indicato.';
+        wizardState.instructions = instrInput.value;
+      }
 
       if (sId === 'srv-custom') {
         if (customWrap) customWrap.style.display = 'block';
@@ -1616,6 +1629,12 @@ function renderWizardView(container, currentUser) {
     customNameInput.addEventListener('input', () => {
       const isSpotify = customNameInput.value.toLowerCase().includes('spotify');
       if (spotifyWrap) spotifyWrap.style.display = isSpotify ? 'block' : 'none';
+      const urlLabel = document.getElementById('lblWizAccessUrl');
+      if (urlLabel) {
+        urlLabel.innerHTML = isSpotify 
+          ? '🔗 Link di Invito Diretto Spotify Family <span style="color:#dc2626;">*</span>' 
+          : 'Link di Invito / Accesso Diretto (Opzionale o Consigliato)';
+      }
     });
   }
 
@@ -1659,10 +1678,18 @@ function renderWizardView(container, currentUser) {
     }
 
     const isSpot = wizardState.serviceId === 'srv-spotify' || wizardState.customServiceName.toLowerCase().includes('spotify');
-    if (isSpot && (!wizardState.ownerSpotifyAddress || !wizardState.ownerSpotifyAddress.trim())) {
-      alert('Per i gruppi Spotify Family è obbligatorio inserire l\'indirizzo completo del Capogruppo (Via, Città, CAP) per consentire ai membri di attivare l\'account.');
-      if (spotifyAddrInput) spotifyAddrInput.focus();
-      return;
+    if (isSpot) {
+      if (!wizardState.ownerSpotifyAddress || wizardState.ownerSpotifyAddress.trim().length < 5) {
+        alert('Per i gruppi Spotify Family è obbligatorio inserire l\'indirizzo completo del Capogruppo (Via, Città, CAP) per consentire ai membri di convalidare la residenza.');
+        if (spotifyAddrInput) spotifyAddrInput.focus();
+        return;
+      }
+      if (!wizardState.accessUrl || !wizardState.accessUrl.trim()) {
+        alert('Per i gruppi Spotify Family è obbligatorio inserire il Link di Invito ufficiale.');
+        const urlInp = document.getElementById('wizAccessUrl');
+        if (urlInp) urlInp.focus();
+        return;
+      }
     }
 
     let finalUrl = (wizardState.accessUrl || '').trim();
