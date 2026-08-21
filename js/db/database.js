@@ -35,9 +35,7 @@ class Database {
     // Pulizia rigorosa da vecchi gruppi demo per ID
     const purgedClientIds = [
       'grp-1042', 'grp-1089', 'grp-1120', 'grp-youtube-famiglia',
-      'grp-1787178342100', // Canva Pro
-      'grp-1787177542100', // CapCut Pro
-      'grp-1787176742344', // YouTube Premium demo
+      'grp-1787178342100', // Canva Pro demo
       'grp-1787174165672', // Gemini Advanced demo
       'grp-1787083131405', 'grp-1787084045714', 'grp-1787085411282',
       'grp-1787085891636', 'grp-1787086615133', 'grp-1787087909072',

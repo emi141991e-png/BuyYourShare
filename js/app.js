@@ -1701,7 +1701,7 @@ function renderWizardView(container, currentUser) {
           db.data.groups.unshift(serverRes.group);
         }
         db.save();
-        await db.syncGroupsFromServer();
+        await db.syncAllFromServer(currentUser);
       } else {
         const localGroup = db.createGroup(
           { serviceId: payload.serviceId, customServiceName: payload.customServiceName, planName: payload.planName, realSubscriptionCostCents: realCostCents, totalSlots, ownerSlots },
@@ -4535,17 +4535,31 @@ function setupInactivityWatchdog() {
   }, 5000);
 
   // Controllo immediato quando l'utente torna sulla scheda o sblocca lo schermo
-  document.addEventListener('visibilitychange', () => {
+  document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible') {
       if (authService.isSessionTimedOut()) {
         handleSessionInactivityTimeout();
+      } else {
+        const u = authService.getCurrentUser();
+        await db.syncAllFromServer(u);
+        const routePath = (currentRoute || '#home').split('?')[0];
+        if (routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+          renderApp();
+        }
       }
     }
   });
 
-  window.addEventListener('focus', () => {
+  window.addEventListener('focus', async () => {
     if (authService.isSessionTimedOut()) {
       handleSessionInactivityTimeout();
+    } else {
+      const u = authService.getCurrentUser();
+      await db.syncAllFromServer(u);
+      const routePath = (currentRoute || '#home').split('?')[0];
+      if (routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+        renderApp();
+      }
     }
   });
 }
@@ -4575,15 +4589,27 @@ async function init() {
     renderApp();
   }
 
-  // Sincronizzazione automatica in background
+  // Sincronizzazione automatica e re-render in Real-Time in background (ogni 4 secondi)
+  let lastDataChecksum = '';
   setInterval(async () => {
     try {
       const u = authService.getCurrentUser();
       await db.syncAllFromServer(u);
       updateHeader(u);
       updateBottomNav();
+
+      const newChecksum = `${(db.data.groups || []).length}_${(db.data.memberships || []).length}_${(db.data.groups || []).map(g => (g.id + ':' + g.occupiedMemberSlots + ':' + g.status)).join(',')}`;
+      if (newChecksum !== lastDataChecksum) {
+        lastDataChecksum = newChecksum;
+        const activeEl = document.activeElement;
+        const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+        const routePath = (currentRoute || '#home').split('?')[0];
+        if (!isTyping && routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+          renderApp();
+        }
+      }
     } catch (e) {}
-  }, 15000);
+  }, 4000);
 }
 
 if (document.readyState === 'loading') {
