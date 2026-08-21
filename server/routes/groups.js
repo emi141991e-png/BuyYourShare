@@ -163,8 +163,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       rulesAndRequirements,
       accessUrl,
       instructions,
-      accessCode,
-      ownerSpotifyAccount,
+      ownerSpotifyAddress,
       additionalInfo,
       publishImmediately,
       payoutIban,
@@ -218,7 +217,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       status: initialStatus,
       isPublished: true,
       publishedAt: new Date().toISOString(),
-      inviteCode: 'BYS-' + Math.floor(1000 + Math.random() * 9000),
+      ownerSpotifyAddress: (ownerSpotifyAddress || '').trim(),
       rulesAndRequirements: (rulesAndRequirements || 'Rispetta le regole della community e del provider.').trim(),
       description: (description || `Gruppo condivisione ${customServiceName}`).trim(),
       createdAt: new Date().toISOString(),
@@ -250,8 +249,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
     await dataRepository.saveAccessInstructions(newGroupId, {
       accessUrl: accessUrl || '',
       instructions: instructions || 'Contatta il Capogruppo per completare l\'accesso.',
-      accessCode: accessCode || '',
-      ownerSpotifyAccount: ownerSpotifyAccount || '',
+      ownerSpotifyAddress: (ownerSpotifyAddress || '').trim(),
       additionalInfo: additionalInfo || ''
     });
 

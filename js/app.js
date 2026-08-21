@@ -1494,6 +1494,17 @@ function renderWizardView(container, currentUser) {
               Inserisci il link di invito o le istruzioni. Verranno mostrati in automatico solo ai membri che acquistano un posto.
             </p>
 
+            <!-- CAMPO OBBLIGATORIO ESCLUSIVO PER SPOTIFY: Indirizzo registrato del Capogruppo -->
+            <div id="spotifyAddressWrap" class="form-group" style="${(wizardState.serviceId === 'srv-spotify' || (wizardState.customServiceName && wizardState.customServiceName.toLowerCase().includes('spotify'))) ? '' : 'display:none;'} margin-bottom:14px; background:#f0fdf4; border:1.5px solid #86efac; border-radius:var(--radius-md); padding:12px 14px;">
+              <label class="form-label" style="font-size:12.5px; font-weight:800; color:#166534; margin-bottom:4px; display:block;">
+                🏠 Indirizzo / Via completa registrata sul tuo account Spotify Family *
+              </label>
+              <p style="font-size:11.5px; color:#15803d; margin-bottom:8px; line-height:1.4;">
+                <strong>Obbligatorio per Spotify:</strong> Spotify richiede ai partecipanti di inserire e confermare lo stesso identico indirizzo di casa del Capogruppo per convalidare l'accesso al piano famiglia.
+              </p>
+              <input type="text" id="wizSpotifyAddress" class="form-input" placeholder="Es. Via Roma 10, 00100 Roma (RM)" value="${escapeHtml(wizardState.ownerSpotifyAddress || '')}" style="background:white; border-color:#86efac;">
+            </div>
+
             <div class="form-group" style="margin-bottom:12px;">
               <label class="form-label" style="font-size:12.5px; font-weight:700;">Link di Invito / Accesso Diretto (Opzionale o Consigliato)</label>
               <input type="text" id="wizAccessUrl" class="form-input" placeholder="https://..." value="${escapeHtml(wizardState.accessUrl)}">
@@ -1504,15 +1515,9 @@ function renderWizardView(container, currentUser) {
               <textarea id="wizInstructions" class="form-textarea" rows="3" placeholder="Scrivi come accedere (es. 'Clicca sul link di invito con il tuo account personale')..." required>${escapeHtml(wizardState.instructions)}</textarea>
             </div>
 
-            <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-              <div class="form-group">
-                <label class="form-label" style="font-size:12px;">Codice Invito (Opzionale)</label>
-                <input type="text" id="wizAccessCode" class="form-input" placeholder="es. 849204" value="${escapeHtml(wizardState.accessCode)}">
-              </div>
-              <div class="form-group">
-                <label class="form-label" style="font-size:12px;">Note Aggiuntive (Opzionale)</label>
-                <input type="text" id="wizAdditionalInfo" class="form-input" placeholder="es. Account 100% personale e privato" value="${escapeHtml(wizardState.additionalInfo)}">
-              </div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <label class="form-label" style="font-size:12px;">Note Aggiuntive (Opzionale)</label>
+              <input type="text" id="wizAdditionalInfo" class="form-input" placeholder="es. Account 100% personale e privato" value="${escapeHtml(wizardState.additionalInfo)}">
             </div>
           </div>
 
@@ -1534,6 +1539,8 @@ function renderWizardView(container, currentUser) {
   const customNameInput = document.getElementById('wizCustomName');
   const planNameInput = document.getElementById('wizPlanName');
   const customWrap = document.getElementById('customServiceWrap');
+  const spotifyWrap = document.getElementById('spotifyAddressWrap');
+  const spotifyAddrInput = document.getElementById('wizSpotifyAddress');
   const ibanInput = document.getElementById('wizPayoutIban');
   const legalNameInput = document.getElementById('wizPayoutLegalName');
   const bankNameInput = document.getElementById('wizPayoutBankName');
@@ -1544,9 +1551,9 @@ function renderWizardView(container, currentUser) {
     wizardState.ownerSlots = ownerSlotsInput ? ownerSlotsInput.value : '1';
     wizardState.customServiceName = customNameInput ? customNameInput.value : '';
     wizardState.planName = planNameInput ? planNameInput.value : '';
+    wizardState.ownerSpotifyAddress = spotifyAddrInput ? spotifyAddrInput.value.trim() : '';
     wizardState.accessUrl = document.getElementById('wizAccessUrl')?.value || '';
     wizardState.instructions = document.getElementById('wizInstructions')?.value || '';
-    wizardState.accessCode = document.getElementById('wizAccessCode')?.value || '';
     wizardState.additionalInfo = document.getElementById('wizAdditionalInfo')?.value || '';
     wizardState.payoutIban = ibanInput ? ibanInput.value.trim().toUpperCase() : '';
     wizardState.payoutLegalName = legalNameInput ? legalNameInput.value.trim() : '';
@@ -1587,6 +1594,9 @@ function renderWizardView(container, currentUser) {
       container.querySelectorAll('.service-card-select').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
 
+      const isSpotify = sId === 'srv-spotify' || (card.dataset.name && card.dataset.name.toLowerCase().includes('spotify'));
+      if (spotifyWrap) spotifyWrap.style.display = isSpotify ? 'block' : 'none';
+
       if (sId === 'srv-custom') {
         if (customWrap) customWrap.style.display = 'block';
         if (customNameInput) {
@@ -1601,6 +1611,13 @@ function renderWizardView(container, currentUser) {
       }
     });
   });
+
+  if (customNameInput) {
+    customNameInput.addEventListener('input', () => {
+      const isSpotify = customNameInput.value.toLowerCase().includes('spotify');
+      if (spotifyWrap) spotifyWrap.style.display = isSpotify ? 'block' : 'none';
+    });
+  }
 
   // Form Submit
   form.addEventListener('submit', async (e) => {
@@ -1641,6 +1658,13 @@ function renderWizardView(container, currentUser) {
       return;
     }
 
+    const isSpot = wizardState.serviceId === 'srv-spotify' || wizardState.customServiceName.toLowerCase().includes('spotify');
+    if (isSpot && (!wizardState.ownerSpotifyAddress || !wizardState.ownerSpotifyAddress.trim())) {
+      alert('Per i gruppi Spotify Family è obbligatorio inserire l\'indirizzo completo del Capogruppo (Via, Città, CAP) per consentire ai membri di attivare l\'account.');
+      if (spotifyAddrInput) spotifyAddrInput.focus();
+      return;
+    }
+
     let finalUrl = (wizardState.accessUrl || '').trim();
     if (finalUrl && !finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
       finalUrl = 'https://' + finalUrl;
@@ -1655,8 +1679,8 @@ function renderWizardView(container, currentUser) {
       ownerSlots: ownerSlots,
       accessUrl: finalUrl,
       instructions: (wizardState.instructions || '').trim(),
+      ownerSpotifyAddress: (wizardState.ownerSpotifyAddress || '').trim(),
       additionalInfo: (wizardState.additionalInfo || '').trim(),
-      accessCode: (wizardState.accessCode || '').trim(),
       payoutIban: cleanIban,
       payoutLegalName: wizardState.payoutLegalName,
       payoutBankName: wizardState.payoutBankName,
@@ -3242,6 +3266,23 @@ async function openAccessModal(groupId, currentUser) {
           ${escapeHtml(instructions.instructions || 'Accedi con il tuo account personale per unirti al piano condiviso.')}
         </div>
 
+        ${isSpotify && (instructions.ownerSpotifyAddress || group.ownerSpotifyAddress) ? `
+          <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:var(--radius-md); padding:12px 14px; margin-top:14px;">
+            <label class="form-label" style="font-size:12px; font-weight:800; color:#166534; margin-bottom:4px; display:block;">
+              🏠 INDIRIZZO SPOTIFY DEL CAPOGRUPPO DA CONFERMARE:
+            </label>
+            <p style="font-size:11.5px; color:#15803d; margin-bottom:8px; line-height:1.4;">
+              Durante la procedura di accettazione, Spotify ti chiederà di confermare che risiedi allo stesso indirizzo del Capogruppo. Inserisci esattamente questo:
+            </p>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid #86efac; padding:8px 12px; border-radius:var(--radius-sm); gap:8px;">
+              <strong style="font-size:13px; color:#166534; word-break:break-word;">${escapeHtml(instructions.ownerSpotifyAddress || group.ownerSpotifyAddress)}</strong>
+              <button class="btn btn-secondary btn-sm btn-copy-address" data-address="${escapeHtml(instructions.ownerSpotifyAddress || group.ownerSpotifyAddress)}" style="font-size:11.5px; padding:4px 10px; font-weight:700; white-space:nowrap;">
+                📋 COPIA
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
         ${instructions.additionalInfo && instructions.additionalInfo.trim() ? `
           <label class="form-label" style="margin-top:14px;">ℹ️ NOTE AGGIUNTIVE:</label>
           <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(instructions.additionalInfo)}</p>
@@ -3263,6 +3304,9 @@ async function openAccessModal(groupId, currentUser) {
 
   modal.querySelectorAll('.btn-copy-url').forEach(b => {
     b.onclick = () => copyToClipboard(b.dataset.url, 'Link copiato!');
+  });
+  modal.querySelectorAll('.btn-copy-address').forEach(b => {
+    b.onclick = () => copyToClipboard(b.dataset.address, 'Indirizzo copiato!');
   });
   modal.querySelectorAll('.btn-open-chat-from-modal').forEach(b => {
     b.onclick = () => {
