@@ -153,6 +153,30 @@ class DataRepository {
     return user;
   }
 
+  async deleteUser(id) {
+    this.data.users = (this.data.users || []).filter(u => u.id !== id);
+    this.data.sessions = (this.data.sessions || []).filter(s => s.userId !== id);
+    this.data.notifications = (this.data.notifications || []).filter(n => n.userId !== id);
+    this.data.connectedAccounts = (this.data.connectedAccounts || []).filter(c => c.userId !== id);
+
+    // Gestione gruppi di proprietà dell'utente eliminato
+    const userGroups = (this.data.groups || []).filter(g => g.ownerId === id);
+    for (const g of userGroups) {
+      const paying = (this.data.memberships || []).filter(m => m.groupId === g.id && m.role === 'MEMBER' && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED'));
+      if (paying.length === 0) {
+        await this.deleteGroup(g.id);
+      } else {
+        g.status = 'CLOSED';
+        g.isPublished = false;
+      }
+    }
+
+    // Rimuovi le membership dell'utente
+    this.data.memberships = (this.data.memberships || []).filter(m => m.userId !== id);
+    await this.save();
+    return true;
+  }
+
   async createSession(userId) {
     const token = 'bys_token_' + Date.now() + '_' + Math.random().toString(36).substring(2, 12);
     const now = Date.now();

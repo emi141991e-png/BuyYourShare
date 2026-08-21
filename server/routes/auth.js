@@ -204,6 +204,35 @@ authRouter.post('/logout', async (req, res) => {
   return res.json({ success: true, message: 'Logout eseguito con successo.' });
 });
 
+// 4b. Eliminazione Definitiva Account Utente
+authRouter.delete('/account', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    if (req.user.role === 'admin') {
+      return res.status(400).json({ error: 'ADMIN_CANNOT_BE_DELETED', message: 'L\'account di amministrazione non può essere eliminato.' });
+    }
+    await dataRepository.deleteUser(userId);
+    return res.json({ success: true, message: 'Account eliminato con successo. Per rientrare dovrai registrarti di nuovo.' });
+  } catch (err) {
+    console.error('[DELETE ACCOUNT ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Errore durante l\'eliminazione dell\'account.' });
+  }
+});
+
+authRouter.post('/delete-account', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    if (req.user.role === 'admin') {
+      return res.status(400).json({ error: 'ADMIN_CANNOT_BE_DELETED', message: 'L\'account di amministrazione non può essere eliminato.' });
+    }
+    await dataRepository.deleteUser(userId);
+    return res.json({ success: true, message: 'Account eliminato con successo. Per rientrare dovrai registrarti di nuovo.' });
+  } catch (err) {
+    console.error('[DELETE ACCOUNT ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Errore durante l\'eliminazione dell\'account.' });
+  }
+});
+
 // 5. Aggiornamento Impostazioni Payout Capogruppo (PayPal / IBAN)
 authRouter.put('/payout-settings', requireAuth, async (req, res) => {
   try {

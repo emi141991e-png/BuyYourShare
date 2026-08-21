@@ -1200,6 +1200,31 @@ class Database {
     this.save();
     return user.paymentMethod;
   }
+
+  async deleteAccount(userId) {
+    try {
+      const token = this.getSessionToken();
+      if (token) {
+        await fetch('/api/auth/delete-account', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[DB DELETE ACCOUNT API ERROR]', e);
+    }
+
+    this.data.users = (this.data.users || []).filter(u => u.id !== userId);
+    this.data.groups = (this.data.groups || []).filter(g => g.ownerId !== userId);
+    this.data.memberships = (this.data.memberships || []).filter(m => m.userId !== userId);
+    this.data.notifications = (this.data.notifications || []).filter(n => n.userId !== userId);
+    this.save();
+    this.clearSessionToken();
+    return true;
+  }
 }
 
 export const db = new Database();

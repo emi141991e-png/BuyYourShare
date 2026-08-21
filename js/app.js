@@ -262,6 +262,13 @@ function updateHeader(currentUser) {
       💳 Pagamenti & IBAN
     </button>
 
+    <!-- Delete Account Button (Tutti gli account registrati) -->
+    ${currentUser.role !== 'admin' ? `
+      <button id="btnDeleteAccountHeader" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; font-weight:700;" title="Elimina definitivamente il tuo account">
+        🗑️ Elimina Account
+      </button>
+    ` : ''}
+
     <!-- Logout Button -->
     <button id="btnLogoutHeader" class="btn btn-secondary btn-sm" style="font-size:11.5px; padding:4px 8px; color:#dc2626; border-color:#fca5a5;" title="Disconnetti account">
       🚪 Esci
@@ -271,7 +278,32 @@ function updateHeader(currentUser) {
   // Bind Payment Modal
   const btnPayment = document.getElementById('btnOpenPaymentSettingsHeader');
   if (btnPayment) {
-    btnPayment.onclick = () => openPaymentAndPayoutSettingsModal(currentUser, 'payout');
+    btnPayment.onclick = () => openPaymentAndPayoutSettingsModal(currentUser);
+  }
+
+  // Bind Delete Account
+  const btnDelAcc = document.getElementById('btnDeleteAccountHeader');
+  if (btnDelAcc) {
+    btnDelAcc.onclick = async () => {
+      const confirmDelete = confirm('⚠️ ATTENZIONE: Vuoi davvero eliminare definitivamente il tuo account?\n\n- Tutti i tuoi dati, quote e impostazioni verranno cancellati.\n- Per accedere di nuovo al sito dovrai registrarti nuovamente da zero.');
+      if (confirmDelete) {
+        btnDelAcc.disabled = true;
+        btnDelAcc.textContent = '⏳ Eliminazione...';
+        try {
+          await db.deleteAccount(currentUser.id);
+          await authService.logout();
+          db.clearUserData();
+          await db.syncAllFromServer(null);
+          showToast('🗑️ Il tuo account è stato eliminato con successo. Arrivederci!');
+          navigateTo('#home');
+          renderApp();
+        } catch (err) {
+          alert('Errore durante l\'eliminazione dell\'account: ' + err.message);
+          btnDelAcc.disabled = false;
+          btnDelAcc.textContent = '🗑️ Elimina Account';
+        }
+      }
+    };
   }
 
   // Bind Gateway Config (Admin only)
@@ -3523,6 +3555,18 @@ function openPaymentAndPayoutSettingsModal(currentUser) {
             Annulla
           </button>
         </div>
+
+        ${currentUser.role !== 'admin' ? `
+          <div style="margin-top:20px; padding-top:14px; border-top:1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span style="font-size:12px; font-weight:800; color:#b91c1c; display:block;">Eliminazione Account</span>
+              <span style="font-size:11px; color:var(--text-muted);">Rimuove definitivamente tutti i tuoi dati da BuyYourShare.</span>
+            </div>
+            <button type="button" id="btnModalDeleteAccount" class="btn btn-secondary btn-sm" style="color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; font-size:11.5px; font-weight:800;">
+              🗑️ Elimina Account
+            </button>
+          </div>
+        ` : ''}
       </form>
     </div>
   `;
@@ -3532,6 +3576,27 @@ function openPaymentAndPayoutSettingsModal(currentUser) {
 
   const cancelBtn = modal.querySelector('#btnCancelUnifiedSettings');
   if (cancelBtn) cancelBtn.onclick = () => modal.classList.remove('active');
+
+  const btnModalDel = modal.querySelector('#btnModalDeleteAccount');
+  if (btnModalDel) {
+    btnModalDel.onclick = async () => {
+      const confirmDelete = confirm('⚠️ ATTENZIONE: Vuoi davvero eliminare definitivamente il tuo account?\n\n- Tutti i tuoi dati, quote e impostazioni verranno cancellati.\n- Per accedere di nuovo al sito dovrai registrarti nuovamente da zero.');
+      if (confirmDelete) {
+        modal.classList.remove('active');
+        try {
+          await db.deleteAccount(currentUser.id);
+          await authService.logout();
+          db.clearUserData();
+          await db.syncAllFromServer(null);
+          showToast('🗑️ Il tuo account è stato eliminato con successo. Arrivederci!');
+          navigateTo('#home');
+          renderApp();
+        } catch (err) {
+          alert('Errore durante l\'eliminazione dell\'account: ' + err.message);
+        }
+      }
+    };
+  }
 
   const form = modal.querySelector('#formUnifiedPaymentSettings');
   if (form) {
