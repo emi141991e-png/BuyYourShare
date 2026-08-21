@@ -32,6 +32,15 @@ adminRouter.post('/sync-database-clean', async (req, res) => {
       }
       dataRepository.data = cleanDb;
       await dataRepository.save();
+      return res.json({ success: true, message: 'Database sincronizzato con successo', groupsCount: dataRepository.data.groups.length });
+    }
+    return res.status(404).json({ error: 'FILE_NOT_FOUND' });
+  } catch (err) {
+    console.error('[ADMIN SYNC ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+  }
+});
+
 // Endpoint per riassegnare/collegare una membership a un gruppo
 adminRouter.post('/assign-membership', async (req, res) => {
   try {
