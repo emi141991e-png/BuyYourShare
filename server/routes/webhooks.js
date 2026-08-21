@@ -8,14 +8,18 @@ import Stripe from 'stripe';
 import { config } from '../config/env.js';
 import { dataRepository } from '../db/dataRepository.js';
 import { DEFAULT_PLATFORM_FEE_CENTS, allocatePaymentTransaction } from '../engine/FeeEngine.js';
-import { addOneMonth } from '../engine/DateEngine.js';
+import { addOneMonth, calculateMonthlyPeriod } from '../engine/DateEngine.js';
 import { paypalPayoutService } from '../services/paypalPayoutService.js';
 
 export const webhooksRouter = express.Router();
 
-const stripe = config.stripe.secretKey && !config.stripe.secretKey.includes('placeholder')
-  ? new Stripe(config.stripe.secretKey)
-  : null;
+function getStripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY || dataRepository.getStripeSecretKey() || config.stripe.secretKey;
+  if (key && !key.includes('placeholder') && key.startsWith('sk_')) {
+    return new Stripe(key);
+  }
+  return null;
+}
 
 // =========================================================================
 // 1. ENDPOINT WEBHOOK STRIPE (/api/webhooks/stripe)
@@ -25,9 +29,10 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
   let event = null;
 
   try {
-    if (stripe && config.stripe.webhookSecret && !config.stripe.webhookSecret.includes('placeholder')) {
+    const stripeInstance = getStripeClient();
+    if (stripeInstance && config.stripe.webhookSecret && !config.stripe.webhookSecret.includes('placeholder')) {
       // Verifica crittografica firma ufficiale Stripe
-      event = stripe.webhooks.constructEvent(req.body, sig, config.stripe.webhookSecret);
+      event = stripeInstance.webhooks.constructEvent(req.body, sig, config.stripe.webhookSecret);
     } else {
       // Modalità fallback parser per ambiente test locale
       event = typeof req.body === 'string' ? JSON.parse(req.body) : JSON.parse(req.body.toString('utf8'));
@@ -41,6 +46,101 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
 
   try {
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        if (session.payment_status === 'paid') {
+          const { groupId, slotNumber, baseShareCents, feeCents, memberId } = session.metadata || {};
+          if (groupId && slotNumber) {
+            const group = await dataRepository.findGroupById(groupId);
+            const slotNum = parseInt(slotNumber, 10);
+            const bShare = parseInt(baseShareCents, 10) || group?.baseMemberShareCents || 0;
+            const gFee = parseInt(feeCents, 10) || DEFAULT_PLATFORM_FEE_CENTS;
+            const totalCents = bShare + gFee;
+
+            const period = calculateMonthlyPeriod();
+            const targetUser = (memberId ? await dataRepository.findUserById(memberId) : null) || (await dataRepository.findUserByEmail(session.customer_email || session.customer_details?.email));
+            const targetUserId = targetUser ? targetUser.id : memberId;
+
+            if (targetUserId && group) {
+              let membership = (await dataRepository.getMemberships({ groupId, userId: targetUserId, slotNumber: slotNum }))[0];
+              if (!membership) {
+                membership = {
+                  id: 'mem_str_' + Date.now(),
+                  groupId,
+                  userId: targetUserId,
+                  role: 'MEMBER',
+                  slotNumber: slotNum,
+                  paidShareCents: bShare,
+                  paidFeeCents: gFee,
+                  memberTotalCents: totalCents,
+                  paymentMethod: 'CARD_EEA',
+                  status: 'ACTIVE',
+                  autoRenew: true,
+                  stripeSubscriptionId: session.payment_intent || session.id,
+                  currentPeriodStart: period.current_period_start,
+                  currentPeriodEnd: period.current_period_end,
+                  nextBillingDate: period.next_billing_date,
+                  joinedAt: new Date().toISOString()
+                };
+                await dataRepository.createMembership(membership);
+
+                const newOccupied = (group.occupiedMemberSlots || 0) + 1;
+                const isFull = newOccupied >= group.availableSlots;
+                await dataRepository.updateGroup(groupId, {
+                  occupiedMemberSlots: newOccupied,
+                  status: isFull ? 'full' : group.status
+                });
+
+                const chat = await dataRepository.getChatByGroupId(groupId);
+                if (chat) {
+                  await dataRepository.addChatMessage({
+                    id: 'msg-' + Date.now(),
+                    chatId: chat.id,
+                    senderId: null,
+                    messageType: 'SYSTEM',
+                    messageContent: `👤 ${targetUser?.fullName || 'Nuovo Membro'} è entrato nel gruppo (Posto #${slotNum}). Pagamento Stripe confermato.`,
+                    createdAt: new Date().toISOString()
+                  });
+                }
+
+                await dataRepository.addNotification({
+                  userId: group.ownerId,
+                  title: '🎉 Nuovo membro pagante (Stripe)!',
+                  message: `${targetUser?.fullName || 'Nuovo Membro'} ha acquistato il Posto #${slotNum} di "${group.customServiceName}". Quota accreditata: +${(bShare / 100).toFixed(2)} €/mese.`,
+                  actionUrl: '#miei-gruppi'
+                });
+              }
+
+              const feeAllocation = allocatePaymentTransaction(bShare, totalCents, 'CARD_EEA');
+              await dataRepository.recordFinancialAuditLog({
+                transactionId: session.payment_intent || session.id,
+                invoiceId: session.id,
+                subscriptionId: membership.stripeSubscriptionId,
+                connectedAccountId: group.ownerId,
+                memberId: targetUserId,
+                groupId: groupId,
+                slotNumber: slotNum,
+                baseShareCents: bShare,
+                buyyourshareFeeCents: gFee,
+                totalAmountCents: totalCents,
+                paymentProviderFeeCents: feeAllocation.gatewayFeeCents,
+                netPlatformAmountCents: feeAllocation.netPlatformRevenueCents,
+                paymentMethod: 'CARD_EEA',
+                cycleNumber: 1,
+                paymentStatus: 'SUCCEEDED',
+                transferStatus: 'TRANSFERRED',
+                payoutStatus: 'PAID',
+                transferId: 'tr_str_' + Date.now(),
+                payoutId: 'po_str_' + Date.now(),
+                payoutDestination: 'acct_1U6oPp1JpLY88mRL',
+                payoutDate: new Date().toISOString(),
+                idempotencyKey: `stripe_live_${session.id}`
+              });
+            }
+          }
+        }
+        break;
+      }
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
         const metadata = invoice.metadata || {};

@@ -86,57 +86,80 @@ export function renderApp() {
     updateHeader(currentUser);
     updateBottomNav();
 
+    // Rilevamento globale session_id da Stripe Checkout
+    const fullQuery = window.location.search ? window.location.search.substring(1) : (currentRoute.includes('?') ? currentRoute.split('?')[1] : '');
+    const urlParams = new URLSearchParams(fullQuery);
+    const stripeSessionId = urlParams.get('session_id');
+
+    if (stripeSessionId && stripeSessionId.startsWith('cs_') && !window.__processedStripeSessions?.has(stripeSessionId)) {
+      if (!window.__processedStripeSessions) window.__processedStripeSessions = new Set();
+      window.__processedStripeSessions.add(stripeSessionId);
+
+      showToast('⏳ Pagamento completato! Verifica Stripe in corso...');
+      stripeCheckoutService.verifyLiveSession(stripeSessionId)
+        .then(async (res) => {
+          if (res.success) {
+            showToast('🎉 Pagamento confermato! Abbonamento attivato con successo.');
+            if (currentUser) await db.syncAllFromServer(currentUser);
+            navigateTo('#miei-abbonamenti');
+          }
+        })
+        .catch(err => {
+          console.warn('Errore verifica sessione Stripe:', err);
+        });
+    }
+
+    const routePath = (currentRoute || '#home').split('?')[0];
+
     // Rotte pubbliche esplicite di login / registrazione / recupero password
-    if (currentRoute.startsWith('#reset-password')) {
-      const hashParts = currentRoute.split('?');
-      const params = new URLSearchParams(hashParts[1] || window.location.search || '');
-      const email = params.get('email') || '';
-      const token = params.get('token') || params.get('code') || '';
+    if (routePath.startsWith('#reset-password')) {
+      const email = urlParams.get('email') || '';
+      const token = urlParams.get('token') || urlParams.get('code') || '';
       renderAuthLandingView(container, 'reset', email, token);
       return;
     }
-    if (currentRoute === '#login') {
+    if (routePath === '#login') {
       renderAuthLandingView(container, 'login');
       return;
     }
-    if (currentRoute === '#register') {
+    if (routePath === '#register') {
       renderAuthLandingView(container, 'register');
       return;
     }
 
     // Se l'utente non è autenticato, proteggi tutte le aree private
     const protectedRoutes = ['#crea', '#miei-abbonamenti', '#miei-gruppi', '#admin', '#notifiche'];
-    const isChatRoute = currentRoute.startsWith('#chat-');
-    const isProtected = protectedRoutes.includes(currentRoute) || isChatRoute;
+    const isChatRoute = routePath.startsWith('#chat-');
+    const isProtected = protectedRoutes.includes(routePath) || isChatRoute;
 
     if (!isAuth && isProtected) {
       renderAuthLandingView(container, 'login');
       return;
     }
 
-    if (currentRoute === '#home' || currentRoute === '') {
+    if (routePath === '#home' || routePath === '') {
       renderHomeView(container, currentUser);
-    } else if (currentRoute === '#cerca') {
+    } else if (routePath === '#cerca') {
       renderMarketplaceView(container, currentUser);
-    } else if (currentRoute.startsWith('#gruppo-')) {
-      const groupId = currentRoute.replace('#gruppo-', '');
+    } else if (routePath.startsWith('#gruppo-')) {
+      const groupId = routePath.replace('#gruppo-', '');
       renderGroupDetailView(container, groupId, currentUser);
-    } else if (currentRoute === '#crea') {
+    } else if (routePath === '#crea') {
       renderWizardView(container, currentUser);
-    } else if (currentRoute === '#miei-abbonamenti') {
+    } else if (routePath === '#miei-abbonamenti') {
       renderMySubscriptionsView(container, currentUser);
-    } else if (currentRoute === '#miei-gruppi') {
+    } else if (routePath === '#miei-gruppi') {
       renderMyGroupsView(container, currentUser);
-    } else if (currentRoute.startsWith('#chat-')) {
-      const groupId = currentRoute.replace('#chat-', '');
+    } else if (routePath.startsWith('#chat-')) {
+      const groupId = routePath.replace('#chat-', '');
       renderChatView(container, groupId, currentUser);
-    } else if (currentRoute === '#admin') {
+    } else if (routePath === '#admin') {
       if (!currentUser || currentUser.role !== 'admin') {
         renderForbiddenAdminView(container, currentUser);
       } else {
         renderAdminView(container, currentUser);
       }
-    } else if (currentRoute === '#notifiche') {
+    } else if (routePath === '#notifiche') {
       renderNotificationsView(container, currentUser);
     } else {
       renderHomeView(container, currentUser);
