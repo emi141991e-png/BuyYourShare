@@ -605,6 +605,14 @@ class DataRepository {
   async getAdminAuditLogs() {
     return this.data.adminAuditLogs || [];
   }
+
+  getStripeSecretKey() {
+    return process.env.STRIPE_SECRET_KEY || this.data.systemConfig?.stripe?.secretKey || '';
+  }
+
+  getStripePublishableKey() {
+    return process.env.STRIPE_PUBLISHABLE_KEY || this.data.systemConfig?.stripe?.publishableKey || '';
+  }
 }
 
 export const dataRepository = new DataRepository();

@@ -96,6 +96,42 @@ class StripeCheckoutService {
   }
 
   /**
+   * Crea una vera Sessione Stripe Checkout Live (Hosted Page con Apple Pay, Google Pay, Carte)
+   */
+  async createLiveCheckoutSession(groupId, slotNumber) {
+    const token = localStorage.getItem('buyyourshare_session_token');
+    const resp = await fetch('/api/checkout/stripe/create-checkout-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ groupId, slotNumber })
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.message || 'Impossibile avviare il checkout Stripe Live.');
+    }
+    return data;
+  }
+
+  /**
+   * Verifica la Sessione Stripe Checkout completata e sblocca l'accesso
+   */
+  async verifyLiveSession(sessionId) {
+    const token = localStorage.getItem('buyyourshare_session_token');
+    const resp = await fetch('/api/checkout/stripe/verify-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ sessionId })
+    });
+    return await resp.json();
+  }
+
+  /**
    * Esegue la verifica server-side autentica del pagamento chiamando il Backend Server.
    */
   async processTestPayment(sessionData, scenarioType = 'success', paymentMethod = 'CARD_EEA') {

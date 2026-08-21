@@ -1707,6 +1707,30 @@ function renderWizardView(container, currentUser) {
 // 5. I MIEI ABBONAMENTI VIEW (MEMBRO - SOLO DOPO PAGAMENTO VERIFICATO)
 // =========================================================================
 function renderMySubscriptionsView(container, currentUser) {
+  // Controllo automatico ritorno da Stripe Checkout (?session_id=cs_live_...)
+  const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+  const urlParams = new URLSearchParams(window.location.search || hashQuery);
+  const stripeSessionId = urlParams.get('session_id');
+
+  if (stripeSessionId && stripeSessionId.startsWith('cs_') && !window.__processedStripeSessions?.has(stripeSessionId)) {
+    if (!window.__processedStripeSessions) window.__processedStripeSessions = new Set();
+    window.__processedStripeSessions.add(stripeSessionId);
+
+    showToast('⏳ Verifica pagamento Stripe Live in corso...');
+    stripeCheckoutService.verifyLiveSession(stripeSessionId)
+      .then(async (res) => {
+        if (res.success) {
+          showToast('🎉 Pagamento Stripe Live confermato! Abbonamento attivato.');
+          await db.syncAllFromServer(currentUser);
+          navigateTo('#miei-abbonamenti');
+          renderMySubscriptionsView(container, currentUser);
+        }
+      })
+      .catch(err => {
+        console.warn('Errore verifica sessione Stripe:', err);
+      });
+  }
+
   const subscriptions = db.getMySubscriptions(currentUser.id);
   const pendingVerif = window.__pendingPaymentVerification;
   const payoutSettings = db.getUserPayoutSettings(currentUser.id);
@@ -4106,9 +4130,23 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
     });
   }
 
-  modal.querySelector('#stripePaymentForm').onsubmit = (e) => {
+  modal.querySelector('#stripePaymentForm').onsubmit = async (e) => {
     e.preventDefault();
     
+    if (currentMethod === 'CARD_EEA' || currentMethod === 'APPLE_PAY') {
+      try {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '⏳ Connessione a Stripe Checkout Live...';
+        const liveSession = await stripeCheckoutService.createLiveCheckoutSession(sessionData.groupId, sessionData.slotNumber);
+        if (liveSession && liveSession.url) {
+          window.location.href = liveSession.url;
+          return;
+        }
+      } catch (err) {
+        console.warn('Fallback standard:', err.message);
+      }
+    }
+
     let scenarioType = 'success';
     if (currentMethod === 'CARD_EEA') {
       const rawCard = cardNumInput ? cardNumInput.value.replace(/\s/g, '') : '';

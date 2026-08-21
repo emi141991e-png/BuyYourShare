@@ -9,12 +9,12 @@ export const config = {
   port: parseInt(process.env.PORT, 10) || 3000,
   platformFeeCents: parseInt(process.env.PLATFORM_FEE_CENTS, 10) || 149, // 1,49 € LORDA FISSA
   
-  // Stripe Configuration
+  // Stripe Configuration (LIVE Production via Environment Variables & Dynamic Gateway Config)
   stripe: {
-    mode: process.env.STRIPE_MODE || 'test',
-    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder',
-    secretKey: process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder',
-    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || 'whsec_placeholder'
+    mode: process.env.STRIPE_MODE || 'live',
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    secretKey: process.env.STRIPE_SECRET_KEY || '',
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || ''
   },
 
   // PayPal Configuration (LIVE / Production Default)

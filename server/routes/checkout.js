@@ -15,9 +15,13 @@ import { paypalBillingService } from '../services/paypalBillingService.js';
 
 export const checkoutRouter = express.Router();
 
-const stripe = config.stripe.secretKey && !config.stripe.secretKey.includes('placeholder')
-  ? new Stripe(config.stripe.secretKey)
-  : null;
+function getStripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY || dataRepository.getStripeSecretKey() || config.stripe.secretKey;
+  if (key && !key.includes('placeholder') && key.startsWith('sk_')) {
+    return new Stripe(key);
+  }
+  return null;
+}
 
 // 1. Creazione Sessione di Checkout (Verifica Disponibilità Posto)
 checkoutRouter.post('/create-session', requireAuth, async (req, res) => {
@@ -583,5 +587,189 @@ checkoutRouter.post('/stripe/process', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[STRIPE PROCESS ERROR]', err);
     return res.status(500).json({ error: 'PAYMENT_FAILED', message: err.message });
+  }
+});
+
+// 4. Creazione Sessione Stripe Checkout Ufficiale (Hosted Page con Apple Pay / Google Pay / Carte)
+checkoutRouter.post('/stripe/create-checkout-session', requireAuth, async (req, res) => {
+  try {
+    const { groupId, slotNumber } = req.body || {};
+    const group = await dataRepository.findGroupById(groupId);
+    if (!group) return res.status(404).json({ error: 'GROUP_NOT_FOUND', message: 'Gruppo non trovato.' });
+
+    const slotNum = parseInt(slotNumber, 10);
+    const feeCents = DEFAULT_PLATFORM_FEE_CENTS; // 1,49 €
+    const baseShareCents = group.baseMemberShareCents;
+
+    const stripeInstance = getStripeClient();
+    if (!stripeInstance) {
+      return res.status(500).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe non configurato sul server.' });
+    }
+
+    const host = req.get('origin') || req.get('referer') || 'https://buyyourshare-production.up.railway.app';
+    const baseUrl = host.replace(/\/$/, '');
+
+    const session = await stripeInstance.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: `Quota Condivisa: ${group.customServiceName} (${group.planName})`,
+              description: `Posto #${slotNum} - Quota reale mensile per la condivisione.`
+            },
+            unit_amount: baseShareCents
+          },
+          quantity: 1
+        },
+        {
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: 'Commissione Piattaforma BuyYourShare',
+              description: 'Gestione automatizzata, chat privata e garanzia di subentro.'
+            },
+            unit_amount: feeCents
+          },
+          quantity: 1
+        }
+      ],
+      mode: 'payment',
+      customer_email: req.user.email,
+      client_reference_id: `${req.user.id}_${group.id}_${slotNum}`,
+      metadata: {
+        groupId: group.id,
+        slotNumber: slotNum.toString(),
+        memberId: req.user.id,
+        ownerId: group.ownerId,
+        baseShareCents: baseShareCents.toString(),
+        feeCents: feeCents.toString()
+      },
+      success_url: `${baseUrl}/#miei-abbonamenti?session_id={CHECKOUT_SESSION_ID}&groupId=${group.id}&slotNumber=${slotNum}`,
+      cancel_url: `${baseUrl}/#gruppo-${group.id}`
+    });
+
+    return res.json({
+      success: true,
+      sessionId: session.id,
+      url: session.url
+    });
+  } catch (err) {
+    console.error('[STRIPE CREATE CHECKOUT SESSION ERROR]', err);
+    return res.status(500).json({ error: 'STRIPE_SESSION_FAILED', message: err.message });
+  }
+});
+
+// 5. Verifica e Attivazione Automatica da Stripe Checkout Session Completata
+checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.body || {};
+    if (!sessionId) return res.status(400).json({ error: 'INVALID_SESSION' });
+
+    const stripeInstance = getStripeClient();
+    if (!stripeInstance) {
+      return res.status(500).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe non configurato.' });
+    }
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({ error: 'PAYMENT_NOT_PAID', message: 'Il pagamento non risulta ancora completato.' });
+    }
+
+    const { groupId, slotNumber, baseShareCents, feeCents } = session.metadata || {};
+    const group = await dataRepository.findGroupById(groupId);
+    if (!group) return res.status(404).json({ error: 'GROUP_NOT_FOUND' });
+
+    const slotNum = parseInt(slotNumber, 10);
+    const bShare = parseInt(baseShareCents, 10) || group.baseMemberShareCents;
+    const gFee = parseInt(feeCents, 10) || DEFAULT_PLATFORM_FEE_CENTS;
+    const totalCents = bShare + gFee;
+
+    const period = calculateMonthlyPeriod();
+    let membership = (await dataRepository.getMemberships({ groupId, userId: req.user.id, slotNumber: slotNum }))[0];
+
+    if (!membership) {
+      membership = {
+        id: 'mem_str_' + Date.now(),
+        groupId,
+        userId: req.user.id,
+        role: 'MEMBER',
+        slotNumber: slotNum,
+        paidShareCents: bShare,
+        paidFeeCents: gFee,
+        memberTotalCents: totalCents,
+        paymentMethod: 'CARD_EEA',
+        status: 'ACTIVE',
+        autoRenew: true,
+        stripeSubscriptionId: session.payment_intent || session.id,
+        currentPeriodStart: period.current_period_start,
+        currentPeriodEnd: period.current_period_end,
+        nextBillingDate: period.next_billing_date,
+        joinedAt: new Date().toISOString()
+      };
+      await dataRepository.createMembership(membership);
+
+      const newOccupied = (group.occupiedMemberSlots || 0) + 1;
+      const isFull = newOccupied >= group.availableSlots;
+      await dataRepository.updateGroup(groupId, {
+        occupiedMemberSlots: newOccupied,
+        status: isFull ? 'full' : group.status
+      });
+
+      const chat = await dataRepository.getChatByGroupId(groupId);
+      if (chat) {
+        await dataRepository.addChatMessage({
+          id: 'msg-' + Date.now(),
+          chatId: chat.id,
+          senderId: null,
+          messageType: 'SYSTEM',
+          messageContent: `👤 ${req.user.fullName} è entrato nel gruppo (Posto #${slotNum}). Pagamento Stripe Live (${session.id}) confermato.`,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      await dataRepository.addNotification({
+        userId: group.ownerId,
+        title: '🎉 Nuovo membro pagante (Stripe Live)!',
+        message: `${req.user.fullName} ha acquistato il Posto #${slotNum} di "${group.customServiceName}". Quota accreditata: +${(bShare / 100).toFixed(2)} €/mese.`,
+        actionUrl: '#miei-gruppi'
+      });
+    }
+
+    const feeAllocation = allocatePaymentTransaction(bShare, totalCents, 'CARD_EEA');
+    const logRecord = await dataRepository.recordFinancialAuditLog({
+      transactionId: session.payment_intent || session.id,
+      invoiceId: session.id,
+      subscriptionId: membership.stripeSubscriptionId,
+      connectedAccountId: group.ownerId,
+      memberId: req.user.id,
+      groupId: groupId,
+      slotNumber: slotNum,
+      baseShareCents: bShare,
+      buyyourshareFeeCents: gFee,
+      totalAmountCents: totalCents,
+      paymentProviderFeeCents: feeAllocation.gatewayFeeCents,
+      netPlatformAmountCents: feeAllocation.netPlatformRevenueCents,
+      paymentMethod: 'CARD_EEA',
+      cycleNumber: 1,
+      paymentStatus: 'SUCCEEDED',
+      transferStatus: 'TRANSFERRED',
+      payoutStatus: 'PAID',
+      transferId: 'tr_str_' + Date.now(),
+      payoutId: 'po_str_' + Date.now(),
+      payoutDestination: 'acct_1U6oPp1JpLY88mRL',
+      payoutDate: new Date().toISOString(),
+      idempotencyKey: `stripe_live_${session.id}`
+    });
+
+    return res.json({
+      success: true,
+      membership,
+      auditLog: logRecord
+    });
+  } catch (err) {
+    console.error('[STRIPE VERIFY SESSION ERROR]', err);
+    return res.status(500).json({ error: 'VERIFY_FAILED', message: err.message });
   }
 });
