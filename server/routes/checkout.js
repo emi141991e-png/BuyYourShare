@@ -16,7 +16,9 @@ import { paypalBillingService } from '../services/paypalBillingService.js';
 export const checkoutRouter = express.Router();
 
 function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY || dataRepository.getStripeSecretKey() || config.stripe.secretKey;
+  const dbKey = dataRepository.getStripeSecretKey();
+  const envKey = process.env.STRIPE_SECRET_KEY;
+  const key = (dbKey && dbKey.startsWith('sk_live_')) ? dbKey : (envKey || dbKey || config.stripe.secretKey);
   if (key && !key.includes('placeholder') && key.startsWith('sk_')) {
     return new Stripe(key);
   }
