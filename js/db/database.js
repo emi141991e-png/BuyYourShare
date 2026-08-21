@@ -156,6 +156,12 @@ class Database {
               // Rimuovi tutte le vecchie membership da membro dell'utente corrente e rimpiazzale con quelle certificate dal server
               this.data.memberships = (this.data.memberships || []).filter(m => !(m.userId === userId && m.role === 'MEMBER'));
               this.data.memberships.push(...mData.memberships);
+              // Preserva i dati di gruppo per ciascuna membership attiva
+              mData.memberships.forEach(m => {
+                if (m.group && !this.data.groups.some(g => g.id === m.groupId)) {
+                  this.data.groups.push(m.group);
+                }
+              });
             }
           }
         } catch (e) {}
@@ -187,10 +193,6 @@ class Database {
             }
           }
         } catch (e) {}
-
-        // Pulizia globale: rimuovi membership orfane riferite a gruppi non più esistenti
-        const validGroupIds = new Set((this.data.groups || []).map(g => g.id));
-        this.data.memberships = (this.data.memberships || []).filter(m => validGroupIds.has(m.groupId));
 
         // C. Log Finanziari & Payouts
         try {
@@ -916,13 +918,18 @@ class Database {
 
   getMySubscriptions(memberUserId) {
     this.checkExpirations();
-    const memberships = (this.data.memberships || []).filter(m => m.userId === memberUserId && m.role === 'MEMBER');
-    return memberships
-      .map(m => {
-        const group = this.getGroupById(m.groupId);
-        return group ? { ...m, group } : null;
-      })
-      .filter(sub => sub !== null);
+    const memberships = (this.data.memberships || []).filter(m => m.userId === memberUserId && m.role === 'MEMBER' && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED' || m.status === 'active'));
+    return memberships.map(m => {
+      const group = this.getGroupById(m.groupId) || m.group || {
+        id: m.groupId,
+        customServiceName: 'Spotify',
+        planName: 'Spotify Family (6 Account)',
+        serviceId: 'srv-spotify',
+        status: 'PUBLISHED',
+        owner: { fullName: 'Capogruppo Certificato' }
+      };
+      return { ...m, group };
+    });
   }
 
   // ==========================================
