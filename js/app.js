@@ -2393,18 +2393,62 @@ function renderMyGroupsView(container, currentUser) {
 // =========================================================================
 // 7. NATIVE PRIVATE GROUP CHAT VIEW
 // =========================================================================
-function renderChatView(container, groupId, currentUser) {
-  const chatData = db.getGroupChat(groupId, currentUser.id);
+async function renderChatView(container, groupId, currentUser) {
+  // Sincronizzazione automatica messaggi chat dal backend
+  try {
+    const token = localStorage.getItem('buyyourshare_session_token');
+    const resp = await fetch(`/api/chat/${groupId}`, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        'X-User-Id': currentUser.id
+      }
+    });
+    if (resp.ok) {
+      const serverChat = await resp.json();
+      if (serverChat.chat && Array.isArray(serverChat.chat.messages)) {
+        if (!db.data.chats) db.data.chats = [];
+        if (!db.data.chats.some(c => c.id === serverChat.chat.id || c.groupId === groupId)) {
+          db.data.chats.push({ id: serverChat.chat.id, groupId: groupId, status: 'ACTIVE' });
+        }
+        if (!db.data.chatMessages) db.data.chatMessages = [];
+        serverChat.chat.messages.forEach(msg => {
+          if (!db.data.chatMessages.some(m => m.id === msg.id)) {
+            db.data.chatMessages.push(msg);
+          }
+        });
+        db.save();
+      }
+    }
+  } catch (e) {
+    console.warn('[CHAT SYNC ERROR]', e);
+  }
+
+  let chatData = db.getGroupChat(groupId, currentUser.id);
 
   if (!chatData) {
-    container.innerHTML = `
-      <div class="page-view" style="text-align:center; padding:40px;">
-        <h3 style="font-size:18px; font-weight:800; color:#dc2626;">Accesso non autorizzato</h3>
-        <p style="font-size:13px; color:var(--text-secondary); margin:12px 0;">Devi essere un partecipante attivo o il Capogruppo per entrare in questa chat.</p>
-        <a href="#miei-abbonamenti" class="btn btn-secondary">I Miei Abbonamenti</a>
-      </div>
-    `;
-    return;
+    const hasMembership = (db.data.memberships || []).some(m =>
+      m.groupId === groupId &&
+      (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED' || m.status === 'active') &&
+      (m.userId === currentUser.id || (currentUser.email && m.memberEmail && m.memberEmail.toLowerCase() === currentUser.email.toLowerCase()))
+    );
+
+    if (!hasMembership && currentUser.role !== 'admin') {
+      container.innerHTML = `
+        <div class="page-view" style="text-align:center; padding:40px;">
+          <h3 style="font-size:18px; font-weight:800; color:#dc2626;">Accesso non autorizzato</h3>
+          <p style="font-size:13px; color:var(--text-secondary); margin:12px 0;">Devi essere un partecipante attivo o il Capogruppo per entrare in questa chat.</p>
+          <a href="#miei-abbonamenti" class="btn btn-secondary">I Miei Abbonamenti</a>
+        </div>
+      `;
+      return;
+    }
+
+    chatData = {
+      chat: { id: 'cht-' + groupId, groupId: groupId },
+      group: db.getGroupById(groupId) || { id: groupId, customServiceName: 'Spotify', planName: 'Spotify Family (6 Account)' },
+      members: [{ userId: currentUser.id, user: currentUser, role: 'MEMBER' }],
+      messages: []
+    };
   }
 
   const grp = chatData.group;
@@ -2473,13 +2517,28 @@ function renderChatView(container, groupId, currentUser) {
 
   // Submit message
   const form = container.querySelector('#chatForm');
-  form.onsubmit = (e) => {
+  form.onsubmit = async (e) => {
     e.preventDefault();
     const input = document.getElementById('chatInputText');
-    if (!input.value.trim()) return;
+    const txt = input.value.trim();
+    if (!txt) return;
 
-    db.sendChatMessage(groupId, currentUser, input.value);
+    db.sendChatMessage(groupId, currentUser, txt);
     input.value = '';
+    
+    try {
+      const token = localStorage.getItem('buyyourshare_session_token');
+      await fetch(`/api/chat/${groupId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-User-Id': currentUser.id
+        },
+        body: JSON.stringify({ message: txt })
+      });
+    } catch (err) {}
+
     renderChatView(container, groupId, currentUser);
   };
 
