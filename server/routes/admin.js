@@ -4,14 +4,42 @@
  */
 
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { dataRepository } from '../db/dataRepository.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getGroupSlotsBreakdown } from '../engine/MoneyEngine.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const adminRouter = express.Router();
 
 // 🔒 BLOCCO DI SICUREZZA SERVER-SIDE: Tutti gli endpoint richiedono autenticazione e ruolo 'admin'
 adminRouter.use(requireAuth, requireRole('admin'));
+
+// Endpoint di Manutenzione: Sincronizza lo stato del database pulito sul Volume Persistente
+adminRouter.post('/sync-database-clean', async (req, res) => {
+  try {
+    const bundledDbPath = path.join(__dirname, '..', 'data', 'database.json');
+    if (fs.existsSync(bundledDbPath)) {
+      const raw = fs.readFileSync(bundledDbPath, 'utf8');
+      const cleanDb = JSON.parse(raw);
+      // Preserva gateway config se esistente
+      if (dataRepository.data?.systemConfig) {
+        cleanDb.systemConfig = dataRepository.data.systemConfig;
+      }
+      dataRepository.data = cleanDb;
+      await dataRepository.save();
+      return res.json({ success: true, message: 'Database sincronizzato con successo', groupsCount: dataRepository.data.groups.length });
+    }
+    return res.status(404).json({ error: 'FILE_NOT_FOUND' });
+  } catch (err) {
+    console.error('[ADMIN SYNC ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+  }
+});
 
 // 1. Dashboard KPI e Metriche Globali
 adminRouter.get('/dashboard', async (req, res) => {
