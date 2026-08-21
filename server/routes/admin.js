@@ -19,6 +19,37 @@ export const adminRouter = express.Router();
 // 🔒 BLOCCO DI SICUREZZA SERVER-SIDE: Tutti gli endpoint richiedono autenticazione e ruolo 'admin'
 adminRouter.use(requireAuth, requireRole('admin'));
 
+// Endpoint di Pulizia Totale Produzione: Elimina tutti i gruppi, transazioni, messaggi e utenti di test
+adminRouter.post('/clean-all-data', async (req, res) => {
+  try {
+    dataRepository.data.groups = [];
+    dataRepository.data.accessInstructions = [];
+    dataRepository.data.memberships = [];
+    dataRepository.data.chats = [];
+    dataRepository.data.chatMessages = [];
+    dataRepository.data.connectedAccounts = [];
+    dataRepository.data.financialAuditLogs = [];
+    dataRepository.data.notifications = [];
+    dataRepository.data.sessions = [];
+    dataRepository.data.reports = [];
+    dataRepository.data.users = (dataRepository.data.users || []).filter(u =>
+      u.role === 'admin' ||
+      u.email === 'emi.141991e@gmail.com' ||
+      u.email === 'emi.141991e@libero.it'
+    );
+    await dataRepository.save();
+    return res.json({
+      success: true,
+      message: 'Database di produzione completamente pulito e azzerato con successo.',
+      remainingUsers: dataRepository.data.users.map(u => ({ email: u.email, fullName: u.fullName })),
+      groupsCount: dataRepository.data.groups.length
+    });
+  } catch (err) {
+    console.error('[ADMIN CLEAN ALL DATA ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+  }
+});
+
 // Endpoint di Manutenzione: Sincronizza lo stato del database pulito sul Volume Persistente
 adminRouter.post('/sync-database-clean', async (req, res) => {
   try {
