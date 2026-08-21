@@ -33,12 +33,20 @@ class Database {
     if (!this.data.financialAuditLogs) this.data.financialAuditLogs = [];
 
     // Pulizia rigorosa da vecchi gruppi demo per ID
-    this.data.groups = this.data.groups.filter(g => 
-      g.id !== 'grp-1042' && 
-      g.id !== 'grp-1089' && 
-      g.id !== 'grp-1120' &&
-      g.id !== 'grp-youtube-famiglia'
-    );
+    const purgedClientIds = [
+      'grp-1042', 'grp-1089', 'grp-1120', 'grp-youtube-famiglia',
+      'grp-1787178342100', // Canva Pro
+      'grp-1787177542100', // CapCut Pro
+      'grp-1787176742344', // YouTube Premium demo
+      'grp-1787174165672', // Gemini Advanced demo
+      'grp-1787083131405', 'grp-1787084045714', 'grp-1787085411282',
+      'grp-1787085891636', 'grp-1787086615133', 'grp-1787087909072',
+      'grp-1787072082706', 'grp-1787072412882'
+    ];
+    this.data.groups = this.data.groups.filter(g => !purgedClientIds.includes(g.id));
+    if (this.data.memberships) {
+      this.data.memberships = this.data.memberships.filter(m => !purgedClientIds.includes(m.groupId));
+    }
 
     if (this.data.connectedAccounts) {
       if (!this.data.connectedAccounts.some(c => c.userId === 'usr-owner-1')) {
