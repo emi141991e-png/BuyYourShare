@@ -4020,32 +4020,25 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
         </div>
       </div>
 
-      <form id="stripePaymentForm">
-        <!-- VISTA CARTA -->
-        <div id="methodViewCard">
-          <div class="form-group" style="margin-bottom:12px;">
-            <label class="form-label" style="font-size:12px; font-weight:700;">Numero Carta di Credito / Debito *</label>
-            <input type="text" id="stripeCardNumber" class="form-input" placeholder="4242 •••• •••• 4242" value="" maxlength="19" required style="font-family:var(--font-mono); font-size:13.5px; padding:10px 12px;">
-          </div>
-
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
-            <div>
-              <label class="form-label" style="font-size:12px; font-weight:700;">Scadenza (MM/AA) *</label>
-              <input type="text" id="stripeCardExpiry" class="form-input" placeholder="MM/AA" value="" maxlength="5" required style="font-size:13px; padding:10px;">
-            </div>
-            <div>
-              <label class="form-label" style="font-size:12px; font-weight:700;">CVC / CVV *</label>
-              <input type="password" id="stripeCardCvc" class="form-input" placeholder="•••" value="" maxlength="4" required style="font-size:13px; padding:10px;">
-            </div>
+        <!-- VISTA CARTA & WALLET STRIPE LIVE -->
+        <div id="methodViewCard" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:var(--radius-md); padding:16px; margin-bottom:14px; text-align:center;">
+          <div style="font-size:28px; margin-bottom:6px;">💳 🛡️</div>
+          <h4 style="font-size:14px; font-weight:800; color:var(--text-main); margin-bottom:4px;">Checkout Cifrato Ufficiale Stripe</h4>
+          <p style="font-size:12px; color:var(--text-secondary); line-height:1.4; margin-bottom:10px;">
+            Verrai reindirizzato sui server sicuri di <strong>Stripe</strong> per completare il pagamento reale con <strong>Carta di Credito/Debito, Apple Pay o Google Pay</strong>.
+          </p>
+          <div style="display:flex; justify-content:center; gap:8px; font-size:11.5px; font-weight:700; color:#475569;">
+            <span>💳 Visa</span> • <span>Mastercard</span> • <span>Apple Pay</span> • <span>Google Pay</span>
           </div>
         </div>
 
         <!-- VISTA WALLET (APPLE PAY / GOOGLE PAY) -->
-        <div id="methodViewWallet" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-sm); padding:12px; margin-bottom:12px; text-align:center;">
-          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">
-            📱 <strong>Apple Pay / Google Pay Tokenizer:</strong> Autorizzazione biometrica del pagamento ricorrente mensile di ${formatCents(sessionData.totalAmountCents)}.
+        <div id="methodViewWallet" style="display:none; background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:var(--radius-md); padding:16px; margin-bottom:14px; text-align:center;">
+          <div style="font-size:28px; margin-bottom:6px;">📱 🍏</div>
+          <h4 style="font-size:14px; font-weight:800; color:var(--text-main); margin-bottom:4px;">Apple Pay & Google Pay</h4>
+          <p style="font-size:12px; color:var(--text-secondary); line-height:1.4; margin-bottom:10px;">
+            Autorizza istantaneamente con FaceID / TouchID / Google Wallet tramite la pagina sicura Stripe.
           </p>
-          <span style="font-size:11px; color:#166534; font-weight:700;">🟢 Dispositivo Test Compatibile Riconosciuto</span>
         </div>
 
         <!-- VISTA PAYPAL -->
@@ -4058,23 +4051,10 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
             </div>
           </div>
 
-          <!-- Configurazione Client ID Merchant -->
-          <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:10px;">
-            <label style="font-size:11px; font-weight:800; color:#003087; display:block; margin-bottom:2px;">
-              ⚙️ PayPal Sandbox Client ID:
-            </label>
-            <div style="display:flex; gap:6px;">
-              <input type="text" id="inputPaypalClientId" class="form-input" value="${escapeHtml(localStorage.getItem('paypal_sandbox_client_id') || 'test')}" placeholder="Inserisci Client ID" style="font-size:11px; padding:4px 8px; font-family:var(--font-mono); flex:1;">
-              <button type="button" id="btnApplyPaypalClient" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 10px; font-weight:700;">
-                Salva
-              </button>
-            </div>
-          </div>
-
           <div style="background:white; border:1px solid #cbd5e1; border-radius:var(--radius-sm); padding:10px; margin-bottom:10px; font-size:12px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
               <span>Canale:</span>
-              <strong style="color:#003087;">sandbox.paypal.com</strong>
+              <strong style="color:#003087;">api-m.paypal.com (LIVE)</strong>
             </div>
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
               <span>Tipo Contratto:</span>
@@ -4086,25 +4066,16 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
             </div>
           </div>
 
-          <p style="font-size:11px; color:#15803d; margin-bottom:10px;">
-            🔒 <strong>Abbonamento Automatico:</strong> Cliccando su "Sottoscrivi con PayPal", PayPal creerà un abbonamento ricorrente continuo (I-...) con addebito mensile automatico e payout al Capogruppo ad ogni ciclo.
-          </p>
-
           <!-- Contenitore Ufficiale PayPal Smart Buttons -->
           <div id="paypal-smart-button-container" style="min-height:45px; margin-top:8px;"></div>
         </div>
 
-        <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label" style="font-size:12px;">Email di Ricevuta</label>
-          <input type="email" id="stripeCardEmail" class="form-input" value="${escapeHtml(sessionData.memberEmail || currentUser.email)}" style="font-size:13px;">
-        </div>
-
         <button type="submit" id="btnSubmitStripePay" class="btn btn-accent btn-block" style="padding:14px; font-size:15px; font-weight:800;">
-          💳 PAGA E ATTIVA SUBITO (${formatCents(sessionData.totalAmountCents)} / Mese)
+          🚀 PROCEDI AL PAGAMENTO SU STRIPE (${formatCents(sessionData.totalAmountCents)} / Mese)
         </button>
         
         <p style="font-size:11px; text-align:center; color:var(--text-muted); margin-top:8px;">
-          🔒 PayPal Subscriptions & Stripe Test Mode • Quota Capogruppo 3,50 € • Fee BYS 1,49 €
+          🔒 Pagamento protetto con crittografia bancaria 256-bit SSL • Stripe Live
         </p>
       </form>
     </div>
@@ -4126,19 +4097,10 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
     ppContainer.innerHTML = '<div style="padding:12px; text-align:center; font-size:12px; color:#003087;">⏳ Connessione a PayPal Billing Plans (P-...)...</div>';
 
     try {
-      // 1. Recupero o creazione del Plan ID reale (P-...) e Client ID dal server
       const planInfo = await stripeCheckoutService.getPayPalPlan(sessionData.groupName, sessionData.totalAmountCents);
       const realPlanId = planInfo.planId;
-      const serverClientId = planInfo.clientId || localStorage.getItem('paypal_sandbox_client_id') || 'test';
-      console.log('[PAYPAL SUBSCRIPTION] Plan ID ottenuto:', realPlanId, '- Client ID:', serverClientId);
+      const serverClientId = planInfo.clientId || 'BAAu5f2XUw-mi7ImM-1A2xDd5p8YtQ8DFV87ZlZ4h94Rp8sAENiJE0ZS9c9bim2jcPYet2almUliiEoaDE';
 
-      // Aggiorna input nel modal se presente
-      const inputClient = modal.querySelector('#inputPaypalClientId');
-      if (inputClient && serverClientId && serverClientId !== 'test') {
-        inputClient.value = serverClientId;
-      }
-
-      // 2. Caricamento SDK con vault=true & intent=subscription usando il Client ID reale del server
       const paypal = await loadPayPalSdk(serverClientId, true);
       ppContainer.innerHTML = '';
 
@@ -4151,7 +4113,6 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
             label: 'subscribe'
           },
           createSubscription: function(data, actions) {
-            console.log('[PAYPAL SDK] Inizio sottoscrizione con Plan ID:', realPlanId);
             return actions.subscription.create({
               plan_id: realPlanId,
               custom_id: JSON.stringify({
@@ -4163,9 +4124,7 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
             });
           },
           onApprove: function(data, actions) {
-            console.log('[PAYPAL SUBSCRIPTION APPROVED] Data:', data);
             const realSubscriptionId = data.subscriptionID;
-
             if (!realSubscriptionId || !realSubscriptionId.startsWith('I-')) {
               alert('ID Subscription non valido ricevuto da PayPal: ' + realSubscriptionId);
               return;
@@ -4174,45 +4133,28 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
             modal.classList.remove('active');
             showToast(`⏳ Verifica Subscription ${realSubscriptionId} in corso...`);
 
-            // Attivazione server-side autentica con verifica API PayPal e Payout reale 3,50 €
             stripeCheckoutService.activatePayPalSubscription(realSubscriptionId, sessionData)
               .then(res => {
                 if (res.success) {
                   window.__pendingPaymentVerification = { status: 'success' };
                   navigateTo('#miei-abbonamenti');
                 } else {
-                  console.error('[ACTIVATION ERROR DETAILS]', res);
                   alert('❌ Errore attivazione Subscription PayPal:\n' + (res.error || 'Verifica server-side fallita'));
                 }
               })
               .catch(err => {
-                console.error('[ACTIVATION THROW ERROR]', err);
                 alert('❌ Errore attivazione Subscription: ' + err.message);
               });
           },
           onError: function(err) {
-            console.error('PayPal Subscription Buttons Error:', err);
-            alert('Errore PayPal Subscription: ' + (err.message || 'Autorizzazione ricorrente non concessa'));
+            alert('Errore PayPal Subscription: ' + (err.message || 'Autorizzazione non concessa'));
           }
         }).render(ppContainer);
       }
     } catch (err) {
-      console.error('Errore inizializzazione PayPal Subscription:', err);
       ppContainer.innerHTML = `<div style="color:#dc2626; font-size:12px; padding:8px;">Errore: ${escapeHtml(err.message)}</div>`;
     }
   };
-
-  // Handler salvataggio Client ID personalizzato
-  const btnApplyClient = modal.querySelector('#btnApplyPaypalClient');
-  if (btnApplyClient) {
-    btnApplyClient.addEventListener('click', () => {
-      const input = modal.querySelector('#inputPaypalClientId');
-      const val = input ? input.value.trim() : 'test';
-      localStorage.setItem('paypal_sandbox_client_id', val || 'test');
-      showToast('Client ID PayPal salvato! Ricaricamento SDK...');
-      mountPayPalSdkAndButtons();
-    });
-  }
 
   methodBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -4232,42 +4174,12 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
 
       if (currentMethod === 'PAYPAL_EEA') {
         mountPayPalSdkAndButtons();
-      } else if (currentMethod === 'APPLE_PAY') {
-        submitBtn.style.display = 'block';
-        submitBtn.innerHTML = `📱 PAGA CON WALLET (${formatCents(sessionData.totalAmountCents)} / Mese)`;
-        submitBtn.style.background = '#000000';
       } else {
         submitBtn.style.display = 'block';
-        submitBtn.innerHTML = `💳 PAGA E ATTIVA SUBITO (${formatCents(sessionData.totalAmountCents)} / Mese)`;
-        submitBtn.style.background = 'var(--accent)';
+        submitBtn.innerHTML = `🚀 PROCEDI AL PAGAMENTO SU STRIPE (${formatCents(sessionData.totalAmountCents)} / Mese)`;
       }
     });
   });
-
-  const cardNumInput = modal.querySelector('#stripeCardNumber');
-  const cardExpInput = modal.querySelector('#stripeCardExpiry');
-
-  if (cardNumInput) {
-    cardNumInput.addEventListener('input', (e) => {
-      let v = e.target.value.replace(/\D/g, '').substring(0, 16);
-      let parts = [];
-      for (let i = 0; i < v.length; i += 4) {
-        parts.push(v.substring(i, i + 4));
-      }
-      e.target.value = parts.join(' ');
-    });
-  }
-
-  if (cardExpInput) {
-    cardExpInput.addEventListener('input', (e) => {
-      let v = e.target.value.replace(/\D/g, '').substring(0, 4);
-      if (v.length >= 2) {
-        e.target.value = v.substring(0, 2) + '/' + v.substring(2);
-      } else {
-        e.target.value = v;
-      }
-    });
-  }
 
   modal.querySelector('#stripePaymentForm').onsubmit = async (e) => {
     e.preventDefault();
@@ -4275,36 +4187,22 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
     if (currentMethod === 'CARD_EEA' || currentMethod === 'APPLE_PAY') {
       try {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '⏳ Connessione a Stripe Checkout Live...';
+        submitBtn.innerHTML = '⏳ Apertura Stripe Checkout Live...';
         const liveSession = await stripeCheckoutService.createLiveCheckoutSession(sessionData.groupId, sessionData.slotNumber);
         if (liveSession && liveSession.url) {
           window.location.href = liveSession.url;
           return;
+        } else {
+          alert('Impossibile aprire il checkout Stripe. Riprova tra poco.');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `🚀 PROCEDI AL PAGAMENTO SU STRIPE (${formatCents(sessionData.totalAmountCents)} / Mese)`;
         }
       } catch (err) {
-        console.warn('Fallback standard:', err.message);
+        alert('Errore Stripe: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `🚀 PROCEDI AL PAGAMENTO SU STRIPE (${formatCents(sessionData.totalAmountCents)} / Mese)`;
       }
     }
-
-    let scenarioType = 'success';
-    if (currentMethod === 'CARD_EEA') {
-      const rawCard = cardNumInput ? cardNumInput.value.replace(/\s/g, '') : '';
-      scenarioType = (rawCard.endsWith('0002') || rawCard.endsWith('4002')) ? 'decline' : 'success';
-    }
-
-    modal.classList.remove('active');
-    
-    // Imposta lo stato di verifica in corso e naviga alla dashboard
-    window.__pendingPaymentVerification = {
-      status: 'verifying',
-      sessionData: { ...sessionData, paymentMethod: currentMethod },
-      cardType: scenarioType,
-      paymentMethod: currentMethod,
-      inFlight: false,
-      timestamp: Date.now()
-    };
-    
-    navigateTo('#miei-abbonamenti');
   };
 
   modal.onclick = (e) => {
