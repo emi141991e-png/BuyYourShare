@@ -4353,10 +4353,70 @@ function escapeHtml(str) {
 }
 
 // =========================================================================
+// SESSION INACTIVITY WATCHDOG (15 MINUTI AUTO-LOGOUT)
+// =========================================================================
+let isLoggingOutDueToTimeout = false;
+
+export async function handleSessionInactivityTimeout() {
+  if (isLoggingOutDueToTimeout) return;
+  isLoggingOutDueToTimeout = true;
+  try {
+    await authService.logout();
+    db.clearUserData();
+    await db.syncAllFromServer(null);
+    showToast('⚠️ Sessione scaduta per inattività (15 minuti). Effettua nuovamente l\'accesso.');
+    navigateTo('#login');
+    renderApp();
+  } finally {
+    setTimeout(() => { isLoggingOutDueToTimeout = false; }, 2000);
+  }
+}
+
+function setupInactivityWatchdog() {
+  const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click', 'input', 'wheel'];
+  
+  const onUserInteraction = () => {
+    if (authService.isSessionTimedOut()) {
+      handleSessionInactivityTimeout();
+    } else {
+      authService.recordActivity();
+    }
+  };
+
+  activityEvents.forEach(evt => {
+    window.addEventListener(evt, onUserInteraction, { passive: true });
+  });
+
+  // Heartbeat di verifica timeout ogni 5 secondi
+  setInterval(() => {
+    if (authService.isSessionTimedOut()) {
+      handleSessionInactivityTimeout();
+    }
+  }, 5000);
+
+  // Controllo immediato quando l'utente torna sulla scheda o sblocca lo schermo
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      if (authService.isSessionTimedOut()) {
+        handleSessionInactivityTimeout();
+      }
+    }
+  });
+
+  window.addEventListener('focus', () => {
+    if (authService.isSessionTimedOut()) {
+      handleSessionInactivityTimeout();
+    }
+  });
+}
+
+// =========================================================================
 // INITIALIZATION
 // =========================================================================
 async function init() {
   try {
+    setupInactivityWatchdog();
+
     const btnConfigHeader = document.getElementById('btnOpenGatewayConfigHeader');
     if (btnConfigHeader) {
       btnConfigHeader.onclick = () => openGatewayConfigModal();

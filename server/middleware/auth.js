@@ -42,15 +42,24 @@ export async function authenticate(req, res, next) {
       }
     }
 
-    // 3. Verifica sessione standard nel repository
+    // 3. Verifica sessione standard nel repository con timeout di inattività a 15 minuti (900.000 ms)
     let session = await dataRepository.findSession(token);
     if (session) {
-      if (new Date(session.expiresAt) < new Date()) {
+      const now = Date.now();
+      const lastActive = session.lastActivityAt ? new Date(session.lastActivityAt).getTime() : new Date(session.createdAt).getTime();
+      const isInactive = (now - lastActive) > (15 * 60 * 1000);
+
+      if (isInactive || new Date(session.expiresAt) < new Date(now)) {
         await dataRepository.deleteSession(token);
         req.user = null;
         req.session = null;
         return next();
       }
+
+      // Rinnova il timestamp di ultima attività e la scadenza (+15 min)
+      session.lastActivityAt = new Date(now).toISOString();
+      session.expiresAt = new Date(now + 15 * 60 * 1000).toISOString();
+
       const user = await dataRepository.findUserById(session.userId);
       if (user && !user.isSuspended) {
         req.user = user;

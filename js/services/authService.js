@@ -10,20 +10,68 @@ const SESSION_TOKEN_KEY = 'buyyourshare_session_token';
 const SESSION_USER_ID_KEY = 'buyyourshare_current_user_id';
 const CACHED_EMAIL_KEY = 'buyyourshare_cached_email';
 const CACHED_NAME_KEY = 'buyyourshare_cached_name';
+const LAST_ACTIVITY_KEY = 'buyyourshare_last_activity_ts';
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minuti di inattività (900.000 ms)
 
 class AuthService {
   constructor() {
     this.sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     this.currentUserId = localStorage.getItem(SESSION_USER_ID_KEY);
+    this._lastThrottledActivity = 0;
   }
 
   /**
-   * Verifica se l'utente attuale è autenticato con una sessione valida.
+   * Registra attività dell'utente aggiornando il timestamp (throttled a 5s)
+   */
+  recordActivity() {
+    const now = Date.now();
+    if (now - this._lastThrottledActivity > 5000) {
+      this._lastThrottledActivity = now;
+      if (this.sessionToken || localStorage.getItem(SESSION_TOKEN_KEY)) {
+        localStorage.setItem(LAST_ACTIVITY_KEY, now.toString());
+      }
+    }
+  }
+
+  /**
+   * Restituisce il timestamp dell'ultima interazione
+   */
+  getLastActivity() {
+    const raw = localStorage.getItem(LAST_ACTIVITY_KEY);
+    return raw ? parseInt(raw, 10) : 0;
+  }
+
+  /**
+   * Verifica se la sessione è scaduta per inattività (> 15 minuti senza interazioni)
+   */
+  isSessionTimedOut() {
+    const token = this.sessionToken || localStorage.getItem(SESSION_TOKEN_KEY);
+    const uid = this.currentUserId || localStorage.getItem(SESSION_USER_ID_KEY);
+    if (!token || !uid) return false;
+
+    const lastActivity = this.getLastActivity();
+    if (!lastActivity) {
+      // Se manca il timestamp di inizio attività su utente loggato, inizializzalo adesso
+      this.recordActivity();
+      return false;
+    }
+
+    const elapsed = Date.now() - lastActivity;
+    return elapsed > INACTIVITY_TIMEOUT_MS;
+  }
+
+  /**
+   * Verifica se l'utente attuale è autenticato con una sessione valida e non scaduta.
    */
   isAuthenticated() {
     this.sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     this.currentUserId = localStorage.getItem(SESSION_USER_ID_KEY);
     if (!this.sessionToken || !this.currentUserId) return false;
+
+    // Controllo rigoroso timeout inattività a 15 minuti per qualunque profilo
+    if (this.isSessionTimedOut()) {
+      return false;
+    }
 
     let user = db.data.users.find(u => u.id === this.currentUserId);
     if (!user) {
@@ -92,6 +140,7 @@ class AuthService {
       localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
       localStorage.setItem(CACHED_EMAIL_KEY, data.user.email);
       localStorage.setItem(CACHED_NAME_KEY, data.user.fullName);
+      localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
 
       // Aggiorna cache locale db
       let localUser = db.data.users.find(u => u.id === data.user.id || u.email.toLowerCase() === cleanEmail);
@@ -129,6 +178,7 @@ class AuthService {
         localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
         localStorage.setItem(CACHED_EMAIL_KEY, user.email);
         localStorage.setItem(CACHED_NAME_KEY, user.fullName);
+        localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
         return user;
       }
       throw err;
@@ -167,6 +217,7 @@ class AuthService {
     localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
     localStorage.setItem(CACHED_EMAIL_KEY, resData.user.email);
     localStorage.setItem(CACHED_NAME_KEY, resData.user.fullName);
+    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
 
     // Salva nel db client per render immediato
     let localUser = db.data.users.find(u => u.id === resData.user.id || u.email.toLowerCase() === resData.user.email.toLowerCase());
@@ -284,6 +335,7 @@ class AuthService {
     localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
     localStorage.setItem(CACHED_EMAIL_KEY, data.user.email);
     localStorage.setItem(CACHED_NAME_KEY, data.user.fullName);
+    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
 
     let localUser = db.data.users.find(u => u.id === data.user.id || u.email.toLowerCase() === cleanEmail);
     if (!localUser) {
@@ -316,6 +368,7 @@ class AuthService {
     localStorage.removeItem(SESSION_USER_ID_KEY);
     localStorage.removeItem(CACHED_EMAIL_KEY);
     localStorage.removeItem(CACHED_NAME_KEY);
+    localStorage.removeItem(LAST_ACTIVITY_KEY);
   }
 }
 

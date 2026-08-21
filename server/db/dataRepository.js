@@ -178,11 +178,13 @@ class DataRepository {
 
   async createSession(userId) {
     const token = 'bys_token_' + Date.now() + '_' + Math.random().toString(36).substring(2, 12);
+    const now = Date.now();
     const session = {
       token,
       userId,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 giorni
+      createdAt: new Date(now).toISOString(),
+      lastActivityAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 15 * 60 * 1000).toISOString() // 15 minuti di inattività per qualunque profilo
     };
     this.data.sessions.push(session);
     await this.save();
