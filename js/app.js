@@ -3220,65 +3220,42 @@ async function openAccessModal(groupId, currentUser) {
     <div class="modal-content">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title">🎉 IL TUO ACCESSO È PRONTO</h2>
+          <h2 class="modal-title">🎉 IL TUO ACCESSO AL SERVIZIO</h2>
           <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(group.customServiceName)} - ${escapeHtml(group.planName)}</p>
         </div>
         <button class="btn-close" onclick="document.getElementById('accessModalOverlay').classList.remove('active')">&times;</button>
       </div>
 
       <div class="access-display-box">
-        <label class="form-label">🔗 LINK DI ACCESSO / INVITO:</label>
+        <label class="form-label">🔗 LINK DI ACCESSO / INVITO UFFICIALE:</label>
         <div class="access-url-row">
           <a href="${escapeHtml(instructions.accessUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="flex:1; font-size:13px;">
-            🚀 APRI LINK SUBITO
+            🚀 APRI LINK DIRETTO
           </a>
           <button class="btn btn-secondary btn-copy-url" data-url="${escapeHtml(instructions.accessUrl)}" style="font-size:13px;">
             📋 COPIA
           </button>
         </div>
 
-        ${isSpotify ? `
-          <label class="form-label" style="margin-top:14px;">📧 INDIRIZZO SPOTIFY DEL CAPOGRUPPO:</label>
-          ${instructions.ownerSpotifyAccount && instructions.ownerSpotifyAccount.trim() ? `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#f0fdf4; border:1px solid #86efac; padding:10px 14px; border-radius:var(--radius-md); margin-bottom:12px;">
-              <div>
-                <strong style="font-family:var(--font-mono); font-size:14px; color:#166534;">${escapeHtml(instructions.ownerSpotifyAccount)}</strong>
-                <p style="font-size:11px; color:#15803d; margin-top:2px;">Utilizza questo indirizzo/account per convalidare l'accesso all'abbonamento Spotify Family.</p>
-              </div>
-              <button class="btn btn-secondary btn-sm btn-copy-spotify" data-email="${escapeHtml(instructions.ownerSpotifyAccount)}" style="font-size:11.5px; padding:4px 10px; font-weight:700;">
-                COPIA
-              </button>
-            </div>
-          ` : `
-            <div style="background:#fffbeb; border:1px solid #fde68a; padding:10px 14px; border-radius:var(--radius-md); margin-bottom:12px;">
-              <strong style="font-size:12.5px; color:#92400e;">Non ancora inserito dal Capogruppo.</strong>
-              <p style="font-size:11.5px; color:#b45309; margin-top:2px;">Il Capogruppo deve inserire questo dato per completare le istruzioni di accesso.</p>
-            </div>
-          `}
-        ` : ''}
+        <label class="form-label" style="margin-top:16px;">📝 ISTRUZIONI PER L'ATTIVAZIONE:</label>
+        <div class="access-instructions-text" style="background:#f8fafc; border:1px solid var(--border-subtle); padding:12px 14px; border-radius:var(--radius-md); font-size:13px; line-height:1.5; color:var(--text-main);">
+          ${escapeHtml(instructions.instructions || 'Accedi con il tuo account personale per unirti al piano condiviso.')}
+        </div>
 
-        <label class="form-label">📝 ISTRUZIONI PER L'ACCESSO:</label>
-        <div class="access-instructions-text">${escapeHtml(instructions.instructions || 'Nessuna istruzione inserita.')}</div>
-
-        ${instructions.accessCode ? `
-          <label class="form-label">🔢 CODICE DI INVITO:</label>
-          <div style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid var(--border-subtle); padding:10px 14px; border-radius:var(--radius-md); margin-bottom:12px;">
-            <strong style="font-family:var(--font-mono); font-size:16px; color:var(--primary);">${escapeHtml(instructions.accessCode)}</strong>
-            <button class="btn btn-secondary btn-sm btn-copy-code" data-code="${escapeHtml(instructions.accessCode)}">Copia Codice</button>
-          </div>
-        ` : ''}
-
-        ${instructions.additionalInfo ? `
-          <label class="form-label">ℹ️ NOTE AGGIUNTIVE:</label>
+        ${instructions.additionalInfo && instructions.additionalInfo.trim() ? `
+          <label class="form-label" style="margin-top:14px;">ℹ️ NOTE AGGIUNTIVE:</label>
           <p style="font-size:12px; color:var(--text-secondary);">${escapeHtml(instructions.additionalInfo)}</p>
         ` : ''}
 
-        <p style="font-size:11px; color:var(--text-muted); background:#f8fafc; border:1px dashed #cbd5e1; padding:8px 10px; border-radius:var(--radius-sm); margin-top:10px;">
-          💡 Per completare l'accesso al piano, segui la procedura indicata e utilizza le credenziali o i dati forniti dal Capogruppo.
-        </p>
+        <div style="margin-top:16px; padding:14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-md); text-align:center;">
+          <p style="font-size:12px; color:#1e40af; font-weight:700; margin-bottom:8px;">Hai bisogno di assistenza o vuoi coordinarti con il Capogruppo?</p>
+          <button class="btn btn-primary btn-sm btn-open-chat-from-modal" data-group-id="${escapeHtml(group.id)}" style="font-size:12px; padding:8px 16px;">
+            💬 APRI LA CHAT DEL GRUPPO
+          </button>
+        </div>
       </div>
 
-      <button class="btn btn-secondary btn-block" onclick="document.getElementById('accessModalOverlay').classList.remove('active')">
+      <button class="btn btn-secondary btn-block" style="margin-top:12px;" onclick="document.getElementById('accessModalOverlay').classList.remove('active')">
         Chiudi
       </button>
     </div>
@@ -3287,11 +3264,11 @@ async function openAccessModal(groupId, currentUser) {
   modal.querySelectorAll('.btn-copy-url').forEach(b => {
     b.onclick = () => copyToClipboard(b.dataset.url, 'Link copiato!');
   });
-  modal.querySelectorAll('.btn-copy-code').forEach(b => {
-    b.onclick = () => copyToClipboard(b.dataset.code, 'Codice copiato!');
-  });
-  modal.querySelectorAll('.btn-copy-spotify').forEach(b => {
-    b.onclick = () => copyToClipboard(b.dataset.email, 'Indirizzo Spotify copiato!');
+  modal.querySelectorAll('.btn-open-chat-from-modal').forEach(b => {
+    b.onclick = () => {
+      modal.classList.remove('active');
+      navigateTo('#chat-' + b.dataset.groupId);
+    };
   });
 
   modal.onclick = (e) => {

@@ -470,11 +470,12 @@
       "status": "PUBLISHED",
       "isPublished": true,
       "publishedAt": "2026-08-18T16:53:24.876Z",
-      "inviteCode": "BYS-7127",
       "rulesAndRequirements": "Invito ufficiale Spotify Family tramite email.",
       "description": "Gruppo Spotify Family gestito da Marco Rossi con rinnovo puntuale.",
       "createdAt": "2026-08-18T15:19:34.922Z",
-      "updatedAt": "2026-08-19T21:28:29.091Z"
+      "updatedAt": "2026-08-19T21:28:29.091Z",
+      "accessUrl": "https://www.spotify.com/it/family/",
+      "instructions": "Accedi con il tuo account Spotify personale per unirti al gruppo famiglia con rinnovo mensile garantito."
     },
     {
       "id": "grp-1787176742344",
@@ -494,11 +495,12 @@
       "status": "PUBLISHED",
       "isPublished": true,
       "publishedAt": "2026-08-21T13:09:35.594Z",
-      "inviteCode": "BYS-5912",
       "rulesAndRequirements": "Accesso personale e privato con account YouTube.",
       "description": "Gruppo YouTube Premium gestito da Emi 141991e (10,00 € / mese).",
       "createdAt": "2026-08-21T13:09:35.596Z",
-      "updatedAt": "2026-08-21T13:09:35.596Z"
+      "updatedAt": "2026-08-21T13:09:35.596Z",
+      "accessUrl": "https://www.youtube.com/premium",
+      "instructions": "Accedi con il tuo account Google/YouTube per accettare l invito al gruppo famiglia."
     },
     {
       "id": "grp-1787177542100",
@@ -518,11 +520,12 @@
       "status": "PUBLISHED",
       "isPublished": true,
       "publishedAt": "2026-08-21T13:09:35.596Z",
-      "inviteCode": "BYS-9144",
       "rulesAndRequirements": "Accesso personale team di montaggio CapCut Pro.",
       "description": "Gruppo CapCut Pro gestito da Emi 141991e (9,00 € / mese).",
       "createdAt": "2026-08-21T13:09:35.596Z",
-      "updatedAt": "2026-08-21T13:09:35.596Z"
+      "updatedAt": "2026-08-21T13:09:35.596Z",
+      "accessUrl": "https://www.capcut.com",
+      "instructions": "Accedi al tuo profilo CapCut Pro per unirti al team di montaggio condiviso."
     }
   ],
   "memberships": [
@@ -800,10 +803,8 @@
     {
       "id": "acc-1787066374922",
       "groupId": "grp-1787066374922",
-      "accessUrl": "https://spotify.com/family/join/invite/official-marco-rossi",
-      "instructions": "Accedi con il tuo account Spotify personale.",
-      "accessCode": "SPOTIFY-FAMILY-2026",
-      "ownerSpotifyAccount": "marco.rossi.spotify@gmail.com",
+      "accessUrl": "https://www.spotify.com/it/family/",
+      "instructions": "Accedi con il tuo account Spotify personale per unirti al gruppo famiglia con rinnovo mensile garantito.",
       "additionalInfo": "Playlist personali 100% private."
     },
     {
@@ -811,8 +812,6 @@
       "groupId": "grp-1787175324383",
       "accessUrl": "https://youtube.com/invite/test12345",
       "instructions": "Clicca sul link di invito per unirti al gruppo famiglia.",
-      "accessCode": "",
-      "ownerSpotifyAccount": "",
       "additionalInfo": "Musica senza pubblicità inclusa"
     }
   ],
