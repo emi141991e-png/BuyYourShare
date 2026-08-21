@@ -775,6 +775,25 @@
       "memberTotalCents": 300,
       "status": "ACTIVE",
       "joinedAt": "2026-08-21T13:09:35.596Z"
+    },
+    {
+      "id": "mem_str_1787317544403",
+      "groupId": "grp-1787066374922",
+      "userId": "usr-1787318594294",
+      "memberEmail": "caseificioforciniti@libero.it",
+      "role": "MEMBER",
+      "slotNumber": 2,
+      "paidShareCents": 120,
+      "paidFeeCents": 149,
+      "memberTotalCents": 269,
+      "paymentMethod": "CARD_EEA",
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "stripeSubscriptionId": "pi_3U6rmN1JpLY88mRL0jCOeuja",
+      "currentPeriodStart": "2026-08-21T13:26:51.638Z",
+      "currentPeriodEnd": "2026-09-20T13:26:51.650Z",
+      "nextBillingDate": "2026-09-20T13:26:51.650Z",
+      "joinedAt": "2026-08-21T13:26:51.650Z"
     }
   ],
   "accessInstructions": [

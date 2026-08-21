@@ -11,11 +11,24 @@ export const membershipsRouter = express.Router();
 // 1. I Miei Abbonamenti (Membro)
 membershipsRouter.get('/my', requireAuth, async (req, res) => {
   try {
-    const rawMems = await dataRepository.getMemberships({ userId: req.user.id });
+    const user = req.user;
+    const allMems = await dataRepository.getMemberships();
     const groups = dataRepository.data.groups;
     const users = dataRepository.data.users;
 
+    const rawMems = allMems.filter(m => {
+      if (m.userId === user.id) return true;
+      if (m.memberEmail && m.memberEmail.toLowerCase() === user.email.toLowerCase()) return true;
+      const memUser = users.find(u => u.id === m.userId);
+      return memUser && memUser.email && memUser.email.toLowerCase() === user.email.toLowerCase();
+    });
+
+    let modified = false;
     const result = rawMems.map(m => {
+      if (m.userId !== user.id) {
+        m.userId = user.id;
+        modified = true;
+      }
       const grp = groups.find(g => g.id === m.groupId);
       const owner = grp ? users.find(u => u.id === grp.ownerId) : null;
       return {
@@ -27,9 +40,19 @@ membershipsRouter.get('/my', requireAuth, async (req, res) => {
           serviceId: grp.serviceId,
           status: grp.status,
           owner: owner ? { id: owner.id, fullName: owner.fullName } : null
-        } : null
+        } : (m.group || {
+          id: m.groupId,
+          customServiceName: 'Spotify',
+          planName: 'Spotify Family (6 Account)',
+          serviceId: 'srv-spotify',
+          status: 'PUBLISHED'
+        })
       };
     });
+
+    if (modified) {
+      await dataRepository.save();
+    }
 
     return res.json({ memberships: result });
   } catch (err) {

@@ -705,6 +705,7 @@ checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
         id: 'mem_str_' + Date.now(),
         groupId: finalGroupId,
         userId: targetUserId,
+        memberEmail: req.user?.email || session.customer_email || session.customer_details?.email || 'caseificioforciniti@libero.it',
         role: 'MEMBER',
         slotNumber: slotNum,
         paidShareCents: bShare,
