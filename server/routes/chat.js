@@ -69,8 +69,8 @@ chatRouter.post('/:groupId/messages', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Accesso negato.' });
     }
 
-    const { content } = req.body || {};
-    const text = (content || '').trim();
+    const { content, message } = req.body || {};
+    const text = (content || message || '').trim();
     if (!text) {
       return res.status(400).json({ error: 'EMPTY_MESSAGE', message: 'Il messaggio non può essere vuoto.' });
     }
