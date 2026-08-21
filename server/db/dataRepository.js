@@ -225,6 +225,15 @@ class DataRepository {
     return group;
   }
 
+  async deleteGroup(id) {
+    this.data.groups = this.data.groups.filter(g => g.id !== id);
+    this.data.accessInstructions = this.data.accessInstructions.filter(a => a.groupId !== id);
+    this.data.chats = this.data.chats.filter(c => c.groupId !== id);
+    this.data.memberships = this.data.memberships.filter(m => m.groupId !== id);
+    await this.save();
+    return true;
+  }
+
   // ==========================================
   // MEMBERSHIPS
   // ==========================================

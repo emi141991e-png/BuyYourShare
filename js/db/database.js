@@ -610,35 +610,63 @@ class Database {
     return newGroup;
   }
 
-  cancelGroup(groupId, ownerUser) {
+  async cancelGroup(groupId, ownerUser) {
     const group = this.data.groups.find(g => g.id === groupId && g.ownerId === ownerUser.id);
     if (!group) throw new Error('Gruppo non trovato o non autorizzato');
 
-    group.status = 'cancellation_scheduled';
-    group.cancellationScheduledAt = new Date().toISOString();
+    const activeMembers = this.data.memberships.filter(m => 
+      m.groupId === groupId && 
+      m.role === 'MEMBER' && 
+      (m.status === 'ACTIVE' || m.status === 'active')
+    );
 
-    // Notifica ai membri
-    const activeMembers = this.data.memberships.filter(m => m.groupId === groupId && m.role === 'MEMBER');
-    activeMembers.forEach(m => {
-      this.addNotification(
-        m.userId,
-        '⚠️ Chiusura gruppo programmata dal Capogruppo',
-        `Il gruppo "${group.customServiceName}" chiuderà al termine del periodo pagato. Non ci saranno rinnovi futuri.`,
-        'group_cancel',
-        groupId
-      );
-    });
+    // 1. Chiamata API server per cancellare/eliminare il gruppo nel database di produzione
+    try {
+      const token = localStorage.getItem('buyyourshare_session_token');
+      if (token) {
+        await fetch(`/api/groups/${groupId}/cancel`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      }
+    } catch (apiErr) {
+      console.warn('[CANCEL GROUP API ERROR]', apiErr.message);
+    }
 
-    const chat = this.data.chats.find(c => c.groupId === groupId);
-    if (chat) {
-      this.data.chatMessages.push({
-        id: 'msg-' + Date.now(),
-        chatId: chat.id,
-        senderId: null,
-        messageType: 'SYSTEM',
-        messageContent: '⚠️ Il Capogruppo ha programmato la chiusura del gruppo. I membri attivi manterranno l\'accesso fino al termine del proprio periodo già pagato.',
-        createdAt: new Date().toISOString()
+    // 2. Se non ci sono membri paganti, elimina completamente il gruppo per non farlo più apparire
+    if (activeMembers.length === 0) {
+      this.data.groups = this.data.groups.filter(g => g.id !== groupId);
+      this.data.accessInstructions = this.data.accessInstructions.filter(a => a.groupId !== groupId);
+      this.data.chats = this.data.chats.filter(c => c.groupId !== groupId);
+      this.data.memberships = this.data.memberships.filter(m => m.groupId !== groupId);
+    } else {
+      group.status = 'cancellation_scheduled';
+      group.cancellationScheduledAt = new Date().toISOString();
+
+      activeMembers.forEach(m => {
+        this.addNotification(
+          m.userId,
+          '⚠️ Chiusura gruppo programmata dal Capogruppo',
+          `Il gruppo "${group.customServiceName}" chiuderà al termine del periodo pagato. Non ci saranno rinnovi futuri.`,
+          'group_cancel',
+          groupId
+        );
       });
+
+      const chat = this.data.chats.find(c => c.groupId === groupId);
+      if (chat) {
+        this.data.chatMessages.push({
+          id: 'msg-' + Date.now(),
+          chatId: chat.id,
+          senderId: null,
+          messageType: 'SYSTEM',
+          messageContent: '⚠️ Il Capogruppo ha programmato la chiusura del gruppo. I membri attivi manterranno l\'accesso fino al termine del proprio periodo già pagato.',
+          createdAt: new Date().toISOString()
+        });
+      }
     }
 
     this.save();

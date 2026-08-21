@@ -2431,10 +2431,12 @@ function renderMyGroupsView(container, currentUser) {
 
   // Cancel group
   container.querySelectorAll('.btn-cancel-group').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (confirm('Vuoi annullare questo gruppo? Non saranno accettati nuovi membri, ma i partecipanti attivi manterranno l\'accesso fino al termine del loro mese già pagato.')) {
-        db.cancelGroup(btn.dataset.id, currentUser);
-        showToast('Chiusura gruppo programmata.');
+    btn.addEventListener('click', async () => {
+      if (confirm('Vuoi annullare questo gruppo? Non saranno accettati nuovi membri e il gruppo verrà rimosso immediatamente dal Marketplace.')) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Annullamento in corso...';
+        await db.cancelGroup(btn.dataset.id, currentUser);
+        showToast('✅ Gruppo annullato con successo!');
         renderMyGroupsView(container, currentUser);
       }
     });

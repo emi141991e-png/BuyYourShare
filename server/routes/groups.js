@@ -326,6 +326,14 @@ groupsRouter.post('/:id/cancel', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Non puoi modificare questo gruppo.' });
     }
 
+    const memberships = await dataRepository.getMemberships({ groupId: group.id, status: 'ACTIVE' });
+    const payingMembers = memberships.filter(m => m.role === 'MEMBER');
+
+    if (payingMembers.length === 0) {
+      await dataRepository.deleteGroup(group.id);
+      return res.json({ success: true, deleted: true, message: 'Gruppo annullato ed eliminato con successo.' });
+    }
+
     await dataRepository.updateGroup(group.id, {
       status: 'CLOSED',
       isPublished: false,
@@ -333,18 +341,38 @@ groupsRouter.post('/:id/cancel', requireAuth, async (req, res) => {
     });
 
     const chat = await dataRepository.getChatByGroupId(group.id);
-    await dataRepository.addChatMessage({
-      id: 'msg-' + Date.now(),
-      chatId: chat.id,
-      senderId: null,
-      messageType: 'SYSTEM',
-      messageContent: `⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.`,
-      createdAt: new Date().toISOString()
-    });
+    if (chat) {
+      await dataRepository.addChatMessage({
+        id: 'msg-' + Date.now(),
+        chatId: chat.id,
+        senderId: null,
+        messageType: 'SYSTEM',
+        messageContent: `⚠️ Il Capogruppo ha chiuso questo gruppo. Gli accessi rimarranno attivi fino al termine del periodo mensile in corso.`,
+        createdAt: new Date().toISOString()
+      });
+    }
 
-    return res.json({ success: true, message: 'Gruppo chiuso con successo.' });
+    return res.json({ success: true, closed: true, message: 'Gruppo chiuso con successo.' });
   } catch (err) {
     console.error('[CANCEL GROUP ERROR]', err);
+    return res.status(500).json({ error: 'INTERNAL_ERROR' });
+  }
+});
+
+// 7. Eliminazione Immediata Gruppo (DELETE)
+groupsRouter.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const group = await dataRepository.findGroupById(req.params.id);
+    if (!group) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    if (group.ownerId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Non puoi eliminare questo gruppo.' });
+    }
+
+    await dataRepository.deleteGroup(group.id);
+    return res.json({ success: true, message: 'Gruppo eliminato definitivamente.' });
+  } catch (err) {
+    console.error('[DELETE GROUP ERROR]', err);
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
 });
