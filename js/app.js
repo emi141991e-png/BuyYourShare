@@ -1421,18 +1421,6 @@ function renderGroupDetailView(container, groupId, currentUser) {
 function renderWizardView(container, currentUser) {
   const services = db.getServices();
   const feeCents = db.getPlatformFeeCents();
-  const pSet = db.getUserPayoutSettings(currentUser.id) || {};
-
-  if (!wizardState.payoutLegalName) {
-    wizardState.payoutLegalName = pSet.legalName || currentUser.fullName || '';
-  }
-  if (!wizardState.payoutIban && pSet.iban) {
-    wizardState.payoutIban = pSet.iban;
-  }
-  if (!wizardState.payoutBankName && pSet.bankName) {
-    wizardState.payoutBankName = pSet.bankName;
-  }
-
   // Calcolo quote live con MoneySplit
   const realCents = eurosToCents(wizardState.realCostEuros || 0);
   const totalSlots = parseInt(wizardState.totalSlots, 10) || 0;
@@ -1453,35 +1441,20 @@ function renderWizardView(container, currentUser) {
         </div>
 
         <h1 class="wizard-title">Crea il tuo gruppo di condivisione</h1>
-        <p class="wizard-desc">Inserisci i dati reali del tuo abbonamento e il tuo IBAN per ricevere le quote mensili dai membri.</p>
+        <p class="wizard-desc">Inserisci i dati del tuo abbonamento. Per ricevere le quote, collega il tuo conto tramite la procedura sicura Stripe.</p>
 
         <form id="createGroupForm">
           
-          <!-- SEZIONE 1: Dati per Ricevere le Quote (IBAN Capogruppo) -->
+          <!-- SEZIONE 1: Stripe Connect -->
           <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:var(--radius-lg); padding:16px; margin-bottom:20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <h3 style="font-size:15px; font-weight:800; color:var(--text-main); margin:0;">🏦 1. Dati per Ricevere le Quote (IBAN) *</h3>
+              <h3 style="font-size:15px; font-weight:800; color:var(--text-main); margin:0;">🏦 1. Ricezione quote con Stripe *</h3>
               <span style="font-size:11px; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:var(--radius-full); font-weight:700;">100% ESENTE FEE</span>
             </div>
             <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
-              Ricevi direttamente su questo conto l'accredito delle quote mensili. Nessuna commissione a carico del Capogruppo.
+              Il conto viene collegato solo nella pagina sicura di Stripe. BuyYourShare non raccoglie né memorizza il tuo IBAN.
             </p>
-
-            <div class="form-group" style="margin-bottom:10px;">
-              <label class="form-label" style="font-size:12px; font-weight:700;">Intestatario del Conto (Nome e Cognome o Ragione Sociale) *</label>
-              <input type="text" id="wizPayoutLegalName" class="form-input" placeholder="es. Mario Rossi" value="${escapeHtml(wizardState.payoutLegalName)}" required>
-            </div>
-
-            <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
-              <div class="form-group">
-                <label class="form-label" style="font-size:12px; font-weight:700;">Codice IBAN (SEPA) *</label>
-                <input type="text" id="wizPayoutIban" class="form-input" placeholder="IT00X0000000000000000000000" value="${escapeHtml(wizardState.payoutIban)}" style="font-family:var(--font-mono); text-transform:uppercase; font-weight:700;" required>
-              </div>
-              <div class="form-group">
-                <label class="form-label" style="font-size:12px; font-weight:700;">Banca (Opzionale)</label>
-                <input type="text" id="wizPayoutBankName" class="form-input" placeholder="es. Intesa, Revolut, BBVA" value="${escapeHtml(wizardState.payoutBankName)}">
-              </div>
-            </div>
+            <button type="button" id="btnWizardStripeOnboarding" class="btn btn-secondary" style="font-weight:800;">Collega Stripe per ricevere le quote</button>
           </div>
 
           <!-- SEZIONE 2: Scelta Servizio o Personalizzato -->
@@ -1621,9 +1594,6 @@ function renderWizardView(container, currentUser) {
   const customWrap = document.getElementById('customServiceWrap');
   const spotifyWrap = document.getElementById('spotifyAddressWrap');
   const spotifyAddrInput = document.getElementById('wizSpotifyAddress');
-  const ibanInput = document.getElementById('wizPayoutIban');
-  const legalNameInput = document.getElementById('wizPayoutLegalName');
-  const bankNameInput = document.getElementById('wizPayoutBankName');
 
   const updateStateAndRerender = () => {
     wizardState.realCostEuros = costInput ? costInput.value : '';
@@ -1635,10 +1605,23 @@ function renderWizardView(container, currentUser) {
     wizardState.accessUrl = document.getElementById('wizAccessUrl')?.value || '';
     wizardState.instructions = document.getElementById('wizInstructions')?.value || '';
     wizardState.additionalInfo = document.getElementById('wizAdditionalInfo')?.value || '';
-    wizardState.payoutIban = ibanInput ? ibanInput.value.trim().toUpperCase() : '';
-    wizardState.payoutLegalName = legalNameInput ? legalNameInput.value.trim() : '';
-    wizardState.payoutBankName = bankNameInput ? bankNameInput.value.trim() : '';
   };
+
+  const startStripeOnboarding = async () => {
+    const token = localStorage.getItem('buyyourshare_session_token');
+    const response = await fetch('/api/connect/onboarding-link', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    const result = await response.json();
+    if (!response.ok || !result.url) throw new Error(result.message || 'Impossibile avviare l\'onboarding Stripe.');
+    window.location.assign(result.url);
+  };
+
+  const onboardingBtn = document.getElementById('btnWizardStripeOnboarding');
+  if (onboardingBtn) onboardingBtn.addEventListener('click', async () => {
+    try { await startStripeOnboarding(); } catch (err) { alert(err.message); }
+  });
 
   const updateCalcBoxLive = () => {
     const rCents = eurosToCents(costInput.value || 0);
@@ -1724,16 +1707,11 @@ function renderWizardView(container, currentUser) {
     const realCostCents = eurosToCents(wizardState.realCostEuros);
     const totalSlots = parseInt(wizardState.totalSlots, 10);
     const ownerSlots = parseInt(wizardState.ownerSlots, 10) || 1;
-    const cleanIban = (wizardState.payoutIban || '').replace(/\s/g, '').toUpperCase();
-
-    if (!cleanIban || cleanIban.length < 15) {
-      alert('Inserisci un codice IBAN valido per ricevere le quote.');
-      if (ibanInput) ibanInput.focus();
-      return;
-    }
-    if (!wizardState.payoutLegalName) {
-      alert('Inserisci l\'intestatario del conto.');
-      if (legalNameInput) legalNameInput.focus();
+    const token = localStorage.getItem('buyyourshare_session_token');
+    const connectStatus = await fetch('/api/connect/status', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const connectResult = await connectStatus.json().catch(() => ({}));
+    if (!connectStatus.ok || !connectResult.isPayoutReady) {
+      alert('Prima collega il conto tramite Stripe per poter ricevere le quote.');
       return;
     }
     if (isNaN(realCostCents) || realCostCents <= 0) {
@@ -1786,18 +1764,8 @@ function renderWizardView(container, currentUser) {
       instructions: (wizardState.instructions || '').trim(),
       ownerSpotifyAddress: (wizardState.ownerSpotifyAddress || '').trim(),
       additionalInfo: (wizardState.additionalInfo || '').trim(),
-      payoutIban: cleanIban,
-      payoutLegalName: wizardState.payoutLegalName,
-      payoutBankName: wizardState.payoutBankName,
       publishImmediately: true
     };
-
-    // Salva subito anche nel client db
-    db.updateUserPayoutSettings(currentUser.id, {
-      iban: cleanIban,
-      legalName: wizardState.payoutLegalName,
-      bankName: wizardState.payoutBankName
-    }, currentUser);
 
     const submitBtn = form.querySelector('button[type="submit"]');
     if (submitBtn) {
@@ -1806,7 +1774,6 @@ function renderWizardView(container, currentUser) {
     }
 
     try {
-      const token = localStorage.getItem('buyyourshare_session_token');
       const userId = currentUser?.id || localStorage.getItem('buyyourshare_current_user_id');
       const resp = await fetch('/api/groups', {
         method: 'POST',
@@ -3575,42 +3542,22 @@ function openPaymentAndPayoutSettingsModal(currentUser) {
     <div class="modal-content" style="max-width:500px; padding:24px;">
       <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-start;">
         <div>
-          <span style="font-size:11px; font-weight:800; color:#0070ba; text-transform:uppercase; letter-spacing:0.5px;">Impostazioni Finanziarie Unificate</span>
+          <span style="font-size:11px; font-weight:800; color:#0070ba; text-transform:uppercase; letter-spacing:0.5px;">Stripe Connect</span>
           <h2 class="modal-title" style="font-size:18px; font-weight:900; margin-top:2px;">💳 Pagamenti & Ricezione Fondi</h2>
-          <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Unico conto per inviare pagamenti e ricevere gli accrediti delle tue quote.</p>
+          <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Collega in modo sicuro il conto su cui ricevere le quote come Capogruppo.</p>
         </div>
         <button class="btn-close" id="btnClosePaymentModal">&times;</button>
       </div>
 
       <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:16px; font-size:12px; color:#166534; line-height:1.4;">
-        🛡️ <strong>Conto Unificato:</strong> Utilizza questo conto/carta sia per ricevere le quote che ti spettano come Capogruppo, sia per gestire i tuoi pagamenti e rinnovi.
+        🛡️ <strong>La tua privacy:</strong> i dati bancari vengono inseriti solo nella procedura sicura ospitata da Stripe e non vengono salvati da BuyYourShare.
       </div>
 
       <form id="formUnifiedPaymentSettings">
-        <div class="form-group" style="margin-bottom:14px;">
-          <label class="form-label" style="font-size:12px; font-weight:800;">Intestatario del Conto / Carta *</label>
-          <input type="text" id="inputUnifiedLegalName" class="form-input" placeholder="es. Mario Rossi" value="${escapeHtml(payoutSettings.legalName || currentUser.fullName || '')}" style="font-size:13px; padding:10px;" required>
-        </div>
-
-        <div class="form-group" style="margin-bottom:14px;">
-          <label class="form-label" style="font-size:12px; font-weight:800;">Codice IBAN (SEPA) / Carta *</label>
-          <input type="text" id="inputUnifiedIban" class="form-input" placeholder="IT00X0000000000000000000000" value="${escapeHtml(payoutSettings.iban || '')}" style="font-family:var(--font-mono); font-size:13.5px; text-transform:uppercase; font-weight:700; padding:10px;" required>
-          <span style="font-size:11px; color:var(--text-muted); margin-top:3px; display:block;">I bonifici delle quote e gli accrediti automatici vengono erogati su questo codice.</span>
-        </div>
-
-        <div class="form-group" style="margin-bottom:14px;">
-          <label class="form-label" style="font-size:12px; font-weight:800;">Banca / Istituto (Opzionale)</label>
-          <input type="text" id="inputUnifiedBankName" class="form-input" placeholder="es. Intesa Sanpaolo, UniCredit, Revolut, BBVA, Postepay" value="${escapeHtml(payoutSettings.bankName || '')}" style="font-size:12.5px; padding:10px;">
-        </div>
-
-        <div class="form-group" style="margin-bottom:18px;">
-          <label class="form-label" style="font-size:12px; font-weight:800;">Email di Riferimento Notifiche</label>
-          <input type="email" id="inputUnifiedEmail" class="form-input" placeholder="nome@esempio.com" value="${escapeHtml(currentUser.email || '')}" style="font-size:12.5px; padding:10px;" readonly>
-        </div>
-
+        <p style="font-size:13px; line-height:1.5; color:var(--text-secondary); margin-bottom:18px;">Stripe verificherà l'identità e raccoglierà le coordinate necessarie per accreditare le quote. Al termine tornerai automaticamente su BuyYourShare.</p>
         <div style="display:flex; gap:10px;">
           <button type="submit" class="btn btn-primary btn-block" style="font-weight:800; padding:12px; font-size:13.5px; background:#003087;">
-            💾 Salva Dati Pagamento & Ricezione
+            🔒 Continua su Stripe
           </button>
           <button type="button" class="btn btn-secondary" id="btnCancelUnifiedSettings" style="font-size:13px;">
             Annulla
@@ -3663,34 +3610,16 @@ function openPaymentAndPayoutSettingsModal(currentUser) {
   if (form) {
     form.onsubmit = async (e) => {
       e.preventDefault();
-      const legalNameVal = document.getElementById('inputUnifiedLegalName').value.trim();
-      const ibanVal = document.getElementById('inputUnifiedIban').value.trim().toUpperCase();
-      const bankNameVal = document.getElementById('inputUnifiedBankName').value.trim();
-
-      await stripeConnectService.completeOnboarding(currentUser, {
-        legalName: legalNameVal,
-        iban: ibanVal,
-        simulatedStatus: 'success'
+      const token = localStorage.getItem('buyyourshare_session_token');
+      const response = await fetch('/api/connect/onboarding-link', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-
-      db.updateUserPayoutSettings(currentUser.id, {
-        iban: ibanVal,
-        bankName: bankNameVal || '',
-        legalName: legalNameVal
-      }, currentUser);
-
-      db.updateUserPaymentMethod(currentUser.id, {
-        type: 'CARD',
-        cardBrand: bankNameVal || 'Carta / IBAN',
-        cardLast4: ibanVal.length >= 4 ? ibanVal.slice(-4) : '4242',
-        cardExpiry: '12/28',
-        paypalEmail: currentUser.email,
-        autoRenewEnabled: true
-      }, currentUser);
-
-      modal.classList.remove('active');
-      showToast('✅ Dati di pagamento e ricezione salvati con successo!');
-      renderApp();
+      const result = await response.json();
+      if (!response.ok || !result.url) {
+        throw new Error(result.message || 'Impossibile avviare la procedura Stripe.');
+      }
+      window.location.assign(result.url);
     };
   }
 
