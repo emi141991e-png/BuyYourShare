@@ -669,7 +669,7 @@ checkoutRouter.post('/stripe/create-checkout-session', requireAuth, async (req, 
 });
 
 // 5. Verifica e Attivazione Automatica da Stripe Checkout Session Completata
-checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
+checkoutRouter.post('/stripe/verify-session', async (req, res) => {
   try {
     const { sessionId } = req.body || {};
     if (!sessionId) return res.status(400).json({ error: 'INVALID_SESSION' });
@@ -690,7 +690,15 @@ checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
       group = dataRepository.data.groups.find(g => g.id === groupId) || dataRepository.data.groups[0];
     }
     const finalGroupId = group ? group.id : (groupId || 'grp-fallback');
-    const targetUserId = req.user?.id || memberId;
+
+    const customerEmail = session.customer_email || session.customer_details?.email;
+    const targetUser = (memberId ? await dataRepository.findUserById(memberId) : null)
+      || (req.user ? req.user : null)
+      || (customerEmail ? await dataRepository.findUserByEmail(customerEmail) : null);
+
+    const targetUserId = targetUser ? targetUser.id : (memberId || req.user?.id || 'usr-' + Date.now());
+    const targetUserEmail = targetUser ? targetUser.email : (customerEmail || req.user?.email || 'membro@buyyourshare.com');
+    const targetUserName = targetUser ? targetUser.fullName : (session.customer_details?.name || 'Nuovo Membro');
 
     const slotNum = parseInt(slotNumber, 10) || 2;
     const bShare = parseInt(baseShareCents, 10) || group?.baseMemberShareCents || 120;
@@ -699,13 +707,16 @@ checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
 
     const period = calculateMonthlyPeriod();
     let membership = (await dataRepository.getMemberships({ groupId: finalGroupId, userId: targetUserId, slotNumber: slotNum }))[0];
+    if (!membership) {
+      membership = (await dataRepository.getMemberships({ groupId: finalGroupId, slotNumber: slotNum }))[0];
+    }
 
     if (!membership) {
       membership = {
         id: 'mem_str_' + Date.now(),
         groupId: finalGroupId,
         userId: targetUserId,
-        memberEmail: req.user?.email || session.customer_email || session.customer_details?.email || 'caseificioforciniti@libero.it',
+        memberEmail: targetUserEmail,
         role: 'MEMBER',
         slotNumber: slotNum,
         paidShareCents: bShare,
@@ -738,7 +749,7 @@ checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
           chatId: chat.id,
           senderId: null,
           messageType: 'SYSTEM',
-          messageContent: `👤 ${req.user ? req.user.fullName : 'Nuovo Membro'} è entrato nel gruppo (Posto #${slotNum}). Pagamento Stripe Live confermato.`,
+          messageContent: `👤 ${targetUserName} è entrato nel gruppo (Posto #${slotNum}). Pagamento Stripe Live confermato.`,
           createdAt: new Date().toISOString()
         });
       }
@@ -747,10 +758,23 @@ checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
         await dataRepository.addNotification({
           userId: group.ownerId,
           title: '🎉 Nuovo membro pagante (Stripe Live)!',
-          message: `${req.user ? req.user.fullName : 'Nuovo Membro'} ha acquistato il Posto #${slotNum} di "${group.customServiceName}". Quota accreditata: +${(bShare / 100).toFixed(2)} €/mese.`,
+          message: `${targetUserName} ha acquistato il Posto #${slotNum} di "${group.customServiceName}". Quota accreditata: +${(bShare / 100).toFixed(2)} €/mese.`,
           actionUrl: '#miei-gruppi'
         });
       }
+
+      await dataRepository.addNotification({
+        userId: targetUserId,
+        title: '🎉 Accesso Sbloccato!',
+        message: `Il tuo posto in "${group ? group.customServiceName : 'Gruppo'}" è attivo. Puoi visualizzare le credenziali e accedere alla chat.`,
+        actionUrl: '#miei-abbonamenti'
+      });
+    } else {
+      membership.userId = targetUserId;
+      membership.memberEmail = targetUserEmail;
+      membership.status = 'ACTIVE';
+      membership.stripeSubscriptionId = session.payment_intent || session.id;
+      await dataRepository.save();
     }
 
     const feeAllocation = allocatePaymentTransaction(bShare, totalCents, 'CARD_EEA');
@@ -779,9 +803,13 @@ checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
       idempotencyKey: `stripe_live_${session.id}`
     });
 
+    const accessInfo = await dataRepository.getAccessInstructions(finalGroupId);
+
     return res.json({
       success: true,
       membership,
+      group,
+      accessInfo,
       auditLog: logRecord
     });
   } catch (err) {

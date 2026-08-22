@@ -101,7 +101,11 @@ export function renderApp() {
           if (res.success) {
             showToast('🎉 Pagamento confermato! Abbonamento attivato con successo.');
             if (currentUser) await db.syncAllFromServer(currentUser);
-            navigateTo('#miei-abbonamenti');
+            try {
+              history.replaceState(null, '', window.location.pathname + '#miei-abbonamenti');
+            } catch (e) {}
+            currentRoute = '#miei-abbonamenti';
+            renderApp();
           }
         })
         .catch(err => {
@@ -1838,6 +1842,18 @@ function renderMySubscriptionsView(container, currentUser) {
   }
 
   const subscriptions = db.getMySubscriptions(currentUser.id);
+
+  // Se non ci sono ancora abbonamenti in cache, esegui una sincronizzazione automatica col server di produzione
+  if (subscriptions.length === 0 && !container.dataset.syncedOnce) {
+    container.dataset.syncedOnce = 'true';
+    db.syncAllFromServer(currentUser).then(() => {
+      const refreshed = db.getMySubscriptions(currentUser.id);
+      if (refreshed.length > 0) {
+        renderMySubscriptionsView(container, currentUser);
+      }
+    }).catch(() => {});
+  }
+
   const pendingVerif = window.__pendingPaymentVerification;
   const payoutSettings = db.getUserPayoutSettings(currentUser.id);
   const paymentMethod = db.getUserPaymentMethod(currentUser.id);
