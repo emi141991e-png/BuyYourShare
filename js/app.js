@@ -2228,6 +2228,16 @@ function renderMySubscriptionsView(container, currentUser) {
 // =========================================================================
 function renderMyGroupsView(container, currentUser) {
   const myGroups = db.getMyCreatedGroups(currentUser.id);
+
+  if (myGroups.length === 0 && !container.dataset.syncedGroupsView) {
+    container.dataset.syncedGroupsView = 'true';
+    db.syncAllFromServer(currentUser).then(() => {
+      const refreshed = db.getMyCreatedGroups(currentUser.id);
+      if (refreshed.length > 0) {
+        renderMyGroupsView(container, currentUser);
+      }
+    }).catch(() => {});
+  }
   const payoutSettings = db.getUserPayoutSettings(currentUser.id) || {
     iban: 'IT60X0542811101000000123456',
     bankName: 'Intesa Sanpaolo (Conto Corrente)',
@@ -4593,7 +4603,7 @@ async function init() {
     renderApp();
   }
 
-  // Sincronizzazione automatica e re-render in Real-Time in background (ogni 4 secondi)
+  // Sincronizzazione automatica e re-render in Real-Time in background (ogni 3 secondi)
   let lastDataChecksum = '';
   setInterval(async () => {
     try {
@@ -4602,7 +4612,7 @@ async function init() {
       updateHeader(u);
       updateBottomNav();
 
-      const newChecksum = `${(db.data.groups || []).length}_${(db.data.memberships || []).length}_${(db.data.groups || []).map(g => (g.id + ':' + g.occupiedMemberSlots + ':' + g.status)).join(',')}`;
+      const newChecksum = `${(db.data.groups || []).length}_${(db.data.memberships || []).length}_${(db.data.chatMessages || []).length}_${(db.data.notifications || []).length}_${(db.data.groups || []).map(g => (g.id + ':' + (g.occupiedMemberSlots || 0) + ':' + (g.status || ''))).join(',')}`;
       if (newChecksum !== lastDataChecksum) {
         lastDataChecksum = newChecksum;
         const activeEl = document.activeElement;
@@ -4613,7 +4623,7 @@ async function init() {
         }
       }
     } catch (e) {}
-  }, 4000);
+  }, 3000);
 }
 
 if (document.readyState === 'loading') {
