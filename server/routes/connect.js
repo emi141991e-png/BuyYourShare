@@ -117,6 +117,18 @@ connectRouter.post('/save-payout-settings', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'INVALID_IBAN', message: 'Inserisci un IBAN valido.' });
     }
 
+    if (!stripe) {
+      return res.status(503).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe Connect non è configurato sul server.' });
+    }
+    const existingConnection = await dataRepository.findConnectedAccountByUserId(req.user.id);
+    if (!existingConnection?.stripeAccountId || !existingConnection.stripeAccountId.startsWith('acct_')) {
+      return res.status(409).json({ error: 'CONNECT_ONBOARDING_REQUIRED', message: 'Completa prima l’onboarding ufficiale Stripe Connect.' });
+    }
+    const stripeAccount = await stripe.accounts.retrieve(existingConnection.stripeAccountId);
+    if (!stripeAccount.details_submitted || !stripeAccount.payouts_enabled) {
+      return res.status(409).json({ error: 'CONNECT_ONBOARDING_INCOMPLETE', message: 'Stripe non ha ancora abilitato i pagamenti al capogruppo.' });
+    }
+
     const last4 = cleanIban.slice(-4);
 
     await dataRepository.updateUser(req.user.id, {
@@ -126,10 +138,10 @@ connectRouter.post('/save-payout-settings', requireAuth, async (req, res) => {
 
     const conn = await dataRepository.saveConnectedAccount({
       userId: req.user.id,
-      stripeAccountId: req.user.stripeAccountId || ('acct_' + req.user.id.replace('usr-', '')),
-      payoutsEnabled: true,
-      chargesEnabled: true,
-      detailsSubmitted: true,
+      stripeAccountId: stripeAccount.id,
+      payoutsEnabled: stripeAccount.payouts_enabled,
+      chargesEnabled: stripeAccount.charges_enabled,
+      detailsSubmitted: stripeAccount.details_submitted,
       onboardingStatus: 'completed',
       businessType: accountType || 'individual',
       legalName: legalName || req.user.fullName,
