@@ -27,16 +27,15 @@ function getStripeClient() {
 webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event = null;
+  let stripeInstance = null;
 
   try {
-    const stripeInstance = getStripeClient();
-    if (stripeInstance && config.stripe.webhookSecret && !config.stripe.webhookSecret.includes('placeholder')) {
-      // Verifica crittografica firma ufficiale Stripe
-      event = stripeInstance.webhooks.constructEvent(req.body, sig, config.stripe.webhookSecret);
-    } else {
-      // Modalità fallback parser per ambiente test locale
-      event = typeof req.body === 'string' ? JSON.parse(req.body) : JSON.parse(req.body.toString('utf8'));
+    stripeInstance = getStripeClient();
+    if (!stripeInstance || !config.stripe.webhookSecret || config.stripe.webhookSecret.includes('placeholder')) {
+      return res.status(503).send('Stripe webhook non configurato in modo sicuro.');
     }
+    // Un evento non firmato non deve mai attivare un abbonamento o un trasferimento.
+    event = stripeInstance.webhooks.constructEvent(req.body, sig, config.stripe.webhookSecret);
   } catch (err) {
     console.error('[STRIPE WEBHOOK SIGNATURE ERROR]', err.message);
     return res.status(400).send(`Webhook Signature Error: ${err.message}`);
@@ -63,6 +62,11 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
 
             if (targetUserId && group) {
               let membership = (await dataRepository.getMemberships({ groupId, userId: targetUserId, slotNumber: slotNum }))[0];
+              const occupiedMembership = (await dataRepository.getMemberships({ groupId, slotNumber: slotNum }))
+                .find(item => item.role === 'MEMBER' && ['ACTIVE', 'CANCELLATION_SCHEDULED'].includes(item.status));
+              if (!membership && occupiedMembership && occupiedMembership.userId !== targetUserId) {
+                throw new Error(`SLOT_CONFLICT: il posto ${slotNum} del gruppo ${groupId} è già assegnato a un altro utente.`);
+              }
               if (!membership) {
                 membership = {
                   id: 'mem_str_' + Date.now(),
@@ -76,7 +80,7 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
                   paymentMethod: 'CARD_EEA',
                   status: 'ACTIVE',
                   autoRenew: true,
-                  stripeSubscriptionId: session.payment_intent || session.id,
+                  stripeSubscriptionId: session.subscription || session.id,
                   currentPeriodStart: period.current_period_start,
                   currentPeriodEnd: period.current_period_end,
                   nextBillingDate: period.next_billing_date,
@@ -128,14 +132,15 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
                 paymentMethod: 'CARD_EEA',
                 cycleNumber: 1,
                 paymentStatus: 'SUCCEEDED',
-                transferStatus: 'TRANSFERRED',
-                payoutStatus: 'PAID',
-                transferId: 'tr_str_' + Date.now(),
-                payoutId: 'po_str_' + Date.now(),
-                payoutDestination: 'acct_1U6oPp1JpLY88mRL',
-                payoutDate: new Date().toISOString(),
+                transferStatus: 'PENDING_INVOICE',
+                payoutStatus: 'PENDING_INVOICE',
+                transferId: null,
+                payoutId: null,
+                payoutDestination: null,
+                payoutDate: null,
                 idempotencyKey: `stripe_live_${session.id}`
               });
+              await dataRepository.releaseCheckoutReservation(session.metadata?.reservationId);
             }
           }
         }
@@ -156,6 +161,51 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
             userId: metadata.memberId,
             slotNumber: parseInt(metadata.slotNumber, 10)
           }))[0];
+        }
+
+        // Stripe non garantisce l'ordine di consegna degli eventi. Se la fattura
+        // arriva prima di checkout.session.completed, recuperiamo i metadata
+        // della subscription e creiamo comunque una sola membership certificata.
+        if (!membership && stripeInstance && subscriptionId) {
+          const subscription = await stripeInstance.subscriptions.retrieve(subscriptionId);
+          const subscriptionMetadata = subscription.metadata || {};
+          const groupId = subscriptionMetadata.groupId;
+          const memberId = subscriptionMetadata.memberId;
+          const slotNum = parseInt(subscriptionMetadata.slotNumber, 10);
+          const group = groupId ? await dataRepository.findGroupById(groupId) : null;
+
+          if (group && memberId && Number.isInteger(slotNum)) {
+            const occupiedMembership = (await dataRepository.getMemberships({ groupId, slotNumber: slotNum }))
+              .find(item => item.role === 'MEMBER' && ['ACTIVE', 'CANCELLATION_SCHEDULED'].includes(item.status));
+            if (occupiedMembership && occupiedMembership.userId !== memberId) {
+              throw new Error(`SLOT_CONFLICT: il posto ${slotNum} del gruppo ${groupId} è già assegnato.`);
+            }
+
+            membership = {
+              id: `mem_str_${Date.now()}`,
+              groupId,
+              userId: memberId,
+              role: 'MEMBER',
+              slotNumber: slotNum,
+              paidShareCents: parseInt(subscriptionMetadata.baseShareCents, 10) || group.baseMemberShareCents,
+              paidFeeCents: parseInt(subscriptionMetadata.feeCents, 10) || DEFAULT_PLATFORM_FEE_CENTS,
+              memberTotalCents: totalPaidCents,
+              paymentMethod: 'CARD_EEA',
+              status: 'ACTIVE',
+              autoRenew: true,
+              stripeSubscriptionId: subscriptionId,
+              currentPeriodStart: new Date().toISOString(),
+              currentPeriodEnd: addOneMonth(new Date()).toISOString(),
+              nextBillingDate: addOneMonth(new Date()).toISOString(),
+              joinedAt: new Date().toISOString()
+            };
+            await dataRepository.createMembership(membership);
+            const newOccupied = (group.occupiedMemberSlots || 0) + 1;
+            await dataRepository.updateGroup(group.id, {
+              occupiedMemberSlots: newOccupied,
+              status: newOccupied >= group.availableSlots ? 'full' : group.status
+            });
+          }
         }
 
         if (membership) {
@@ -184,18 +234,21 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
             const currentCycle = prevLogs.length + 1;
 
             // Esecuzione Transfer Stripe Reale (se abilitato)
-            let transferId = 'tr_str_' + Date.now();
-            let payoutStatus = 'PAID';
+            let transferId = null;
+            let payoutStatus = 'PENDING_CONNECTED_ACCOUNT';
 
-            const conn = await dataRepository.findConnectedAccountByUserId(group.ownerId);
+            const conn = group ? await dataRepository.findConnectedAccountByUserId(group.ownerId) : null;
 
-            if (stripe && conn?.stripeAccountId) {
+            if (stripeInstance && conn?.stripeAccountId && conn.stripeAccountId.startsWith('acct_')) {
               try {
-                const transfer = await stripe.transfers.create({
+                const transfer = await stripeInstance.transfers.create({
                   amount: baseShareCents,
                   currency: 'eur',
                   destination: conn.stripeAccountId,
-                  description: `Quota ${group.customServiceName} - Posto #${membership.slotNumber} (Mese ${currentCycle})`
+                  description: `Quota ${group?.customServiceName || 'BuyYourShare'} - Posto #${membership.slotNumber} (Mese ${currentCycle})`,
+                  transfer_group: `bys_${subscriptionId}`
+                }, {
+                  idempotencyKey: `stripe_transfer_${invoiceId}`
                 });
                 transferId = transfer.id;
                 payoutStatus = 'PAID';
@@ -222,7 +275,7 @@ webhooksRouter.post('/stripe', express.raw({ type: 'application/json' }), async 
               paymentMethod: 'CARD_EEA',
               cycleNumber: currentCycle,
               paymentStatus: 'SUCCEEDED',
-              transferStatus: payoutStatus === 'PAID' ? 'TRANSFERRED' : 'FAILED',
+              transferStatus: payoutStatus === 'PAID' ? 'TRANSFERRED' : (payoutStatus === 'PENDING_CONNECTED_ACCOUNT' ? 'PENDING_CONNECTED_ACCOUNT' : 'FAILED'),
               payoutStatus: payoutStatus,
               transferId: transferId,
               payoutId: transferId,
