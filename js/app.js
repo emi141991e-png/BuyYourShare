@@ -3914,7 +3914,8 @@ function openStripeCheckoutModal(group, activeSlot, currentUser) {
         <button class="btn-close" onclick="document.getElementById('stripeCheckoutModalOverlay').classList.remove('active')">&times;</button>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
+      <form id="stripePaymentForm">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
           <strong style="font-size:14px;">${escapeHtml(group.customServiceName)} - ${escapeHtml(group.planName)}</strong>
           <span style="font-weight:800; color:var(--primary);">Posto #${sessionData.slotNumber}</span>
