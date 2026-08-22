@@ -375,6 +375,10 @@ class Database {
   // GROUPS, SLOTS & PRICING
   // ==========================================
   getGroupSlotsBreakdown(group) {
+    if (group.slotsInfo && Array.isArray(group.slotsInfo.slots)) {
+      return group.slotsInfo;
+    }
+
     const feeCents = this.getPlatformFeeCents();
     const pricing = calculatePricingBreakdown(group.realSubscriptionCostCents, group.totalSlots, feeCents);
     const shares = pricing.exactSharesCents; // Array di quote esatte per ogni posto (es. [350, 350, 350, 350, 350, 349])
@@ -396,7 +400,7 @@ class Database {
         assignedMembership = activeMemberships.find(m => m.role === 'MEMBER' && m.slotNumber === slotNumber) || null;
       }
 
-      const isOccupied = !!assignedMembership;
+      const isOccupied = isOwnerSlot || !!assignedMembership || (idx < ((group.ownerSlots || 1) + (group.occupiedMemberSlots || 0)));
       const memberTotalCents = isOwnerSlot ? shareCents : (shareCents + feeCents);
 
       const assignedUser = isOwnerSlot
@@ -421,21 +425,20 @@ class Database {
     const availableMemberSlots = slots.filter(s => !s.isOwnerSlot && !s.isOccupied);
     const nextAvailableSlot = availableMemberSlots.length > 0 ? availableMemberSlots[0] : null;
 
+    const baseSharesList = slots.filter(s => !s.isOwnerSlot).map(s => s.baseShareCents);
+    const minBaseShareCents = baseSharesList.length > 0 ? Math.min(...baseSharesList) : pricing.baseMemberShareCents;
+    const maxBaseShareCents = baseSharesList.length > 0 ? Math.max(...baseSharesList) : pricing.baseMemberShareCents;
+
     return {
+      group,
       slots,
-      pricing,
-      totalSlots: group.totalSlots,
-      occupiedSlotsCount: slots.filter(s => s.isOccupied).length,
       availableSlotsCount: availableMemberSlots.length,
       nextAvailableSlot,
-      minMemberTotalCents: pricing.exactSharesCents.slice(group.ownerSlots).length > 0 
-        ? Math.min(...pricing.exactSharesCents.slice(group.ownerSlots)) + feeCents 
-        : pricing.memberTotalCents,
-      maxMemberTotalCents: pricing.exactSharesCents.slice(group.ownerSlots).length > 0 
-        ? Math.max(...pricing.exactSharesCents.slice(group.ownerSlots)) + feeCents 
-        : pricing.memberTotalCents,
-      minBaseShareCents: Math.min(...pricing.exactSharesCents),
-      maxBaseShareCents: Math.max(...pricing.exactSharesCents)
+      pricing,
+      minBaseShareCents,
+      maxBaseShareCents,
+      minMemberTotalCents: minBaseShareCents + feeCents,
+      maxMemberTotalCents: maxBaseShareCents + feeCents
     };
   }
 
@@ -467,7 +470,7 @@ class Database {
     const rawOwner = this.data.users.find(u => u.id === group.ownerId);
     const service = this.data.services.find(s => s.id === group.serviceId);
     const memberships = this.data.memberships.filter(m => m.groupId === groupId && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED'));
-    const slotsInfo = this.getGroupSlotsBreakdown(group);
+    const slotsInfo = group.slotsInfo && Array.isArray(group.slotsInfo.slots) ? group.slotsInfo : this.getGroupSlotsBreakdown(group);
 
     // Sanitizzazione proprietario per utenti non autorizzati (Zero Data Leakage)
     const isOwner = requestingUser && requestingUser.id === group.ownerId;
@@ -480,7 +483,7 @@ class Database {
       isVerified: rawOwner.isVerified,
       createdAt: rawOwner.createdAt,
       ...(isOwner || isAdmin ? { email: rawOwner.email, iban: rawOwner.iban, stripeAccountId: rawOwner.stripeAccountId } : {})
-    } : null;
+    } : (group.owner || null);
 
     return {
       ...group,

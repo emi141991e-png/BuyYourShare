@@ -1185,7 +1185,24 @@ function renderGroupCardsHTML(groups) {
 let selectedSlotForCheckout = null;
 
 function renderGroupDetailView(container, groupId, currentUser) {
-  const group = db.getGroupById(groupId);
+  let group = db.getGroupById(groupId);
+
+  // Sincronizzazione in tempo reale della scheda gruppo dal server
+  if (!container.dataset.syncedGroup || container.dataset.syncedGroup !== groupId) {
+    container.dataset.syncedGroup = groupId;
+    fetch(`/api/groups/${groupId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.group) {
+          const idx = db.data.groups.findIndex(g => g.id === groupId);
+          if (idx >= 0) db.data.groups[idx] = d.group;
+          else db.data.groups.push(d.group);
+          db.save();
+          renderGroupDetailView(container, groupId, currentUser);
+        }
+      }).catch(() => {});
+  }
+
   if (!group) {
     container.innerHTML = `<div class="page-view"><p>Gruppo non trovato.</p><a href="#cerca" class="btn btn-secondary">Torna alla ricerca</a></div>`;
     return;
