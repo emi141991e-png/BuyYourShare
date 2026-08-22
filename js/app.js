@@ -1832,25 +1832,18 @@ function renderWizardView(container, currentUser) {
         db.save();
         await db.syncAllFromServer(currentUser);
       } else {
-        const localGroup = db.createGroup(
-          { serviceId: payload.serviceId, customServiceName: payload.customServiceName, planName: payload.planName, realSubscriptionCostCents: realCostCents, totalSlots, ownerSlots },
-          { accessUrl: finalUrl, instructions: payload.instructions, additionalInfo: payload.additionalInfo, accessCode: payload.accessCode },
-          currentUser
-        );
-        createdId = localGroup.id;
+        throw new Error(serverRes.message || 'Il gruppo non è stato salvato sul server. Riprova tra poco.');
       }
 
       showToast('🎉 Gruppo creato e pubblicato con successo!');
       navigateTo(`#gruppo-${createdId}`);
     } catch (err) {
       console.error('[CREATE GROUP ERROR]', err);
-      const localGroup = db.createGroup(
-        { serviceId: payload.serviceId, customServiceName: payload.customServiceName, planName: payload.planName, realSubscriptionCostCents: realCostCents, totalSlots, ownerSlots },
-        { accessUrl: finalUrl, instructions: payload.instructions, additionalInfo: payload.additionalInfo, accessCode: payload.accessCode },
-        currentUser
-      );
-      showToast('🎉 Gruppo creato con successo!');
-      navigateTo(`#gruppo-${localGroup.id}`);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Pubblica gruppo';
+      }
+      showToast(`❌ Gruppo non pubblicato: ${err.message || 'errore di connessione'}`);
     }
   });
 }

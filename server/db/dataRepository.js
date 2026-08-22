@@ -107,7 +107,8 @@ class DataRepository {
       connectedAccounts: JSON.parse(JSON.stringify(INITIAL_CONNECTED_ACCOUNTS)),
       financialAuditLogs: [],
       notifications: [],
-      sessions: []
+      sessions: [],
+      checkoutReservations: []
     };
   }
 
@@ -118,7 +119,7 @@ class DataRepository {
   }
 
   async save() {
-    this._writeLock = this._writeLock.then(async () => {
+    this._writeLock = this._writeLock.catch(() => {}).then(async () => {
       const tempFile = DB_FILE + '.tmp.' + Date.now();
       await fs.promises.writeFile(tempFile, JSON.stringify(this.data, null, 2), 'utf8');
       await fs.promises.rename(tempFile, DB_FILE);
@@ -289,6 +290,66 @@ class DataRepository {
     this.data.memberships.push(memData);
     await this.save();
     return memData;
+  }
+
+  // A Railway con un solo processo il file JSON non offre transazioni SQL.
+  // Questa piccola prenotazione serializzata impedisce comunque che due checkout
+  // vengano avviati contemporaneamente sullo stesso posto.
+  async reserveCheckoutSlot({ groupId, slotNumber, userId, expiresAt }) {
+    let reservation;
+    const now = Date.now();
+
+    this._writeLock = this._writeLock.catch(() => {}).then(async () => {
+      const reservations = this.data.checkoutReservations || [];
+      this.data.checkoutReservations = reservations.filter(item =>
+        new Date(item.expiresAt).getTime() > now
+      );
+
+      const occupied = this.data.memberships.some(item =>
+        item.groupId === groupId &&
+        item.slotNumber === slotNumber &&
+        item.role === 'MEMBER' &&
+        ['ACTIVE', 'CANCELLATION_SCHEDULED'].includes(item.status)
+      );
+      const alreadyReserved = this.data.checkoutReservations.some(item =>
+        item.groupId === groupId && item.slotNumber === slotNumber && item.userId !== userId
+      );
+
+      if (occupied || alreadyReserved) {
+        const error = new Error('SLOT_UNAVAILABLE');
+        error.code = 'SLOT_UNAVAILABLE';
+        throw error;
+      }
+
+      reservation = this.data.checkoutReservations.find(item =>
+        item.groupId === groupId && item.slotNumber === slotNumber && item.userId === userId
+      );
+      if (!reservation) {
+        reservation = {
+          id: `res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          groupId,
+          slotNumber,
+          userId,
+          expiresAt,
+          createdAt: new Date().toISOString()
+        };
+        this.data.checkoutReservations.push(reservation);
+      }
+
+      const tempFile = DB_FILE + '.tmp.' + Date.now();
+      await fs.promises.writeFile(tempFile, JSON.stringify(this.data, null, 2), 'utf8');
+      await fs.promises.rename(tempFile, DB_FILE);
+    });
+
+    await this._writeLock;
+    return reservation;
+  }
+
+  async releaseCheckoutReservation(reservationId) {
+    if (!reservationId) return;
+    this.data.checkoutReservations = (this.data.checkoutReservations || [])
+      .filter(item => item.id !== reservationId);
+    await this.save();
   }
 
   async updateMembership(id, updateData) {

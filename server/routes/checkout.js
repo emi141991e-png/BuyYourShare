@@ -605,6 +605,9 @@ checkoutRouter.post('/stripe/create-checkout-session', requireAuth, async (req, 
     if (!group) return res.status(404).json({ error: 'GROUP_NOT_FOUND', message: 'Gruppo non trovato.' });
 
     const slotNum = parseInt(slotNumber, 10);
+    if (!Number.isInteger(slotNum) || slotNum <= group.ownerSlots || slotNum > group.totalSlots) {
+      return res.status(400).json({ error: 'INVALID_SLOT', message: 'Il posto selezionato non è disponibile.' });
+    }
     const feeCents = DEFAULT_PLATFORM_FEE_CENTS; // 1,49 €
     const baseShareCents = group.baseMemberShareCents;
 
@@ -613,49 +616,74 @@ checkoutRouter.post('/stripe/create-checkout-session', requireAuth, async (req, 
       return res.status(500).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe non configurato sul server.' });
     }
 
+    // Il capogruppo deve avere un account Connect reale e abilitato prima di
+    // accettare denaro destinato a lui. Non creare checkout che non possono
+    // essere regolati in modo corretto.
+    const connectedAccount = await dataRepository.findConnectedAccountByUserId(group.ownerId);
+    if (!connectedAccount?.stripeAccountId || !connectedAccount.stripeAccountId.startsWith('acct_')) {
+      return res.status(409).json({ error: 'OWNER_PAYOUT_NOT_READY', message: 'Il capogruppo non ha ancora completato Stripe Connect.' });
+    }
+    const stripeAccount = await stripeInstance.accounts.retrieve(connectedAccount.stripeAccountId);
+    if (!stripeAccount.payouts_enabled || !stripeAccount.details_submitted) {
+      return res.status(409).json({ error: 'OWNER_PAYOUT_NOT_READY', message: 'Il conto Stripe del capogruppo non è ancora abilitato ai pagamenti.' });
+    }
+
+    let reservation;
+    try {
+      reservation = await dataRepository.reserveCheckoutSlot({
+        groupId: group.id,
+        slotNumber: slotNum,
+        userId: req.user.id,
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+      });
+    } catch (reservationError) {
+      if (reservationError.code === 'SLOT_UNAVAILABLE') {
+        return res.status(409).json({ error: 'SLOT_OCCUPIED', message: 'Questo posto è già in fase di acquisto o è stato occupato.' });
+      }
+      throw reservationError;
+    }
+
     const host = req.get('origin') || req.get('referer') || 'https://buyyourshare-production.up.railway.app';
     const baseUrl = host.replace(/\/$/, '');
 
-    const session = await stripeInstance.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'eur',
-            product_data: {
-              name: `Quota Condivisa: ${group.customServiceName} (${group.planName})`,
-              description: `Posto #${slotNum} - Quota reale mensile per la condivisione.`
-            },
-            unit_amount: baseShareCents
-          },
-          quantity: 1
-        },
-        {
-          price_data: {
-            currency: 'eur',
-            product_data: {
-              name: 'Commissione Piattaforma BuyYourShare',
-              description: 'Gestione automatizzata, chat privata e garanzia di subentro.'
-            },
-            unit_amount: feeCents
-          },
-          quantity: 1
-        }
-      ],
-      mode: 'payment',
-      customer_email: req.user.email,
-      client_reference_id: `${req.user.id}_${group.id}_${slotNum}`,
-      metadata: {
+    let session;
+    try {
+      const metadata = {
         groupId: group.id,
         slotNumber: slotNum.toString(),
         memberId: req.user.id,
         ownerId: group.ownerId,
         baseShareCents: baseShareCents.toString(),
-        feeCents: feeCents.toString()
-      },
-      success_url: `${baseUrl}/#miei-abbonamenti?session_id={CHECKOUT_SESSION_ID}&groupId=${group.id}&slotNumber=${slotNum}`,
-      cancel_url: `${baseUrl}/#gruppo-${group.id}`
-    });
+        feeCents: feeCents.toString(),
+        reservationId: reservation.id
+      };
+      session = await stripeInstance.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: `Abbonamento BuyYourShare: ${group.customServiceName} (${group.planName})`,
+              description: `Posto #${slotNum}; quota capogruppo e commissione piattaforma incluse.`
+            },
+            unit_amount: baseShareCents + feeCents,
+            recurring: { interval: 'month' }
+          },
+          quantity: 1
+        }],
+        mode: 'subscription',
+        customer_email: req.user.email,
+        client_reference_id: `${req.user.id}_${group.id}_${slotNum}`,
+        metadata,
+        subscription_data: { metadata },
+        expires_at: Math.floor(Date.now() / 1000) + (30 * 60),
+        success_url: `${baseUrl}/?session_id={CHECKOUT_SESSION_ID}#miei-abbonamenti`,
+        cancel_url: `${baseUrl}/#gruppo-${group.id}`
+      });
+    } catch (stripeError) {
+      await dataRepository.releaseCheckoutReservation(reservation.id);
+      throw stripeError;
+    }
 
     return res.json({
       success: true,
@@ -669,7 +697,7 @@ checkoutRouter.post('/stripe/create-checkout-session', requireAuth, async (req, 
 });
 
 // 5. Verifica e Attivazione Automatica da Stripe Checkout Session Completata
-checkoutRouter.post('/stripe/verify-session', async (req, res) => {
+checkoutRouter.post('/stripe/verify-session', requireAuth, async (req, res) => {
   try {
     const { sessionId } = req.body || {};
     if (!sessionId) return res.status(400).json({ error: 'INVALID_SESSION' });
@@ -685,16 +713,15 @@ checkoutRouter.post('/stripe/verify-session', async (req, res) => {
     }
 
     const { groupId, slotNumber, baseShareCents, feeCents, memberId } = session.metadata || {};
-    let group = await dataRepository.findGroupById(groupId);
-    if (!group) {
-      group = dataRepository.data.groups.find(g => g.id === groupId) || dataRepository.data.groups[0];
+    const group = await dataRepository.findGroupById(groupId);
+    if (!group) return res.status(404).json({ error: 'GROUP_NOT_FOUND' });
+    if (!memberId || memberId !== req.user.id) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Questa sessione Stripe appartiene a un altro utente.' });
     }
-    const finalGroupId = group ? group.id : (groupId || 'grp-fallback');
+    const finalGroupId = group.id;
 
     const customerEmail = session.customer_email || session.customer_details?.email;
-    const targetUser = (memberId ? await dataRepository.findUserById(memberId) : null)
-      || (req.user ? req.user : null)
-      || (customerEmail ? await dataRepository.findUserByEmail(customerEmail) : null);
+    const targetUser = req.user;
 
     const targetUserId = targetUser ? targetUser.id : (memberId || req.user?.id || 'usr-' + Date.now());
     const targetUserEmail = targetUser ? targetUser.email : (customerEmail || req.user?.email || 'membro@buyyourshare.com');
@@ -707,8 +734,13 @@ checkoutRouter.post('/stripe/verify-session', async (req, res) => {
 
     const period = calculateMonthlyPeriod();
     let membership = (await dataRepository.getMemberships({ groupId: finalGroupId, userId: targetUserId, slotNumber: slotNum }))[0];
-    if (!membership) {
-      membership = (await dataRepository.getMemberships({ groupId: finalGroupId, slotNumber: slotNum }))[0];
+    const occupiedMembership = (await dataRepository.getMemberships({ groupId: finalGroupId, slotNumber: slotNum }))
+      .find(item => item.role === 'MEMBER' && ['ACTIVE', 'CANCELLATION_SCHEDULED'].includes(item.status));
+    if (!membership && occupiedMembership && occupiedMembership.userId !== targetUserId) {
+      return res.status(409).json({
+        error: 'SLOT_ALREADY_ASSIGNED',
+        message: 'Il posto è già stato assegnato. Non è stato modificato alcun abbonamento: verifica il pagamento Stripe prima di procedere con un rimborso.'
+      });
     }
 
     if (!membership) {
@@ -725,7 +757,7 @@ checkoutRouter.post('/stripe/verify-session', async (req, res) => {
         paymentMethod: 'CARD_EEA',
         status: 'ACTIVE',
         autoRenew: true,
-        stripeSubscriptionId: session.payment_intent || session.id,
+        stripeSubscriptionId: session.subscription || session.id,
         currentPeriodStart: period.current_period_start,
         currentPeriodEnd: period.current_period_end,
         nextBillingDate: period.next_billing_date,
@@ -773,7 +805,7 @@ checkoutRouter.post('/stripe/verify-session', async (req, res) => {
       membership.userId = targetUserId;
       membership.memberEmail = targetUserEmail;
       membership.status = 'ACTIVE';
-      membership.stripeSubscriptionId = session.payment_intent || session.id;
+      membership.stripeSubscriptionId = session.subscription || session.id;
       await dataRepository.save();
     }
 
@@ -794,16 +826,17 @@ checkoutRouter.post('/stripe/verify-session', async (req, res) => {
       paymentMethod: 'CARD_EEA',
       cycleNumber: 1,
       paymentStatus: 'SUCCEEDED',
-      transferStatus: 'TRANSFERRED',
-      payoutStatus: 'PAID',
-      transferId: 'tr_str_' + Date.now(),
-      payoutId: 'po_str_' + Date.now(),
-      payoutDestination: 'acct_1U6oPp1JpLY88mRL',
-      payoutDate: new Date().toISOString(),
+      transferStatus: 'PENDING_WEBHOOK',
+      payoutStatus: 'PENDING_WEBHOOK',
+      transferId: null,
+      payoutId: null,
+      payoutDestination: null,
+      payoutDate: null,
       idempotencyKey: `stripe_live_${session.id}`
     });
 
     const accessInfo = await dataRepository.getAccessInstructions(finalGroupId);
+    await dataRepository.releaseCheckoutReservation(session.metadata?.reservationId);
 
     return res.json({
       success: true,
