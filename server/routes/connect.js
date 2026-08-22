@@ -50,9 +50,10 @@ connectRouter.post('/onboarding-link', requireAuth, async (req, res) => {
 
     if (stripe) {
       if (!stripeAccountId) {
-        // Creazione account Standard/Express su Stripe
+        // Express è il modello Connect adatto ai marketplace: consente
+        // l'onboarding ospitato da Stripe e mantiene al sicuro i dati bancari.
         const account = await stripe.accounts.create({
-          type: 'standard', // 0€ costo fisso mensile piattaforma
+          type: 'express'
           country: 'IT',
           email: user.email
         });
