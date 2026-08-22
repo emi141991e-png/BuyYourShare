@@ -916,6 +916,18 @@ function openEmailVerificationModal(email, generatedCode = '123456') {
 // =========================================================================
 function renderHomeView(container, currentUser) {
   const availableGroups = db.getGroups({ onlyAvailable: true });
+
+  // Se non ci sono ancora gruppi caricati in memoria, sincronizza in tempo reale dal server
+  if (availableGroups.length === 0 && !container.dataset.syncedHome) {
+    container.dataset.syncedHome = 'true';
+    db.syncAllFromServer(currentUser).then(() => {
+      const refreshed = db.getGroups({ onlyAvailable: true });
+      if (refreshed.length > 0) {
+        renderHomeView(container, currentUser);
+      }
+    }).catch(() => {});
+  }
+
   const hasAvailableGroups = availableGroups.length > 0;
   const previewGroups = availableGroups;
 
@@ -1024,6 +1036,19 @@ function renderMarketplaceView(container, currentUser) {
     serviceId: selectedCategoryFilter === 'ALL' ? null : selectedCategoryFilter,
     search: searchKeyword
   });
+
+  if (groups.length === 0 && !container.dataset.syncedMarket) {
+    container.dataset.syncedMarket = 'true';
+    db.syncAllFromServer(currentUser).then(() => {
+      const refreshed = db.getGroups({
+        serviceId: selectedCategoryFilter === 'ALL' ? null : selectedCategoryFilter,
+        search: searchKeyword
+      });
+      if (refreshed.length > 0) {
+        renderMarketplaceView(container, currentUser);
+      }
+    }).catch(() => {});
+  }
 
   container.innerHTML = `
     <div class="page-view">
