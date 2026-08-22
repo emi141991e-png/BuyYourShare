@@ -116,11 +116,156 @@
       "complianceNotes": "Team di montaggio video."
     }
   ],
-  "groups": [],
-  "accessInstructions": [],
-  "memberships": [],
-  "chats": [],
-  "chatMessages": [],
+  "groups": [
+    {
+      "id": "grp-1787421251818",
+      "ownerId": "usr-1787421251575",
+      "serviceId": "srv-spotify",
+      "customServiceName": "Spotify",
+      "planName": "Spotify premium family",
+      "realSubscriptionCostCents": 2099,
+      "totalSlots": 6,
+      "ownerSlots": 1,
+      "availableSlots": 5,
+      "occupiedMemberSlots": 1,
+      "baseMemberShareCents": 349,
+      "platformFeeCents": 149,
+      "memberTotalCents": 498,
+      "groupType": "public",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-22T08:26:28.000Z",
+      "ownerSpotifyAddress": "Via Buffa, 10040 Val della Torre TO, Italy",
+      "rulesAndRequirements": "Rispetta le regole della community e del provider.",
+      "description": "Gruppo condivisione Spotify",
+      "createdAt": "2026-08-22T08:26:28.000Z",
+      "updatedAt": "2026-08-22T18:00:00.000Z"
+    },
+    {
+      "id": "grp-1787422031454",
+      "ownerId": "usr-1787422031450",
+      "serviceId": "srv-custom",
+      "customServiceName": "all",
+      "planName": "team",
+      "realSubscriptionCostCents": 100,
+      "totalSlots": 2,
+      "ownerSlots": 1,
+      "availableSlots": 1,
+      "occupiedMemberSlots": 0,
+      "baseMemberShareCents": 50,
+      "platformFeeCents": 149,
+      "memberTotalCents": 199,
+      "groupType": "public",
+      "status": "PUBLISHED",
+      "isPublished": true,
+      "publishedAt": "2026-08-22T18:07:00.000Z",
+      "rulesAndRequirements": "Rispetta le regole della community.",
+      "description": "Gruppo condivisione all team",
+      "createdAt": "2026-08-22T18:07:00.000Z",
+      "updatedAt": "2026-08-22T18:07:00.000Z"
+    }
+  ],
+  "accessInstructions": [
+    {
+      "id": "acc-1787421251818",
+      "groupId": "grp-1787421251818",
+      "accessUrl": "https://www.spotify.com/it/family/join/invite/4b03Y7y19CbZxC2",
+      "instructions": "1. Clicca sul link di invito ufficiale di Spotify fornito qui sopra.\n2. Accedi con il tuo account Spotify personale.\n3. Quando Spotify richiede di confermare la residenza, inserisci esattamente l'indirizzo del Capogruppo indicato: Via Buffa, 10040 Val della Torre TO, Italy",
+      "ownerSpotifyAddress": "Via Buffa, 10040 Val della Torre TO, Italy",
+      "additionalInfo": ""
+    },
+    {
+      "id": "acc-1787422031454",
+      "groupId": "grp-1787422031454",
+      "accessUrl": "https://all.com",
+      "instructions": "Accedi con le credenziali fornite in chat dal Capogruppo.",
+      "ownerSpotifyAddress": "",
+      "additionalInfo": ""
+    }
+  ],
+  "memberships": [
+    {
+      "id": "mem-1787421251818-owner",
+      "groupId": "grp-1787421251818",
+      "userId": "usr-1787421251575",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 350,
+      "paidFeeCents": 0,
+      "memberTotalCents": 350,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-22T08:26:28.000Z",
+      "currentPeriodEnd": "2026-09-22T08:26:28.000Z",
+      "nextBillingDate": "2026-09-22T08:26:28.000Z",
+      "joinedAt": "2026-08-22T08:26:28.000Z"
+    },
+    {
+      "id": "mem-1787421242841",
+      "groupId": "grp-1787421251818",
+      "userId": "usr-1787421251754",
+      "memberEmail": "lidiaaaaaaz@gmail.com",
+      "role": "MEMBER",
+      "slotNumber": 2,
+      "paidShareCents": 350,
+      "paidFeeCents": 149,
+      "memberTotalCents": 499,
+      "paymentMethod": "CARD_EEA",
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "stripeSubscriptionId": "pi_lidia_spotify_active",
+      "currentPeriodStart": "2026-08-22T17:54:02.000Z",
+      "currentPeriodEnd": "2026-09-22T17:54:02.000Z",
+      "nextBillingDate": "2026-09-22T17:54:02.000Z",
+      "joinedAt": "2026-08-22T17:54:02.000Z"
+    },
+    {
+      "id": "mem-1787422031454-owner",
+      "groupId": "grp-1787422031454",
+      "userId": "usr-1787422031450",
+      "role": "OWNER",
+      "slotNumber": 1,
+      "paidShareCents": 50,
+      "paidFeeCents": 0,
+      "memberTotalCents": 50,
+      "status": "ACTIVE",
+      "autoRenew": true,
+      "currentPeriodStart": "2026-08-22T18:07:00.000Z",
+      "currentPeriodEnd": "2026-09-22T18:07:00.000Z",
+      "nextBillingDate": "2026-09-22T18:07:00.000Z",
+      "joinedAt": "2026-08-22T18:07:00.000Z"
+    }
+  ],
+  "chats": [
+    {
+      "id": "chat-grp-1787421251818",
+      "groupId": "grp-1787421251818",
+      "createdAt": "2026-08-22T08:26:28.000Z"
+    },
+    {
+      "id": "chat-grp-1787422031454",
+      "groupId": "grp-1787422031454",
+      "createdAt": "2026-08-22T18:07:00.000Z"
+    }
+  ],
+  "chatMessages": [
+    {
+      "id": "msg-sp-1",
+      "chatId": "chat-grp-1787421251818",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Mirko Cristian Nechita. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-22T08:26:28.000Z"
+    },
+    {
+      "id": "msg-all-1",
+      "chatId": "chat-grp-1787422031454",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "messageContent": "🎉 Gruppo creato da Caseificio Forciniti. Benvenuti nella chat del gruppo!",
+      "createdAt": "2026-08-22T18:07:00.000Z"
+    }
+  ],
   "connectedAccounts": [],
   "financialAuditLogs": [],
   "notifications": [],
