@@ -103,16 +103,22 @@ adminRouter.post('/assign-membership', async (req, res) => {
       if (slotNumber) mem.slotNumber = slotNumber;
     }
     
-    // Aggiorna posti occupati di tutti i gruppi
+// Endpoint per sincronizzare o resettare i posti dei gruppi
+adminRouter.post('/sync-group-slots', async (req, res) => {
+  try {
+    const { groupId, resetMemberships } = req.body;
+    if (resetMemberships && groupId) {
+      dataRepository.data.memberships = dataRepository.data.memberships.filter(m => m.groupId !== groupId || m.role === 'OWNER');
+    }
     dataRepository.data.groups.forEach(g => {
       const occ = dataRepository.data.memberships.filter(m => m.groupId === g.id && m.role === 'MEMBER' && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED')).length;
       g.occupiedMemberSlots = occ;
+      g.status = occ >= g.availableSlots ? 'FULL' : 'PUBLISHED';
     });
-
     await dataRepository.save();
-    return res.json({ success: true, mem, groups: dataRepository.data.groups });
+    return res.json({ success: true, groups: dataRepository.data.groups });
   } catch (err) {
-    console.error('[ASSIGN MEMBERSHIP ERROR]', err);
+    console.error('[SYNC GROUP SLOTS ERROR]', err);
     return res.status(500).json({ error: err.message });
   }
 });
