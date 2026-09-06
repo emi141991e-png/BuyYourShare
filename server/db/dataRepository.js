@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createSecureToken, hashPassword } from '../services/passwordSecurity.js';
 import {
   INITIAL_SERVICES,
   INITIAL_USERS,
@@ -97,6 +98,24 @@ class DataRepository {
     // Additive SSO state: existing marketplace records remain untouched.
     if (this.data && !Array.isArray(this.data.usedSsoTickets)) {
       this.data.usedSsoTickets = [];
+    }
+
+    // One-time security migration: hash legacy plaintext passwords and revoke
+    // sessions that may have been exposed by older static-file configuration.
+    if (!this.data.systemConfig) this.data.systemConfig = {};
+    if (!this.data.systemConfig.securityHardeningV1) {
+      for (const user of this.data.users || []) {
+        if (user.password) {
+          user.passwordHash = hashPassword(user.password);
+          if (user.password === 'Password123!') user.passwordResetRequired = true;
+          delete user.password;
+        }
+        delete user.resetPasswordCode;
+        delete user.resetPasswordExpires;
+      }
+      this.data.sessions = [];
+      this.data.systemConfig.securityHardeningV1 = new Date().toISOString();
+      this.saveSync();
     }
   }
 
@@ -190,7 +209,7 @@ class DataRepository {
   }
 
   async createSession(userId) {
-    const token = 'bys_token_' + Date.now() + '_' + Math.random().toString(36).substring(2, 12);
+    const token = createSecureToken('bys_session_');
     const now = Date.now();
     const session = {
       token,
@@ -211,6 +230,11 @@ class DataRepository {
 
   async deleteSession(token) {
     this.data.sessions = this.data.sessions.filter(s => s.token !== token);
+    await this.save();
+  }
+
+  async deleteSessionsByUserId(userId) {
+    this.data.sessions = this.data.sessions.filter(s => s.userId !== userId);
     await this.save();
   }
 
@@ -596,7 +620,14 @@ class DataRepository {
     return users.map(u => {
       const createdGroupsCount = groups.filter(g => g.ownerId === u.id).length;
       const activeMembershipsCount = memberships.filter(m => m.userId === u.id && m.status === 'ACTIVE').length;
-      const { password, ...safeUser } = u;
+      const {
+        password,
+        passwordHash,
+        resetPasswordCode,
+        resetPasswordTokenHash,
+        resetPasswordExpires,
+        ...safeUser
+      } = u;
       return {
         ...safeUser,
         createdGroupsCount,

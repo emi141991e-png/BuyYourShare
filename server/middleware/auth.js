@@ -14,35 +14,13 @@ export async function authenticate(req, res, next) {
       token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
     }
 
-    // 1. Fallback resiliente prioritario con header x-user-id o x-session-user-id
-    const fallbackUserId = req.headers['x-user-id'] || req.headers['x-session-user-id'];
-    if (fallbackUserId) {
-      const user = await dataRepository.findUserById(fallbackUserId);
-      if (user && !user.isSuspended) {
-        req.user = user;
-        req.session = { token: token || 'bys_token_' + Date.now(), userId: user.id };
-        return next();
-      }
-    }
-
     if (!token) {
       req.user = null;
       req.session = null;
       return next();
     }
 
-    // 2. Supporto sessioni demo rapide
-    if (token.startsWith('bys_demo_token_')) {
-      const demoUserId = token.replace('bys_demo_token_', '');
-      const user = await dataRepository.findUserById(demoUserId);
-      if (user && !user.isSuspended) {
-        req.user = user;
-        req.session = { token, userId: user.id };
-        return next();
-      }
-    }
-
-    // 3. Verifica sessione standard nel repository con timeout di inattività a 15 minuti (900.000 ms)
+    // Verifica esclusivamente una sessione server-side reale.
     let session = await dataRepository.findSession(token);
     if (session) {
       const now = Date.now();
@@ -64,16 +42,6 @@ export async function authenticate(req, res, next) {
       if (user && !user.isSuspended) {
         req.user = user;
         req.session = session;
-        return next();
-      }
-    }
-
-    // 4. Se il token esiste ma il server è stato riavviato a freddo, supporta fallback utente attivo
-    if (token && (token.startsWith('bys_token_') || token.startsWith('bys_'))) {
-      const defaultUser = await dataRepository.findUserById('usr-emilio') || (await dataRepository.findUserById('usr-owner-1'));
-      if (defaultUser && !defaultUser.isSuspended) {
-        req.user = defaultUser;
-        req.session = { token, userId: defaultUser.id };
         return next();
       }
     }

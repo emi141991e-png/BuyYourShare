@@ -84,7 +84,7 @@ class AuthService {
         fullName: name,
         firstName: firstName || 'Utente',
         lastName: rest.join(' ') || 'BuyYourShare',
-        role: this.currentUserId.includes('admin') || email.includes('admin') ? 'admin' : 'user',
+        role: 'user',
         isVerified: true,
         isEmailVerified: true,
         isSuspended: false
@@ -153,34 +153,11 @@ class AuthService {
 
       return data.user;
     } catch (err) {
-      // Fallback resiliente locale
-      let user = db.data.users.find(u => u.email.toLowerCase() === cleanEmail);
-      if (!user && cleanPass.length >= 8) {
-        const namePart = cleanEmail.split('@')[0].replace(/[._-]/g, ' ');
-        const formattedName = namePart.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Utente';
-        user = {
-          id: 'usr-' + Date.now(),
-          email: cleanEmail,
-          fullName: formattedName,
-          firstName: formattedName.split(' ')[0],
-          lastName: formattedName.split(' ').slice(1).join(' ') || 'BuyYourShare',
-          role: cleanEmail.includes('admin') ? 'admin' : 'user',
-          isSuspended: false
-        };
-        db.data.users.push(user);
-        db.save();
-      }
-
-      if (user) {
-        this.sessionToken = 'bys_token_' + Date.now();
-        this.currentUserId = user.id;
-        localStorage.setItem(SESSION_TOKEN_KEY, this.sessionToken);
-        localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
-        localStorage.setItem(CACHED_EMAIL_KEY, user.email);
-        localStorage.setItem(CACHED_NAME_KEY, user.fullName);
-        localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
-        return user;
-      }
+      this.sessionToken = null;
+      this.currentUserId = null;
+      localStorage.removeItem(SESSION_TOKEN_KEY);
+      localStorage.removeItem(SESSION_USER_ID_KEY);
+      localStorage.removeItem(LAST_ACTIVITY_KEY);
       throw err;
     }
   }
@@ -304,48 +281,6 @@ class AuthService {
     }
 
     return data;
-  }
-
-  /**
-   * Reimpostazione Istantanea Universale (Zero-Delay, Zero-Dependency)
-   */
-  async resetPasswordDirect(email, newPassword, confirmPassword) {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPass = (newPassword || '').trim();
-    const cleanConfirm = (confirmPassword || '').trim();
-
-    const resp = await fetch('/api/auth/reset-password-direct', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: cleanEmail,
-        newPassword: cleanPass,
-        confirmPassword: cleanConfirm
-      })
-    });
-
-    const data = await resp.json();
-    if (!resp.ok || !data.success) {
-      throw new Error(data.message || 'Errore durante la modifica della password.');
-    }
-
-    this.sessionToken = data.token;
-    this.currentUserId = data.user.id;
-    localStorage.setItem(SESSION_TOKEN_KEY, this.sessionToken);
-    localStorage.setItem(SESSION_USER_ID_KEY, this.currentUserId);
-    localStorage.setItem(CACHED_EMAIL_KEY, data.user.email);
-    localStorage.setItem(CACHED_NAME_KEY, data.user.fullName);
-    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
-
-    let localUser = db.data.users.find(u => u.id === data.user.id || u.email.toLowerCase() === cleanEmail);
-    if (!localUser) {
-      db.data.users.push(data.user);
-    } else {
-      Object.assign(localUser, data.user);
-    }
-    db.save();
-
-    return data.user;
   }
 
   /**
