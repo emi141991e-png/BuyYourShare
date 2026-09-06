@@ -33,7 +33,7 @@ test('provisions a new P2P profile with the same BYS user id and no second passw
   const result = await exchangeBysSsoTicket(ticket(), repo);
   assert.equal(result.user.id, 'bys-user-1');
   assert.equal(result.user.bysUserId, 'bys-user-1');
-  assert.equal(result.user.password, null);
+  assert.equal(result.user.password, undefined);
   assert.equal(result.session.userId, 'bys-user-1');
 });
 
