@@ -185,7 +185,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
     const oSlots = parseInt(ownerSlots, 10) || 1;
     const feeCents = DEFAULT_PLATFORM_FEE_CENTS;
 
-    if (!customServiceName || realCostCents <= 0 || tSlots < 2) {
+    if (!customServiceName || realCostCents <= 0 || tSlots < 2 || tSlots > 50 || oSlots < 1 || oSlots >= tSlots) {
       return res.status(400).json({ error: 'INVALID_INPUT', message: 'Dati del gruppo non validi.' });
     }
 
