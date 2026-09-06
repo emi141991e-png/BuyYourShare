@@ -99,7 +99,6 @@ export async function exchangeBysSsoTicket(token, repository) {
         bysUserId: identity.bysUserId,
         email: identity.email,
         ...names,
-        password: null,
         authSource: 'BYS_SSO',
         role: 'user',
         isVerified: identity.emailVerified,
