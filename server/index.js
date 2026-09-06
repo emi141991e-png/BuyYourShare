@@ -4,7 +4,6 @@
  */
 
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config/env.js';
@@ -27,14 +26,21 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.join(__dirname, '..');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // 1. Webhooks Router (mounted before JSON body parser for Stripe signature)
 app.use('/api/webhooks', webhooksRouter);
 
 // 2. Standard Middlewares
-app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 
 // 3. Global Authentication Middleware
 app.use(authenticate);
@@ -69,14 +75,27 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(ROOT_DIR, {
+const staticOptions = {
   extensions: ['html', 'js', 'css', 'json', 'png', 'jpg', 'svg'],
   setHeaders: (res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
   }
-}));
+};
+
+// Publish only browser assets. Never expose server/, package files or the database.
+app.use('/css', express.static(path.join(ROOT_DIR, 'css'), staticOptions));
+app.use('/js', express.static(path.join(ROOT_DIR, 'js'), staticOptions));
+app.get('/', (req, res) => res.sendFile(path.join(ROOT_DIR, 'index.html')));
+
+app.use((req, res, next) => {
+  const blocked = ['/server', '/tests', '/package.json', '/package-lock.json', '/railway.json', '/.env', '/.git'];
+  if (blocked.some(prefix => req.path === prefix || req.path.startsWith(`${prefix}/`))) {
+    return res.status(404).end();
+  }
+  next();
+});
 
 // Fallback to index.html for SPA routes
 app.get('*', (req, res) => {
