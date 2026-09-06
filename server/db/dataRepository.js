@@ -93,6 +93,11 @@ class DataRepository {
         this.saveSync();
       }
     }
+
+    // Additive SSO state: existing marketplace records remain untouched.
+    if (this.data && !Array.isArray(this.data.usedSsoTickets)) {
+      this.data.usedSsoTickets = [];
+    }
   }
 
   createDefaultState() {
@@ -108,7 +113,8 @@ class DataRepository {
       financialAuditLogs: [],
       notifications: [],
       sessions: [],
-      checkoutReservations: []
+      checkoutReservations: [],
+      usedSsoTickets: []
     };
   }
 
@@ -138,6 +144,11 @@ class DataRepository {
     if (!email) return null;
     const clean = email.trim().toLowerCase();
     return this.data.users.find(u => u.email.toLowerCase() === clean) || null;
+  }
+
+  async findUserByBysUserId(bysUserId) {
+    if (!bysUserId) return null;
+    return this.data.users.find(user => user.bysUserId === bysUserId) || null;
   }
 
   async createUser(userData) {
@@ -201,6 +212,22 @@ class DataRepository {
   async deleteSession(token) {
     this.data.sessions = this.data.sessions.filter(s => s.token !== token);
     await this.save();
+  }
+
+  async consumeSsoTicket(jti, expiresAt) {
+    let consumed = false;
+    const now = Date.now();
+    this._writeLock = this._writeLock.catch(() => {}).then(async () => {
+      this.data.usedSsoTickets = (this.data.usedSsoTickets || []).filter(item => item.expiresAt > now);
+      if (this.data.usedSsoTickets.some(item => item.jti === jti)) return;
+      this.data.usedSsoTickets.push({ jti, expiresAt });
+      const tempFile = DB_FILE + '.tmp.' + Date.now();
+      await fs.promises.writeFile(tempFile, JSON.stringify(this.data, null, 2), 'utf8');
+      await fs.promises.rename(tempFile, DB_FILE);
+      consumed = true;
+    });
+    await this._writeLock;
+    return consumed;
   }
 
   // ==========================================

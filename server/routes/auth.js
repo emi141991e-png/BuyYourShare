@@ -2,6 +2,7 @@ import express from 'express';
 import { dataRepository } from '../db/dataRepository.js';
 import { requireAuth } from '../middleware/auth.js';
 import { emailService } from '../services/emailService.js';
+import { BysSsoError, exchangeBysSsoTicket } from '../services/bysSsoService.js';
 
 export const authRouter = express.Router();
 
@@ -10,6 +11,41 @@ function sanitizeUser(user) {
   const { password, resetPasswordCode, resetPasswordExpires, ...safe } = user;
   return safe;
 }
+
+function renderSsoCompletion(session, user) {
+  const safeState = JSON.stringify({
+    token: session.token,
+    user: sanitizeUser(user)
+  }).replace(/</g, '\\u003c');
+  return `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width,initial-scale=1"><title>Accesso completato</title></head><body>
+  <p>Accesso al Marketplace completato. Reindirizzamento in corso…</p><script>
+  const state=${safeState};
+  localStorage.setItem('buyyourshare_session_token',state.token);
+  localStorage.setItem('buyyourshare_current_user_id',state.user.id);
+  localStorage.setItem('buyyourshare_cached_email',state.user.email);
+  localStorage.setItem('buyyourshare_cached_name',state.user.fullName||state.user.name||'Utente');
+  localStorage.setItem('buyyourshare_last_activity_ts',Date.now().toString());
+  location.replace('/#home');</script></body></html>`;
+}
+
+// BYS 2.0 is the identity authority. The signed ticket is POSTed so it never appears in a URL.
+authRouter.post('/bys/callback', async (req, res) => {
+  try {
+    const { session, user } = await exchangeBysSsoTicket(req.body?.ticket, dataRepository);
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    return res.type('html').send(renderSsoCompletion(session, user));
+  } catch (error) {
+    const status = error instanceof BysSsoError && error.code !== 'SSO_NOT_CONFIGURED' ? 401 : 503;
+    console.warn('[BYS SSO ERROR]', error.code || error.message);
+    return res.status(status).send('Accesso BuyYourShare non riuscito. Torna su BYS 2.0 e riprova.');
+  }
+});
 
 // 1. Registrazione Account
 authRouter.post('/register', async (req, res) => {
@@ -45,6 +81,12 @@ authRouter.post('/register', async (req, res) => {
 
     const existing = await dataRepository.findUserByEmail(cleanEmail);
     if (existing) {
+      if (existing.authSource === 'BYS_SSO' && !existing.password) {
+        return res.status(409).json({
+          error: 'BYS_ACCOUNT',
+          message: 'Questo account usa l’accesso unico BuyYourShare. Entra dal portale BYS 2.0.'
+        });
+      }
       // Aggiorna la password e nome utente, ed effettua l'accesso immediato
       await dataRepository.updateUser(existing.id, {
         password: cleanPass,
@@ -159,6 +201,13 @@ authRouter.post('/login', async (req, res) => {
 
     if (user.isSuspended) {
       return res.status(403).json({ error: 'USER_SUSPENDED', message: 'Questo account è stato sospeso dall\'amministratore.' });
+    }
+
+    if (user.authSource === 'BYS_SSO' && !user.password) {
+      return res.status(401).json({
+        error: 'BYS_SSO_REQUIRED',
+        message: 'Questo account usa l’accesso unico. Entra dal portale BuyYourShare 2.0.'
+      });
     }
 
     // Verifica password con tolleranza universale e aggiornamento automatico
