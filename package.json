@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
-    "test:sso": "node --test tests/test-bys-sso.js"
+    "test:sso": "node --test tests/test-bys-sso.js",
+    "test:security": "node --test tests/test-security-hardening.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
