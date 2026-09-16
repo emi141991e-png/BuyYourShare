@@ -183,7 +183,7 @@ export class P2pQuota {
     const events = this.repo.data.p2pQuotaWebhookEvents ||= [];
     if (events.some(e => e.id === event.id)) return { duplicate: true };
     const supported = ['MERCHANT.ONBOARDING.COMPLETED', 'MERCHANT.PARTNER-CONSENT.REVOKED',
-      'PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.CAPTURE.PENDING', 'PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.REFUNDED', 'PAYMENT.CAPTURE.REVERSED'];
+      'PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.CAPTURE.PENDING', 'PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.DECLINED', 'PAYMENT.CAPTURE.REFUNDED', 'PAYMENT.CAPTURE.REVERSED'];
     if (!supported.includes(event.event_type)) return { ignored: true };
     const resource = event.resource || {}, type = event.event_type;
     if (type.startsWith('MERCHANT.')) {
@@ -199,7 +199,7 @@ export class P2pQuota {
       if (!p) throw new P2pError('PAYPAL_UNKNOWN_PAYMENT_REQUIRES_REVIEW', 503);
       if (p) {
         // Refund/reversal is monotone; a delayed completed event cannot restore access.
-        if (['PAYMENT.CAPTURE.REFUNDED', 'PAYMENT.CAPTURE.REVERSED', 'PAYMENT.CAPTURE.DENIED'].includes(type)) {
+        if (['PAYMENT.CAPTURE.REFUNDED', 'PAYMENT.CAPTURE.REVERSED', 'PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.DECLINED'].includes(type)) {
           this.revoke(p, type.endsWith('REFUNDED') ? 'refunded' : type.endsWith('REVERSED') ? 'reversed' : 'failed');
         } else {
           await this.reconcile(p, false);

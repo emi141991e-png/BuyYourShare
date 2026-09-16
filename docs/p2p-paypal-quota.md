@@ -43,7 +43,7 @@ Le vecchie istruzioni di pagamento e la conferma manuale rispondono 410. Creazio
 
 ## Webhook da registrare sull'app partner
 
-MERCHANT.ONBOARDING.COMPLETED; MERCHANT.PARTNER-CONSENT.REVOKED; PAYMENT.CAPTURE.COMPLETED; PAYMENT.CAPTURE.PENDING; PAYMENT.CAPTURE.DENIED; PAYMENT.CAPTURE.REFUNDED; PAYMENT.CAPTURE.REVERSED.
+MERCHANT.ONBOARDING.COMPLETED; MERCHANT.PARTNER-CONSENT.REVOKED; PAYMENT.CAPTURE.COMPLETED; PAYMENT.CAPTURE.PENDING; PAYMENT.CAPTURE.DENIED; PAYMENT.CAPTURE.DECLINED; PAYMENT.CAPTURE.REFUNDED; PAYMENT.CAPTURE.REVERSED.
 
 Per capture completata il server rilegge l'ordine e verifica ID, custom_id, destinatario, EUR, importo e capture. Eventi duplicati non creano membership multiple; refund/reversal sono terminali e non vengono annullati da eventi completed tardivi. Eventi capture sconosciuti o provider non ancora coerente rispondono con errore retryable invece di perdere l'evento.
 

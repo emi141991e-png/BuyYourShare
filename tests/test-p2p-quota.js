@@ -70,6 +70,15 @@ test('a leader cannot capture a buyer-approved order and other users cannot insp
   await f.service.refresh('leader', p.id); assert.equal(f.counts().captureCount, 0);
   await assert.rejects(() => f.service.refresh('other', p.id), /PAYMENT_NOT_FOUND/);
 });
+test('both declined and denied capture events block access despite stale provider completion', async () => {
+  for (const type of ['PAYMENT.CAPTURE.DECLINED', 'PAYMENT.CAPTURE.DENIED']) {
+    const f = fixture(), p = await prepared(f); await f.service.refresh('member', p.id);
+    await f.service.webhook({ id: type, event_type: type, resource: { id: 'CAPTURE' } });
+    await f.service.refresh('member', p.id);
+    assert.equal(f.service.payments()[0].status, 'failed');
+    assert.equal(f.repo.data.memberships[0].status, 'PAYMENT_REVERSED');
+  }
+});
 test('quota client fails closed for unapproved live and never falls back to subscription credentials', () => {
   assert.throws(() => new P2pQuotaPayPal({ P2P_QUOTA_PAYPAL_MODE: 'live' }).settings(), /LIVE_NOT_APPROVED/);
   assert.throws(() => new P2pQuotaPayPal({ P2P_QUOTA_ENABLED: 'true', P2P_QUOTA_PAYPAL_MODE: 'sandbox', PAYPAL_CLIENT_ID: 'store', PAYPAL_CLIENT_SECRET: 'store-secret' }).ready(), /NOT_CONFIGURED/);
