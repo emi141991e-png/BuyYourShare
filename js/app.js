@@ -16,7 +16,7 @@ import { renderP2pAccess } from './ui/p2pAccess.js';
 // =========================================================================
 // GLOBAL STATE & ROUTING
 // =========================================================================
-let currentRoute = window.location.hash || '#home';
+let currentRoute = window.location.hash.split('&')[0] || '#home';
 let selectedCategoryFilter = 'ALL';
 let searchKeyword = '';
 let wizardState = {
@@ -68,7 +68,7 @@ function navigateTo(hash) {
 }
 
 window.addEventListener('hashchange', async () => {
-  currentRoute = window.location.hash || '#home';
+  currentRoute = window.location.hash.split('&')[0] || '#home';
   const currentUser = authService.getCurrentUser();
   await db.syncAllFromServer(currentUser);
   renderApp();
