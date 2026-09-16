@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-export const PRICES = Object.freeze({ MEMBER: 99, GROUP_LEADER: 49 });
+export const PRICES = Object.freeze({ MEMBER: 99, GROUP_LEADER: 99 });
 export class P2pError extends Error {
   constructor(code, status = 409) { super(code); this.status = status; }
 }
@@ -117,12 +117,10 @@ export class P2pSubscriptions {
     await this.reconcile(s); await this.save();
     if (!accessAllowed(s, this.now()) || s.cancelAtPeriodEnd) throw new P2pError('P2P_ACTIVE_SUBSCRIPTION_REQUIRED', 402);
     if (s.role === 'GROUP_LEADER') return this.view(userId);
-    if (s.pendingRole && s.approvalUrl) return this.view(userId);
-    const plans = await this.provider.validatePlans();
-    s.pendingRole = 'GROUP_LEADER'; s.pendingPlanId = plans.GROUP_LEADER;
-    s.revisionRequestId ||= randomUUID(); await this.save();
-    const result = await this.provider.revise(s.providerSubscriptionId, s.pendingPlanId, s.revisionRequestId);
-    s.approvalUrl = approval(result); await this.reconcile(s); await this.save();
+    // Role is independent of billing: retain the existing subscription and paid period.
+    s.role = 'GROUP_LEADER';
+    s.pendingRole = null; s.pendingPlanId = null; s.revisionRequestId = null; s.approvalUrl = null;
+    await this.save();
     return this.view(userId);
   }); }
   cancel(userId) { return this.exclusive(async () => {

@@ -11,7 +11,7 @@ function fixture() {
   const calls = [];
   const remote = { id: 'I-TEST', custom_id: '', plan_id: 'P-MEMBER', status: 'APPROVAL_PENDING', billing_info: {} };
   const provider = {
-    async validatePlans() { return { MEMBER: 'P-MEMBER', GROUP_LEADER: 'P-LEADER' }; },
+    async validatePlans() { return { MEMBER: 'P-MEMBER', GROUP_LEADER: 'P-MEMBER' }; },
     async create(record) { calls.push(['create', record.requestId]); remote.custom_id = record.customId; remote.plan_id = record.planId; return { id: remote.id, status: remote.status, links: [{ rel: 'approve', href: 'https://www.sandbox.paypal.com/approve' }] }; },
     async get() { return structuredClone(remote); },
     async revise(id, planId, key) { calls.push(['revise', id, planId, key]); return { links: [{ rel: 'approve', href: 'https://www.sandbox.paypal.com/revise' }] }; },
@@ -33,8 +33,8 @@ test('concurrent activation creates one recurring subscription, with role chosen
   assert.ok(f.repo.saves[0].p2pSubscriptions[0].requestId);
   const owner = fixture(); owner.repo.data.groups.push({ ownerId: 'user' });
   await owner.service.start('user', 'MEMBER');
-  assert.equal(owner.remote.plan_id, 'P-LEADER');
-  assert.equal(owner.service.view('user').priceCents, 49);
+  assert.equal(owner.remote.plan_id, 'P-MEMBER');
+  assert.equal(owner.service.view('user').priceCents, 99);
 });
 test('ACTIVE alone does not unlock unpaid access; renewal failure and suspension block it', async () => {
   const f = fixture(); await f.service.start('user', 'MEMBER');
@@ -47,15 +47,14 @@ test('ACTIVE alone does not unlock unpaid access; renewal failure and suspension
   f.remote.status = 'SUSPENDED'; f.remote.billing_info.failed_payments_count = 0;
   await f.service.refresh('user'); assert.equal(f.service.view('user').status, 'suspended');
 });
-test('upgrade revises same ID; stays MEMBER without consent and becomes leader only on verified plan', async () => {
+test('leader role keeps the same paid subscription without PayPal revision or extra charge', async () => {
   const f = fixture(); await f.service.start('user', 'MEMBER'); f.paid(); await f.service.refresh('user');
   await f.service.upgrade('user'); await f.service.upgrade('user');
-  assert.equal(f.calls.filter(c => c[0] === 'revise').length, 1);
-  assert.equal(f.service.view('user').role, 'MEMBER');
-  assert.equal(f.service.view('user').pendingRole, 'GROUP_LEADER');
-  f.remote.plan_id = 'P-LEADER'; await f.service.refresh('user');
+  assert.equal(f.calls.filter(c => c[0] === 'revise').length, 0);
   assert.equal(f.service.view('user').role, 'GROUP_LEADER');
-  assert.equal(f.service.view('user').priceCents, 49);
+  assert.equal(f.service.view('user').pendingRole, null);
+  assert.equal(f.service.find('user').planId, 'P-MEMBER');
+  assert.equal(f.service.view('user').priceCents, 99);
   assert.equal(f.service.view('user').nextBillingDate, '2026-10-01T12:00:00Z');
   assert.equal(f.calls.filter(c => c[0] === 'create').length, 1);
   f.repo.data.groups = []; await f.service.refresh('user');
@@ -120,15 +119,16 @@ test('legacy subscriptions block new billing; paid end does not move forward wit
   f.remote.billing_info.next_billing_time = '2026-11-01T12:00:00Z'; f.remote.billing_info.failed_payments_count = 1;
   await f.service.refresh('user'); assert.equal(f.service.find('user').currentPeriodEnd, '2026-10-01T12:00:00Z');
 });
-test('plan validation requires exact monthly EUR prices, same product, no setup fee or trial', async () => {
-  const plans = ['MEMBER', 'LEADER'].map((role, i) => ({ product_id: 'PRODUCT', status: 'ACTIVE', billing_cycles: [{ tenure_type: 'REGULAR', sequence: 1, total_cycles: 0, frequency: { interval_unit: 'MONTH', interval_count: 1 }, pricing_scheme: { fixed_price: { currency_code: 'EUR', value: i ? '0.49' : '0.99' } } }], payment_preferences: { setup_fee: { value: '0' } } }));
-  const p = new P2pPayPal({ P2P_PAYPAL_MODE: 'sandbox', P2P_PAYPAL_MEMBER_PLAN_ID: 'P-MEMBER', P2P_PAYPAL_LEADER_PLAN_ID: 'P-LEADER' });
-  p.request = async path => structuredClone(path.endsWith('P-MEMBER') ? plans[0] : plans[1]);
-  await p.validatePlans();
-  plans[1].billing_cycles[0].pricing_scheme.fixed_price.value = '0.99';
-  await assert.rejects(p.validatePlans(), /PLAN_INVALID/);
-  plans[1].billing_cycles[0].pricing_scheme.fixed_price.value = '0.49'; plans[1].product_id = 'OTHER';
-  await assert.rejects(p.validatePlans(), /PRODUCT_MISMATCH/);
+test('one monthly EUR 0.99 plan serves both roles; old discounted price and trials are rejected', async () => {
+ const plan = {product_id:'PRODUCT',status:'ACTIVE',billing_cycles:[{tenure_type:'REGULAR',sequence:1,total_cycles:0,frequency:{interval_unit:'MONTH',interval_count:1},pricing_scheme:{fixed_price:{currency_code:'EUR',value:'0.99'}}}],payment_preferences:{setup_fee:{value:'0'}}};
+ const p = new P2pPayPal({P2P_PAYPAL_MODE:'sandbox',P2P_PAYPAL_MEMBER_PLAN_ID:'P-MEMBER',P2P_PAYPAL_LEADER_PLAN_ID:'P-OLD-DISCOUNT'});
+ p.request=async path=>{assert.ok(path.endsWith('P-MEMBER'));return structuredClone(plan);};
+ assert.deepEqual(await p.validatePlans(),{MEMBER:'P-MEMBER',GROUP_LEADER:'P-MEMBER'});
+ plan.billing_cycles[0].pricing_scheme.fixed_price.value='0.49';
+ await assert.rejects(p.validatePlans(),/PLAN_INVALID/);
+ plan.billing_cycles[0].pricing_scheme.fixed_price.value='0.99';
+ plan.billing_cycles[0].tenure_type='TRIAL';
+ await assert.rejects(p.validatePlans(),/PLAN_INVALID/);
 });
 test('successful renewal extends the paid period once, and stale failures cannot revoke a later payment', async () => {
   const f = fixture(); await f.service.start('user', 'MEMBER'); f.paid(); await f.service.refresh('user');

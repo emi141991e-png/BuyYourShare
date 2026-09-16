@@ -16,7 +16,7 @@ const messages = {
   PAYPAL_ACCOUNT_CHANGE_REQUIRES_REVIEW: 'Per cambiare il conto destinatario contatta l’assistenza.',
   SLOT_RESERVED: 'Il posto è riservato da un pagamento in corso.',
   P2P_ACTIVE_SUBSCRIPTION_REQUIRED: 'Attiva o regolarizza l’abbonamento P2P per continuare.',
-  P2P_LEADER_PLAN_REQUIRED: 'Conferma il passaggio al piano capogruppo prima di creare il gruppo.',
+  P2P_LEADER_PLAN_REQUIRED: 'Scegli il ruolo capogruppo prima di creare il gruppo.',
   MEMBER_SUBSCRIPTION_INACTIVE: 'Il membro deve prima attivare o regolarizzare il proprio abbonamento BYS.',
   P2P_CREATE_REQUIRES_RECONCILIATION: 'La richiesta PayPal deve essere verificata dall’assistenza. Non effettuare un nuovo pagamento.',
   P2P_LEGACY_BILLING_REQUIRES_RECONCILIATION: 'Attivazione temporaneamente sospesa: è in corso la verifica dei precedenti abbonamenti dei gruppi.',
@@ -60,7 +60,7 @@ export async function renderP2pAccess(container, route, user) {
   }
   const reload = () => renderP2pAccess(container, route, user);
   if (!user) {
-    shell(`<h2>Un abbonamento per accedere al P2P</h2><p>Membro: <strong>0,99 €/mese</strong>. Capogruppo: <strong>0,49 €/mese</strong>.</p>
+    shell(`<h2>Un abbonamento per accedere al P2P</h2><p>Membro: <strong>0,99 €/mese</strong>. Capogruppo: <strong>0,99 €/mese</strong>.</p>
       <p>Rinnovo automatico mensile fino alla cancellazione. Le quote dei gruppi sono separate.</p>${link('#login', 'Accedi')}${link('#register', 'Registrati')}`); return;
   }
   try {
@@ -76,13 +76,13 @@ export async function renderP2pAccess(container, route, user) {
         ${!s.accessAllowed ? '<p>Puoi gestire il pagamento e cancellare il rinnovo da questa pagina. Le funzioni P2P restano sospese finché il pagamento non risulta attivo.</p>' : ''}
         ${!state.available ? `<p>${esc(messages[state.unavailableReason] || 'Attivazione temporaneamente non disponibile.')}</p>` : ''}
         <div style="display:flex;gap:12px;flex-wrap:wrap">
-        ${state.available && ['inactive', 'canceled'].includes(s.status) ? `${s.role === 'MEMBER' ? button('p2pMember', 'Attiva membro · 0,99 €/mese') : ''}${button('p2pLeader', 'Attiva capogruppo · 0,49 €/mese')}` : ''}
+        ${state.available && ['inactive', 'canceled'].includes(s.status) ? `${s.role === 'MEMBER' ? button('p2pMember', 'Attiva membro · 0,99 €/mese') : ''}${button('p2pLeader', 'Attiva capogruppo · 0,99 €/mese')}` : ''}
         ${state.available && s.status === 'pending' && !s.providerStatus ? button('p2pRetry', 'Recupera richiesta PayPal in corso') : ''}
         ${s.approvalUrl ? `<a class="btn btn-primary" href="${esc(s.approvalUrl)}">Continua e approva su PayPal</a>` : ''}
-        ${state.available && s.accessAllowed && s.role === 'MEMBER' && !s.cancelAtPeriodEnd ? button('p2pUpgrade', 'Passa a capogruppo · 0,49 €/mese') : ''}
+        ${state.available && s.accessAllowed && s.role === 'MEMBER' && !s.cancelAtPeriodEnd ? button('p2pUpgrade', 'Passa a capogruppo · 0,99 €/mese') : ''}
         ${button('p2pRefresh', 'Aggiorna stato PayPal')}
         ${s.providerStatus && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? button('p2pCancel', 'Disattiva rinnovo automatico') : ''}</div>
-        <p>Il passaggio a capogruppo modifica lo stesso abbonamento con il tuo consenso su PayPal: 0,49 € dal prossimo ciclo, senza secondo abbonamento o addebiti di conguaglio. Potrai creare il gruppo dopo la conferma. La chiusura dei gruppi non cambia automaticamente il piano.</p>`);
+        <p>Puoi diventare capogruppo senza cambiare abbonamento: il prezzo resta 0,99 € al mese. Nessun secondo addebito e nessuna nuova autorizzazione di pagamento.</p>`);
       for (const [id, role] of [['p2pMember', 'MEMBER'], ['p2pLeader', 'GROUP_LEADER']]) bind(id, async () => { await api('/api/p2p/subscription/start', { role }); await reload(); });
       bind('p2pUpgrade', async () => { await api('/api/p2p/subscription/upgrade', {}); await reload(); });
       bind('p2pRetry', async () => { await api('/api/p2p/subscription/start', { role: s.role }); await reload(); });

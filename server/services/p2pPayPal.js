@@ -12,7 +12,7 @@ export class P2pPayPal {
       clientId: e.P2P_PAYPAL_CLIENT_ID || (mode === config.paypal.mode ? config.paypal.clientId : ''),
       secret: e.P2P_PAYPAL_CLIENT_SECRET || (mode === config.paypal.mode ? config.paypal.clientSecret : ''),
       webhookId: e.P2P_PAYPAL_WEBHOOK_ID,
-      plans: { MEMBER: e.P2P_PAYPAL_MEMBER_PLAN_ID, GROUP_LEADER: e.P2P_PAYPAL_LEADER_PLAN_ID }
+      plans: { MEMBER: e.P2P_PAYPAL_MEMBER_PLAN_ID, GROUP_LEADER: e.P2P_PAYPAL_MEMBER_PLAN_ID }
     };
   }
   async request(path, method = 'GET', body, requestId) {
@@ -40,7 +40,7 @@ export class P2pPayPal {
   }
   async validatePlans() {
     const { plans } = this.settings();
-    if (!plans.MEMBER || !plans.GROUP_LEADER || plans.MEMBER === plans.GROUP_LEADER) throw new Error('P2P_NOT_CONFIGURED');
+    if (!plans.MEMBER || !plans.GROUP_LEADER) throw new Error('P2P_NOT_CONFIGURED');
     const details = [];
     for (const [role, id] of Object.entries(plans)) {
       const p = await this.request(`/v1/billing/plans/${encodeURIComponent(id)}`);
@@ -48,7 +48,7 @@ export class P2pPayPal {
       if (p.status !== 'ACTIVE' || p.billing_cycles?.length !== 1 || c.tenure_type !== 'REGULAR' ||
           c.frequency?.interval_unit !== 'MONTH' || c.frequency.interval_count !== 1 || c.total_cycles !== 0 ||
           c.pricing_scheme?.fixed_price?.currency_code !== 'EUR' ||
-          Number(c.pricing_scheme.fixed_price.value) !== (role === 'MEMBER' ? 0.99 : 0.49) ||
+          Number(c.pricing_scheme.fixed_price.value) !== 0.99 ||
           Number(p.payment_preferences?.setup_fee?.value || 0) !== 0 || p.quantity_supported ||
           Number(p.taxes?.percentage || 0) !== 0) throw new Error('P2P_PLAN_INVALID');
       details.push(p);
