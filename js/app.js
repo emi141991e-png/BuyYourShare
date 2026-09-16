@@ -430,7 +430,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
           </div>
           <h1 style="font-size:24px; font-weight:900; color:var(--text-main); margin-bottom:6px;">Benvenuto su BuyYourShare</h1>
           <p style="font-size:13.5px; color:var(--text-secondary); max-width:420px; margin:0 auto; line-height:1.4;">
-            Accedi al P2P: membro 0,99 €/mese, capogruppo 0,49 €/mese. Le quote dei gruppi si pagano direttamente al capogruppo.
+            Accedi al P2P: membro 0,99 €/mese, capogruppo 0,99 €/mese. Le quote dei gruppi si pagano direttamente al capogruppo.
           </p>
         </div>
 

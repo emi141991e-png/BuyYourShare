@@ -40,10 +40,10 @@ let generation = 0;
 export async function renderP2pAccess(container, route, user) {
   const turn = ++generation;
   container.innerHTML = '<p role="status">Caricamento P2P…</p>';
-  const shell = content => {
+  const shell = (content, billing = false) => {
     if (generation !== turn) return;
-    container.innerHTML = `<section class="p2p-access" style="max-width:1000px;margin:auto;padding:24px;display:grid;gap:20px">
-      <h1>BuyYourShare P2P</h1><nav style="display:flex;gap:10px;flex-wrap:wrap" aria-label="P2P">
+    container.innerHTML = `<section class="p2p-access ${billing ? 'p2p-billing' : ''}" style="max-width:1000px;margin:auto;padding:24px;display:grid;gap:20px">
+      <h1>${billing ? 'Il tuo spazio P2P' : 'BuyYourShare P2P'}</h1><nav style="display:flex;gap:10px;flex-wrap:wrap" aria-label="P2P">
       ${link('#cerca', 'Gruppi')}${link('#crea', 'Crea gruppo')}${link('#miei-abbonamenti', 'Le mie partecipazioni')}${link('#miei-gruppi', 'I miei gruppi')}${link('#p2p-abbonamento', 'Abbonamento BYS')}</nav>
       <p style="padding:16px;background:#eff6ff;border-radius:12px;color:#16345b">${direct}</p>
       <div id="p2pMessage" role="status" aria-live="polite"></div>${content}</section>`;
@@ -68,21 +68,25 @@ export async function renderP2pAccess(container, route, user) {
     if (generation !== turn) return;
     const s = state.subscription;
     if (route === '#p2p-abbonamento' || !s.accessAllowed || !state.available || (route === '#crea' && s.role !== 'GROUP_LEADER')) {
-      shell(`<h2>Abbonamento di accesso BYS</h2>
-        <p><strong>${s.role === 'GROUP_LEADER' ? 'Capogruppo' : 'Membro'} · ${money(s.priceCents)}/mese</strong></p>
-        <p>Stato: <strong>${esc(statuses[s.status] || s.status)}</strong></p>
-        <p>${s.cancelAtPeriodEnd ? `Rinnovo disattivato. Accesso fino al ${date(s.currentPeriodEnd)}.` : `Rinnovo automatico mensile. Prossima data: ${date(s.nextBillingDate)}.`}</p>
-        ${s.pendingRole ? '<p>Passaggio a capogruppo in attesa di consenso PayPal. Fino alla conferma rimane il piano membro.</p>' : ''}
-        ${!s.accessAllowed ? '<p>Puoi gestire il pagamento e cancellare il rinnovo da questa pagina. Le funzioni P2P restano sospese finché il pagamento non risulta attivo.</p>' : ''}
-        ${!state.available ? `<p>${esc(messages[state.unavailableReason] || 'Attivazione temporaneamente non disponibile.')}</p>` : ''}
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
-        ${state.available && ['inactive', 'canceled'].includes(s.status) ? `${s.role === 'MEMBER' ? button('p2pMember', 'Attiva membro · 0,99 €/mese') : ''}${button('p2pLeader', 'Attiva capogruppo · 0,99 €/mese')}` : ''}
-        ${state.available && s.status === 'pending' && !s.providerStatus ? button('p2pRetry', 'Recupera richiesta PayPal in corso') : ''}
-        ${s.approvalUrl ? `<a class="btn btn-primary" href="${esc(s.approvalUrl)}">Continua e approva su PayPal</a>` : ''}
-        ${state.available && s.accessAllowed && s.role === 'MEMBER' && !s.cancelAtPeriodEnd ? button('p2pUpgrade', 'Passa a capogruppo · 0,99 €/mese') : ''}
-        ${button('p2pRefresh', 'Aggiorna stato PayPal')}
-        ${s.providerStatus && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? button('p2pCancel', 'Disattiva rinnovo automatico') : ''}</div>
-        <p>Puoi diventare capogruppo senza cambiare abbonamento: il prezzo resta 0,99 € al mese. Nessun secondo addebito e nessuna nuova autorizzazione di pagamento.</p>`);
+      shell(`<div class="billing-grid"><article class="billing-card">
+        <div class="billing-top"><span class="billing-eyebrow">ABBONAMENTO BYS</span><span class="billing-status ${s.accessAllowed ? 'is-active' : ''}">${esc(statuses[s.status] || s.status)}</span></div>
+        <h2>Un unico piano.<br>Il tuo modo di condividere.</h2>
+        <p class="billing-intro">Entra nei gruppi o diventa capogruppo, allo stesso prezzo.</p>
+        <div class="billing-price">${money(s.priceCents)}<span>/ mese</span></div>
+        <p class="billing-caption">Rinnovo automatico mensile · Puoi disattivarlo quando vuoi</p>
+        <dl class="billing-details"><div><dt>Il tuo ruolo</dt><dd>${s.role === 'GROUP_LEADER' ? 'Capogruppo' : 'Membro'}</dd></div><div><dt>${s.cancelAtPeriodEnd ? 'Accesso fino al' : 'Prossimo rinnovo'}</dt><dd>${s.cancelAtPeriodEnd ? date(s.currentPeriodEnd) : s.nextBillingDate ? date(s.nextBillingDate) : 'Dopo l’attivazione'}</dd></div></dl>
+        ${!s.accessAllowed ? '<p class="billing-notice">Completa l’attivazione su PayPal per accedere alle funzioni P2P.</p>' : '<p class="billing-notice is-active">Il tuo accesso P2P è attivo.</p>'}
+        ${s.cancelAtPeriodEnd ? '<p class="billing-notice">Rinnovo disattivato: conservi il periodo già pagato.</p>' : ''}
+        ${s.pendingRole ? '<p class="billing-notice">Cambio ruolo in attesa di conferma PayPal.</p>' : ''}
+        ${!state.available ? `<p class="billing-notice">${esc(messages[state.unavailableReason] || 'Attivazione temporaneamente non disponibile.')}</p>` : ''}
+        <div class="billing-actions">
+        ${state.available && ['inactive', 'canceled'].includes(s.status) ? button(s.role === 'GROUP_LEADER' ? 'p2pLeader' : 'p2pMember', 'Attiva il tuo accesso · 0,99 €/mese') : ''}
+        ${state.available && s.status === 'pending' && !s.providerStatus ? button('p2pRetry', 'Recupera richiesta PayPal') : ''}
+        ${s.approvalUrl ? `<a class="btn btn-primary" href="${esc(s.approvalUrl)}">Continua su PayPal <span aria-hidden="true">↗</span></a>` : ''}
+        ${state.available && s.accessAllowed && s.role === 'MEMBER' && !s.cancelAtPeriodEnd ? button('p2pUpgrade', 'Diventa capogruppo · stesso prezzo') : ''}
+        <button class="billing-refresh" id="p2pRefresh" type="button">Aggiorna stato del pagamento</button></div>
+        ${s.providerStatus && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? '<div class="billing-manage"><button id="p2pCancel" type="button">Disattiva rinnovo automatico</button></div>' : ''}
+        </article><aside class="billing-aside"><span class="billing-eyebrow">SEMPLICE, TRASPARENTE</span><h3>Un accesso,<br>due possibilità.</h3><div><span class="billing-step">01</span><h4>Partecipa a un gruppo</h4><p>Scegli il gruppo e gestisci le tue partecipazioni in un unico spazio.</p></div><div><span class="billing-step">02</span><h4>Crea il tuo gruppo</h4><p>Diventa capogruppo senza un secondo abbonamento o costi aggiuntivi di accesso.</p></div><div class="billing-separate"><h4>Le quote restano separate</h4><p>Le quote dei membri vanno direttamente al capogruppo tramite PayPal. BYS incassa solo l’abbonamento di accesso.</p></div></aside></div>`, true);
       for (const [id, role] of [['p2pMember', 'MEMBER'], ['p2pLeader', 'GROUP_LEADER']]) bind(id, async () => { await api('/api/p2p/subscription/start', { role }); await reload(); });
       bind('p2pUpgrade', async () => { await api('/api/p2p/subscription/upgrade', {}); await reload(); });
       bind('p2pRetry', async () => { await api('/api/p2p/subscription/start', { role: s.role }); await reload(); });

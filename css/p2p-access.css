@@ -14,3 +14,37 @@
   .p2p-access { padding: 16px 8px 100px !important; }
   .p2p-access nav .btn { flex: 1 1 42%; font-size: 13px; }
 }
+/* Subscription page: scoped to P2P billing only. */
+.p2p-billing > h1 {font-size:26px;letter-spacing:-.8px;margin:8px 0 0;color:#14213b}
+.p2p-billing > nav {gap:4px!important;border-bottom:1px solid #e2e8f0;padding-bottom:16px}
+.p2p-billing > nav .btn {background:transparent;box-shadow:none;border:0;color:#61708a;font-size:13px;padding:7px 10px}
+.p2p-billing > p {display:none}
+.billing-grid {display:grid;grid-template-columns:minmax(0,1.5fr) minmax(230px,1fr);gap:24px;align-items:start}
+.billing-card {background:#fff;border:1px solid #e1e7f0;border-radius:24px;padding:32px;box-shadow:0 12px 40px #20356a09}
+.billing-top {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.billing-eyebrow {font-size:10px;font-weight:800;letter-spacing:1.8px;color:#5968a0}
+.billing-status {font-size:11px;font-weight:600;border-radius:20px;padding:6px 10px;background:#fff4df;color:#8a5b13;max-width:100%}
+.billing-status.is-active {background:#e9f8ef;color:#187044}
+.billing-card h2 {font-size:30px;line-height:1.2;letter-spacing:-1px;margin:24px 0 12px;color:#15233e}
+.billing-intro,.billing-caption {color:#718099;font-size:14px;line-height:1.6}
+.billing-price {font-size:54px;font-weight:800;letter-spacing:-2.5px;color:#192843;margin-top:24px;line-height:1.2}
+.billing-price span {font-size:15px;font-weight:500;letter-spacing:0;color:#718099;margin-left:8px}
+.billing-caption {font-size:11px;margin-top:8px}
+.billing-details {display:grid;grid-template-columns:1fr 1fr;gap:16px;border-top:1px solid #edf0f5;border-bottom:1px solid #edf0f5;padding:18px 0;margin:24px 0}
+.billing-details dt {font-size:11px;color:#718099;margin-bottom:5px}
+.billing-details dd {font-size:13px;font-weight:700;margin:0;color:#253651}
+.billing-notice {font-size:12px;line-height:1.65;background:#f3f6ff;border-radius:10px;padding:12px;color:#4c6084}
+.billing-actions {display:grid;gap:12px;margin-top:20px}
+.billing-actions .btn {margin:0;width:100%;box-sizing:border-box;display:flex;justify-content:center;gap:14px;align-items:center;border-radius:12px;font-size:14px;padding:15px 12px;background:#405be8;box-shadow:0 5px 12px #405be821}
+.billing-refresh,.billing-manage button {border:0;background:transparent;font:inherit;font-size:12px;color:#647494;cursor:pointer;padding:9px;text-decoration:underline;text-underline-offset:3px}
+.billing-manage {margin-top:18px;padding-top:14px;border-top:1px solid #edf0f5;text-align:center}
+.billing-manage button {color:#8d6170;font-size:11px}
+.billing-aside {padding:30px 24px;background:linear-gradient(145deg,#eef2ff,#f5f9fc);border-radius:24px;color:#253651}
+.billing-aside h3 {font-size:25px;line-height:1.25;letter-spacing:-.6px;margin:16px 0 28px}
+.billing-aside h4 {font-size:14px;margin:10px 0 6px}
+.billing-aside p {font-size:12px;line-height:1.75;color:#67758e;margin:0 0 24px}
+.billing-step {font-size:11px;font-weight:800;color:#536be5;background:#fff;border-radius:8px;display:inline-block;padding:5px 8px}
+.billing-separate {border-top:1px solid #dce3f1;padding-top:12px}
+.billing-separate p {margin-bottom:0}
+.p2p-billing button:focus-visible,.p2p-billing a:focus-visible {outline:3px solid #8a9dff;outline-offset:3px}
+@media(max-width:720px){.billing-grid{grid-template-columns:1fr}.billing-card{padding:24px}.billing-card h2{font-size:27px}.billing-aside{padding:24px}.billing-price{font-size:48px}.p2p-billing > nav .btn{flex:initial;font-size:12px}}
