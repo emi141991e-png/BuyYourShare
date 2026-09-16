@@ -11,6 +11,7 @@ import { formatDateIT, formatDateShort } from './engine/DateEngine.js';
 import { stripeCheckoutService } from './services/stripeCheckoutService.js';
 import { stripeConnectService } from './services/stripeConnectService.js';
 import { financialAuditService } from './services/financialAuditService.js';
+import { renderP2pAccess } from './ui/p2pAccess.js';
 
 // =========================================================================
 // GLOBAL STATE & ROUTING
@@ -141,6 +142,11 @@ export function renderApp() {
       return;
     }
 
+    if (routePath !== '#admin') {
+      renderP2pAccess(container, routePath, currentUser);
+      return;
+    }
+
     if (routePath === '#home' || routePath === '') {
       renderHomeView(container, currentUser);
     } else if (routePath === '#cerca') {
@@ -223,7 +229,7 @@ function updateHeader(currentUser) {
     return;
   }
 
-  const roleLabel = currentUser.role === 'admin' ? '⚙️ Admin' : (currentUser.id.includes('owner') || db.getMyCreatedGroups(currentUser.id, currentUser).length > 0 ? '👑 Capogruppo' : '👤 Membro');
+  const roleLabel = currentUser.role === 'admin' ? '⚙️ Admin' : 'P2P';
   const roleBg = currentUser.role === 'admin' ? '#f3e8ff' : (roleLabel.includes('Capogruppo') ? '#fef3c7' : '#e0f2fe');
   const roleColor = currentUser.role === 'admin' ? '#6b21a8' : (roleLabel.includes('Capogruppo') ? '#92400e' : '#0369a1');
 
@@ -262,9 +268,7 @@ function updateHeader(currentUser) {
     ` : ''}
 
     <!-- Payment and Payout Settings Button -->
-    <button id="btnOpenPaymentSettingsHeader" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;" title="Gestione IBAN e Metodi di Pagamento">
-      💳 Pagamenti & IBAN
-    </button>
+    <a href="#p2p-abbonamento" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;">Abbonamento P2P</a>
 
     <!-- Delete Account Button (Tutti gli account registrati) -->
     ${currentUser.role !== 'admin' ? `
@@ -426,7 +430,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
           </div>
           <h1 style="font-size:24px; font-weight:900; color:var(--text-main); margin-bottom:6px;">Benvenuto su BuyYourShare</h1>
           <p style="font-size:13.5px; color:var(--text-secondary); max-width:420px; margin:0 auto; line-height:1.4;">
-            La piattaforma sicura per condividere abbonamenti digitali legittimamente con MoneySplit e ricezione quote su IBAN.
+            Accedi al P2P: membro 0,99 €/mese, capogruppo 0,49 €/mese. Le quote dei gruppi si pagano direttamente al capogruppo.
           </p>
         </div>
 
@@ -629,7 +633,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         </div>
 
         <p style="text-align:center; font-size:11.5px; color:var(--text-muted); margin-top:20px;">
-          🔒 Connessione cifrata TLS 256-bit • Pagamenti protetti con Stripe Connect & PayPal Sandbox
+          Abbonamento BYS con rinnovo automatico tramite PayPal. Nessun incasso o distribuzione delle quote dei gruppi da parte di BYS.
         </p>
       </div>
     `;

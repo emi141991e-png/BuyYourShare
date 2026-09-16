@@ -8,7 +8,6 @@ import express from 'express';
 import { dataRepository } from '../db/dataRepository.js';
 import { requireAuth } from '../middleware/auth.js';
 import { calculatePricingBreakdown, getGroupSlotsBreakdown } from '../engine/MoneyEngine.js';
-import { DEFAULT_PLATFORM_FEE_CENTS } from '../engine/FeeEngine.js';
 
 export const groupsRouter = express.Router();
 
@@ -35,8 +34,8 @@ function sanitizeGroupForPublic(group, ownerUser) {
     availableSlots: group.availableSlots,
     occupiedMemberSlots: group.occupiedMemberSlots || 0,
     baseMemberShareCents: group.baseMemberShareCents,
-    platformFeeCents: group.platformFeeCents || DEFAULT_PLATFORM_FEE_CENTS,
-    memberTotalCents: group.memberTotalCents,
+    platformFeeCents: 0,
+    memberTotalCents: group.baseMemberShareCents,
     groupType: group.groupType || 'public',
     status: computedStatus,
     rulesAndRequirements: group.rulesAndRequirements || '',
@@ -150,7 +149,6 @@ groupsRouter.get('/:id', async (req, res) => {
 groupsRouter.post('/', requireAuth, async (req, res) => {
   try {
     const user = req.user;
-    const conn = await dataRepository.findConnectedAccountByUserId(user.id);
 
     const {
       serviceId,
@@ -183,18 +181,16 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
     const realCostCents = Math.round((parseFloat(realCostEuros) || 0) * 100);
     const tSlots = parseInt(totalSlots, 10) || 6;
     const oSlots = parseInt(ownerSlots, 10) || 1;
-    const feeCents = DEFAULT_PLATFORM_FEE_CENTS;
+    const feeCents = 0; // Group shares are direct; platform access has its own subscription.
 
     if (!customServiceName || realCostCents <= 0 || tSlots < 2 || tSlots > 50 || oSlots < 1 || oSlots >= tSlots) {
       return res.status(400).json({ error: 'INVALID_INPUT', message: 'Dati del gruppo non validi.' });
     }
 
     const pricing = calculatePricingBreakdown(realCostCents, tSlots, feeCents);
-    const newGroupId = 'grp-' + Date.now();
+    const newGroupId = 'grp-' + crypto.randomUUID();
 
-    const hasStripePayout = conn && conn.payoutsEnabled && conn.chargesEnabled && conn.onboardingStatus === 'completed';
-    const hasPaypalPayout = !!(user.paypalPayoutEmail && user.paypalPayoutEmail.includes('@'));
-    const isPayoutReady = !!(hasStripePayout || hasPaypalPayout);
+    const isPayoutReady = true; // BYS does not collect or distribute group funds.
 
     // Di default il gruppo creato dall'utente viene pubblicato per essere immediatamente visibile
     const initialStatus = 'PUBLISHED';
@@ -220,6 +216,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       ownerSpotifyAddress: (ownerSpotifyAddress || '').trim(),
       rulesAndRequirements: (rulesAndRequirements || 'Rispetta le regole della community e del provider.').trim(),
       description: (description || `Gruppo condivisione ${customServiceName}`).trim(),
+      directPaymentInstructions: typeof req.body.directPaymentInstructions === 'string' ? req.body.directPaymentInstructions.trim().slice(0, 2000) : '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -237,7 +234,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       paidFeeCents: 0,
       memberTotalCents: pricing.shares[0] || pricing.baseMemberShareCents,
       status: 'ACTIVE',
-      autoRenew: true,
+      autoRenew: false,
       currentPeriodStart: new Date().toISOString(),
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -284,17 +281,6 @@ groupsRouter.post('/:id/publish', requireAuth, async (req, res) => {
 
     if (group.ownerId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Non hai i permessi per pubblicare questo gruppo.' });
-    }
-
-    const conn = await dataRepository.findConnectedAccountByUserId(req.user.id);
-    const hasStripePayout = conn && conn.payoutsEnabled && conn.chargesEnabled && conn.onboardingStatus === 'completed';
-    const hasPaypalPayout = !!(req.user.paypalPayoutEmail && req.user.paypalPayoutEmail.includes('@'));
-
-    if (!hasStripePayout && !hasPaypalPayout) {
-      return res.status(403).json({
-        error: 'PAYOUT_NOT_READY',
-        message: 'Prima di pubblicare il gruppo, configura il tuo IBAN (Stripe Connect) o la tua email PayPal per ricevere le quote mensili.'
-      });
     }
 
     await dataRepository.updateGroup(group.id, {

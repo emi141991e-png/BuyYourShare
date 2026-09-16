@@ -1,0 +1,16 @@
+.p2p-access { padding-bottom: 100px !important; line-height: 1.55; }
+.p2p-access form label { display: grid; gap: 7px; font-weight: 600; }
+.p2p-access input, .p2p-access textarea {
+  width: 100%; box-sizing: border-box; border: 1px solid #94a3b8;
+  border-radius: 9px; padding: 11px 13px; font: inherit; background: #fff; color: #172033;
+}
+.p2p-access textarea { min-height: 95px; resize: vertical; }
+.p2p-access input:focus, .p2p-access textarea:focus { outline: 2px solid #4f46e5; outline-offset: 2px; }
+.p2p-access .btn { white-space: normal; margin: 3px; }
+.p2p-access button:disabled { opacity: .6; cursor: wait; }
+.p2p-access pre { font: inherit; overflow-wrap: anywhere; }
+.p2p-access #p2pMessage:not(:empty) { padding: 14px; border: 1px solid #d97706; background: #fffbeb; color: #78350f; border-radius: 10px; }
+@media (max-width: 600px) {
+  .p2p-access { padding: 16px 8px 100px !important; }
+  .p2p-access nav .btn { flex: 1 1 42%; font-size: 13px; }
+}

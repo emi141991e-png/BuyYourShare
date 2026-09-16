@@ -25,7 +25,8 @@ accessRouter.get('/:groupId', requireAuth, async (req, res) => {
       return memUser && memUser.email && memUser.email.toLowerCase() === user.email.toLowerCase();
     });
 
-    const isMember = matching.some(m => m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED' || m.status === 'active');
+    const isMember = matching.some(m => ['ACTIVE', 'CANCELLATION_SCHEDULED', 'active'].includes(m.status) &&
+      (m.paymentMethod !== 'DIRECT' || Date.parse(m.currentPeriodEnd) > Date.now()));
 
     if (!isOwner && !isMember) {
       return res.status(403).json({
