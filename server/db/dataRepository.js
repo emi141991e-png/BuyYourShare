@@ -47,9 +47,9 @@ class DataRepository {
         this.data = JSON.parse(raw);
         console.log(`[DB] Database persistente caricato da: ${DB_FILE}`);
       } catch (err) {
-        console.error('[DB] Errore lettura database.json, reinizializzazione con seed...', err);
-        this.data = this.createDefaultState();
-        this.saveSync();
+        // Losing provider IDs could create duplicate paid subscriptions on retry.
+        // Fail closed and retain the original file for recovery instead of reseeding.
+        throw new Error('P2P_DATABASE_UNREADABLE: restore the persistent database before starting.', { cause: err });
       }
     } else {
       // Se siamo su volume persistente Railway vuoto, copia lo stato esistente da DEFAULT_DATA_DIR se presente
@@ -135,6 +135,10 @@ class DataRepository {
       checkoutReservations: [],
       usedSsoTickets: []
     };
+  }
+
+  backupForP2pMigration() {
+    fs.copyFileSync(DB_FILE, `${DB_FILE}.before-p2p-${Date.now()}.bak`, fs.constants.COPYFILE_EXCL);
   }
 
   saveSync() {

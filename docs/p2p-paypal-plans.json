@@ -1,0 +1,19 @@
+{
+  "instructions": "Template da usare esclusivamente nell'ambiente PayPal scelto. Sostituire product_id con lo stesso prodotto per entrambi. Nessuna risorsa viene creata automaticamente.",
+  "plans": [
+    {
+      "product_id": "REPLACE_WITH_SAME_PRODUCT_ID",
+      "name": "BuyYourShare P2P MEMBER",
+      "status": "ACTIVE",
+      "billing_cycles": [{ "frequency": { "interval_unit": "MONTH", "interval_count": 1 }, "tenure_type": "REGULAR", "sequence": 1, "total_cycles": 0, "pricing_scheme": { "fixed_price": { "value": "0.99", "currency_code": "EUR" } } }],
+      "payment_preferences": { "auto_bill_outstanding": true, "payment_failure_threshold": 2 }
+    },
+    {
+      "product_id": "REPLACE_WITH_SAME_PRODUCT_ID",
+      "name": "BuyYourShare P2P GROUP_LEADER",
+      "status": "ACTIVE",
+      "billing_cycles": [{ "frequency": { "interval_unit": "MONTH", "interval_count": 1 }, "tenure_type": "REGULAR", "sequence": 1, "total_cycles": 0, "pricing_scheme": { "fixed_price": { "value": "0.49", "currency_code": "EUR" } } }],
+      "payment_preferences": { "auto_bill_outstanding": true, "payment_failure_threshold": 2 }
+    }
+  ]
+}

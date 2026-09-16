@@ -18,6 +18,14 @@ export const adminRouter = express.Router();
 
 // 🔒 BLOCCO DI SICUREZZA SERVER-SIDE: Tutti gli endpoint richiedono autenticazione e ruolo 'admin'
 adminRouter.use(requireAuth, requireRole('admin'));
+// Billing identities and event deduplication must never be erased by legacy reset tools.
+adminRouter.use((req, res, next) => {
+  if (req.method === 'POST' && ['/clean-all-data', '/sync-database-clean'].includes(req.path) &&
+      (dataRepository.data.p2pSubscriptions || []).length) {
+    return res.status(409).json({ error: 'P2P_BILLING_RECORDS_PROTECTED', message: 'La pulizia legacy non può rimuovere utenti o dati collegati agli abbonamenti P2P.' });
+  }
+  next();
+});
 
 // Endpoint di Pulizia Totale Produzione: Elimina tutti i gruppi, transazioni, messaggi e utenti di test
 adminRouter.post('/clean-all-data', async (req, res) => {

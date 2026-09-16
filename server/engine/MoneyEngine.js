@@ -15,7 +15,7 @@ export function allocateMoneySplit(totalCents, slotsCount) {
   return shares;
 }
 
-export function calculatePricingBreakdown(realCostCents, totalSlots = 6, platformFeeCents = 149) {
+export function calculatePricingBreakdown(realCostCents, totalSlots = 6, platformFeeCents = 0) {
   const tSlots = parseInt(totalSlots, 10) || 6;
   const cost = parseInt(realCostCents, 10) || 0;
   const shares = allocateMoneySplit(cost, tSlots);
@@ -52,10 +52,11 @@ export function getGroupSlotsBreakdown(group, memberships = [], requestingUser =
   const totalSlots = group.totalSlots || 6;
   const ownerSlots = group.ownerSlots || 1;
   const realCostCents = group.realSubscriptionCostCents || 0;
-  const feeCents = group.platformFeeCents || 149;
+  const feeCents = 0; // Access subscription is never added to a group's share.
 
   const shares = allocateMoneySplit(realCostCents, totalSlots);
-  const groupMemberships = memberships.filter(m => m.groupId === group.id && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED'));
+  const groupMemberships = memberships.filter(m => m.groupId === group.id && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED') &&
+    (m.paymentMethod !== 'DIRECT' || Date.parse(m.currentPeriodEnd) > Date.now()));
 
   const slots = [];
   for (let i = 1; i <= totalSlots; i++) {
