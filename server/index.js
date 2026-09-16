@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import Stripe from 'stripe';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config/env.js';
@@ -30,8 +31,10 @@ const ROOT_DIR = path.join(__dirname, '..');
 const app = express();
 const p2pProvider = new P2pPayPal();
 if (process.env.P2P_LEGACY_RECONCILE_IDS) {
+  const stripeKey = process.env.STRIPE_SECRET_KEY || dataRepository.getStripeSecretKey() || config.stripe.secretKey;
+  const legacyStripe = stripeKey?.startsWith('sk_') ? new Stripe(stripeKey, { apiVersion: '2024-06-20', timeout: 15000, maxNetworkRetries: 1 }) : null;
   const migrated = await prepareLegacyMigration(dataRepository.data, p2pProvider,
-    process.env.P2P_LEGACY_RECONCILE_IDS.split(',').map(id => id.trim()).filter(Boolean));
+    process.env.P2P_LEGACY_RECONCILE_IDS.split(',').map(id => id.trim()).filter(Boolean), new Date(), { stripe: legacyStripe });
   if (migrated) {
     dataRepository.backupForP2pMigration();
     dataRepository.data = migrated;

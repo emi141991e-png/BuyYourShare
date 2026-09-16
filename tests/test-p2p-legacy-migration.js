@@ -40,3 +40,22 @@ test('migration credit cannot be billed early and creates a fresh request after 
   clock=Date.parse('2026-09-23');
   assert.equal((await service.start('u','MEMBER')).status,'pending'); assert.equal(calls,1);
 });
+
+test('legacy Stripe one-time payment requires provider proof and never extends stored paid period', async () => {
+  const d=data(); delete d.memberships[0].paypalSubscriptionId;
+  Object.assign(d.memberships[0],{stripeSubscriptionId:'pi_old',currentPeriodEnd:'2026-09-21T12:00:00Z'});
+  const payment=()=>({id:'pi_old',status:'succeeded',currency:'eur',amount_received:499,invoice:null,
+    latest_charge:{paid:true,refunded:false,amount_refunded:0,invoice:null,created:Date.parse('2026-08-22T12:00:00Z')/1000}});
+  const stripeFor=p=>({paymentIntents:{retrieve:async(id,opts)=>{assert.equal(id,'pi_old');assert.deepEqual(opts.expand,['latest_charge']);return p;}}});
+  const result=await prepareLegacyMigration(d,{},['pi_old'],now,{stripe:stripeFor(payment())});
+  assert.equal(result.memberships[0].legacyProviderStatus,'ONE_TIME_PAYMENT_VERIFIED');
+  assert.equal(result.p2pSubscriptions[0].currentPeriodEnd,'2026-09-21T12:00:00.000Z');
+  assert.equal(d.memberships[0].legacyBillingEndedAt,undefined);
+  for (const alter of [p=>p.invoice='in_recurring',p=>p.latest_charge.invoice='in_recurring',p=>p.status='processing',p=>p.latest_charge.refunded=true,p=>p.amount_received=0,p=>p.id='pi_other']) {
+    const p=payment();alter(p);
+    await assert.rejects(prepareLegacyMigration(d,{},['pi_old'],now,{stripe:stripeFor(p)}));
+  }
+  await assert.rejects(prepareLegacyMigration(d,{},[],now,{stripe:stripeFor(payment())}));
+  d.memberships[0].stripeSubscriptionId='sub_actual';
+  await assert.rejects(prepareLegacyMigration(d,{},['sub_actual'],now,{stripe:stripeFor(payment())}));
+});
