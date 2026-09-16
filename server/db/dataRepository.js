@@ -137,6 +137,10 @@ class DataRepository {
     };
   }
 
+  backupForP2pMigration() {
+    fs.copyFileSync(DB_FILE, `${DB_FILE}.before-p2p-${Date.now()}.bak`, fs.constants.COPYFILE_EXCL);
+  }
+
   saveSync() {
     const tempFile = DB_FILE + '.tmp.' + Date.now();
     fs.writeFileSync(tempFile, JSON.stringify(this.data, null, 2), 'utf8');

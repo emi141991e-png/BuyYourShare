@@ -79,7 +79,7 @@ Registrare `BILLING.SUBSCRIPTION.ACTIVATED`, `UPDATED`, `PAYMENT.FAILED`, `CANCE
 
 Le vecchie rotte checkout/connect restituiscono 410 e non chiamano incassi, transfer o payout. Le vecchie rotte webhook restituiscono 503: un evento di quota preesistente deve essere riconciliato, non distribuito automaticamente dal nuovo codice.
 
-**Questo non cancella le subscription già esistenti su PayPal/Stripe.** Non basta disabilitare un endpoint per fermare un addebito ricorrente esterno. Prima del cutover è necessario un inventario verificato dei precedenti abbonamenti e la loro disattivazione/migrazione con gestione dei periodi pagati. `ready()` blocca il nuovo servizio se una membership conserva un ID ricorrente senza `legacyBillingEndedAt` verificato. Non aggiungere tale attestazione finché non è stata controllata la cessazione effettiva presso il provider. Questo lavoro non esegue tale migrazione né modifica dati reali.
+**Questo non cancella le subscription già esistenti su PayPal/Stripe.** Non basta disabilitare un endpoint per fermare un addebito ricorrente esterno. Prima del cutover è necessario un inventario verificato dei precedenti abbonamenti e la loro disattivazione/migrazione con gestione dei periodi pagati. `ready()` blocca il nuovo servizio se una membership conserva un ID ricorrente senza `legacyBillingEndedAt` verificato. Non aggiungere tale attestazione finché non è stata controllata la cessazione effettiva presso il provider. La migrazione autorizzata è descritta di seguito.
 
 Rilascio consentito solo dopo: confronto con HEAD, build/test verdi, prova sandbox end-to-end con approvazione/revisione/cancellazione reali di sandbox e webhook, piani validati, nessun vecchio addebito ricorrente residuo, volume persistente e singola replica, Railway stabile. Se queste condizioni non sono verificabili, mantenere i commit locali e non pubblicare.
 
@@ -92,3 +92,9 @@ Riferimento PayPal sul cambio piano: https://developer.paypal.com/subscriptions/
 ## Ambiente Railway sandbox isolato
 
 Solo in `test`, usare `railway.p2p-sandbox.json`. L'avvio dedicato richiede credenziali P2P sandbox e crea esclusivamente `/app/server/data/p2p-sandbox-20260916/database.json`, vuoto, senza utenti o dati copiati. La creazione esclusiva preserva il file ai riavvii; un file preesistente senza marcatore sandbox causa arresto. Il comando di produzione resta invariato. Non usare questo file di configurazione in produzione.
+
+## Migrazione legacy autorizzata
+
+`P2P_LEGACY_RECONCILE_IDS` abilita una riconciliazione di avvio con allowlist esplicita di ID PayPal. Prima va cessato il rinnovo presso PayPal. Il codice non cancella abbonamenti: verifica stato CANCELLED/EXPIRED, corrispondenza utente/gruppo e ultimo pagamento EUR positivo. ID Stripe o PayPal non autorizzati arrestano l'avvio prima di applicare modifiche.
+
+Per i precedenti piani mensili viene preservato un mese dall'ultimo pagamento verificato. Prima del salvataggio viene creata una copia esclusiva `database.json.before-p2p-<timestamp>.bak` sul volume persistente. Le membership vengono convertite al pagamento diretto, senza rinnovo automatico della quota. Un credito di accesso P2P (`migrationCredit`) copre il periodo pagato residuo: nessuna nuova subscription viene creata prima della sua scadenza. Alla scadenza l'utente deve approvare il nuovo piano; non si riusa il consenso del vecchio abbonamento. Le subscription di accesso già presenti non sono sovrascritte. La riconciliazione è idempotente.

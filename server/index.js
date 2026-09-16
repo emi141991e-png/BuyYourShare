@@ -11,6 +11,7 @@ import { authenticate } from './middleware/auth.js';
 import { dataRepository } from './db/dataRepository.js';
 import { P2pPayPal } from './services/p2pPayPal.js';
 import { P2pSubscriptions } from './services/p2pSubscription.js';
+import { prepareLegacyMigration } from './services/p2pLegacyMigration.js';
 import { createP2pRoutes, requireP2p, p2pError } from './routes/p2p.js';
 
 import { authRouter } from './routes/auth.js';
@@ -28,6 +29,16 @@ const ROOT_DIR = path.join(__dirname, '..');
 
 const app = express();
 const p2pProvider = new P2pPayPal();
+if (process.env.P2P_LEGACY_RECONCILE_IDS) {
+  const migrated = await prepareLegacyMigration(dataRepository.data, p2pProvider,
+    process.env.P2P_LEGACY_RECONCILE_IDS.split(',').map(id => id.trim()).filter(Boolean));
+  if (migrated) {
+    dataRepository.backupForP2pMigration();
+    dataRepository.data = migrated;
+    await dataRepository.save();
+    console.log('[P2P] Verified legacy migration completed; backup retained on persistent volume.');
+  }
+}
 export const p2pSubscriptions = new P2pSubscriptions(dataRepository, p2pProvider);
 const p2pGate = requireP2p(p2pSubscriptions);
 app.set('trust proxy', 1);

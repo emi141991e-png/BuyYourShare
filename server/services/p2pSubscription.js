@@ -90,12 +90,13 @@ export class P2pSubscriptions {
     this.ready();
     if (!Object.hasOwn(PRICES, requestedRole)) throw new P2pError('P2P_ROLE_INVALID', 400);
     let s = this.find(userId);
+    if (s?.migrationCredit && accessAllowed(s, this.now())) return this.view(userId);
     if (s?.providerSubscriptionId) {
       await this.reconcile(s); await this.save();
       if (!['CANCELLED', 'EXPIRED'].includes(s.providerStatus) || accessAllowed(s, this.now())) return this.view(userId);
     }
     const plans = await this.provider.validatePlans();
-    if (!s || s.providerSubscriptionId) {
+    if (!s || s.providerSubscriptionId || s.migrationCredit) {
       const previous = s;
       const role = this.roleFor(userId) === 'GROUP_LEADER' ? 'GROUP_LEADER' : requestedRole;
       s = { userId, role, status: 'pending', planId: plans[role], providerSubscriptionId: null,
