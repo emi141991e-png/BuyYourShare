@@ -88,3 +88,7 @@ Rilascio consentito solo dopo: confronto con HEAD, build/test verdi, prova sandb
 `npm run test:p2p`, `npm run test:sso`, `npm run test:security`, `npm run build`. I test usano provider simulato e server HTTP locale con database temporaneo creato vuoto: mai il database incluso nel repository, credenziali reali o pagamenti live. La SPA statica ha un controllo sintattico di tutti i JS come build. La piattaforma Next separata usa il proprio `npm run build` e suite di regressione esistente.
 
 Riferimento PayPal sul cambio piano: https://developer.paypal.com/subscriptions/tiers (stesso prodotto, consenso richiesto, nuovo prezzo dal ciclo successivo, niente prorata automatico).
+
+## Ambiente Railway sandbox isolato
+
+Solo in `test`, usare `railway.p2p-sandbox.json`. L'avvio dedicato richiede credenziali P2P sandbox e crea esclusivamente `/app/server/data/p2p-sandbox-20260916/database.json`, vuoto, senza utenti o dati copiati. La creazione esclusiva preserva il file ai riavvii; un file preesistente senza marcatore sandbox causa arresto. Il comando di produzione resta invariato. Non usare questo file di configurazione in produzione.
