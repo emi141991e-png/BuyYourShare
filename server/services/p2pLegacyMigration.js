@@ -7,7 +7,12 @@ export async function prepareLegacyMigration(data, provider, ids, now = new Date
   const next = structuredClone(data);
   next.p2pSubscriptions ||= [];
   for (const old of pending) {
-    if (old.stripeSubscriptionId || !ids.includes(old.paypalSubscriptionId)) throw new Error('P2P_LEGACY_NOT_AUTHORIZED');
+    if (old.stripeSubscriptionId || !ids.includes(old.paypalSubscriptionId)) {
+      console.error('[P2P] Legacy billing reference requires reconciliation', JSON.stringify({ membershipId: old.id,
+        paypalSubscriptionId: old.paypalSubscriptionId || null, stripeSubscriptionId: old.stripeSubscriptionId || null,
+        status: old.status, currentPeriodEnd: old.currentPeriodEnd || null }));
+      throw new Error('P2P_LEGACY_NOT_AUTHORIZED');
+    }
     const remote = await provider.get(old.paypalSubscriptionId);
     const identity = JSON.parse(remote.custom_id || '{}');
     if (remote.id !== old.paypalSubscriptionId || !['CANCELLED', 'EXPIRED'].includes(remote.status) ||
@@ -30,3 +35,4 @@ export async function prepareLegacyMigration(data, provider, ids, now = new Date
   }
   return next;
 }
+
