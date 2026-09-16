@@ -13,6 +13,7 @@ import { dataRepository } from './db/dataRepository.js';
 import { P2pPayPal } from './services/p2pPayPal.js';
 import { P2pSubscriptions } from './services/p2pSubscription.js';
 import { prepareLegacyMigration } from './services/p2pLegacyMigration.js';
+import { prepareLegacyCleanup } from './services/p2pLegacyCleanup.js';
 import { createP2pRoutes, requireP2p, p2pError } from './routes/p2p.js';
 
 import { authRouter } from './routes/auth.js';
@@ -40,6 +41,15 @@ if (process.env.P2P_LEGACY_RECONCILE_IDS) {
     dataRepository.data = migrated;
     await dataRepository.save();
     console.log('[P2P] Verified legacy migration completed; backup retained on persistent volume.');
+  }
+}
+if (process.env.P2P_LEGACY_CLEANUP_IDS) {
+  const cleaned = prepareLegacyCleanup(dataRepository.data, process.env.P2P_LEGACY_CLEANUP_IDS.split(','));
+  if (cleaned) {
+    dataRepository.backupForP2pMigration();
+    dataRepository.data = cleaned;
+    await dataRepository.save();
+    console.log('[P2P] Authorized legacy cleanup completed; paid access and financial history preserved.');
   }
 }
 export const p2pSubscriptions = new P2pSubscriptions(dataRepository, p2pProvider);

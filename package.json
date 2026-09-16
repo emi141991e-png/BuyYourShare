@@ -8,7 +8,7 @@
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "build": "node tests/check-p2p-syntax.js",
-    "test:p2p": "node --test tests/test-p2p-subscription.js tests/test-p2p-http.js tests/test-p2p-legacy-migration.js",
+    "test:p2p": "node --test tests/test-p2p-subscription.js tests/test-p2p-http.js tests/test-p2p-legacy-migration.js tests/test-p2p-legacy-cleanup.js",
     "test:sso": "node --test tests/test-bys-sso.js",
     "test:security": "node --test tests/test-security-hardening.js"
   },
