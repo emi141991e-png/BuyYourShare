@@ -39,8 +39,14 @@ export class P2pQuotaPayPal extends P2pPayPal {
       } } }], products: ['EXPRESS_CHECKOUT'], legal_consents: [{ type: 'SHARE_DATA_CONSENT', granted: true }]
     }, p.requestId);
   }
-  seller(trackingId) {
-    return this.partnerRequest(`/v1/customer/partners/${encodeURIComponent(this.ready().partnerId)}/merchant-integrations?tracking_id=${encodeURIComponent(trackingId)}`);
+  async seller(trackingId) {
+    const path = `/v1/customer/partners/${encodeURIComponent(this.ready().partnerId)}/merchant-integrations`;
+    const reference = await this.partnerRequest(`${path}?tracking_id=${encodeURIComponent(trackingId)}`);
+    // Tracking lookup only returns identity and links, not readiness or delegated scopes.
+    if (reference.tracking_id !== trackingId || !reference.merchant_id) throw new P2pError('PAYPAL_CONNECTION_INCOMPLETE');
+    const details = await this.partnerRequest(`${path}/${encodeURIComponent(reference.merchant_id)}`);
+    if (details.merchant_id !== reference.merchant_id || (details.tracking_id && details.tracking_id !== trackingId)) throw new P2pError('PAYPAL_CONNECTION_INCOMPLETE');
+    return { ...details, tracking_id: trackingId };
   }
   createOrder(p) {
     return this.partnerRequest('/v2/checkout/orders', 'POST', {

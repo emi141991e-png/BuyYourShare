@@ -83,6 +83,19 @@ test('quota client fails closed for unapproved live and never falls back to subs
   assert.throws(() => new P2pQuotaPayPal({ P2P_QUOTA_PAYPAL_MODE: 'live' }).settings(), /LIVE_NOT_APPROVED/);
   assert.throws(() => new P2pQuotaPayPal({ P2P_QUOTA_ENABLED: 'true', P2P_QUOTA_PAYPAL_MODE: 'sandbox', PAYPAL_CLIENT_ID: 'store', PAYPAL_CLIENT_SECRET: 'store-secret' }).ready(), /NOT_CONFIGURED/);
 });
+test('seller lookup fetches authoritative readiness after resolving tracking identity', async () => {
+  const p = new P2pQuotaPayPal(); p.ready = () => ({ partnerId: 'partner' });
+  const calls = [];
+  p.partnerRequest = async path => {
+    calls.push(path);
+    return path.includes('?') ? { merchant_id: 'seller', tracking_id: 'tracking' } : { merchant_id: 'seller', payments_receivable: true, primary_email_confirmed: true };
+  };
+  const seller = await p.seller('tracking');
+  assert.equal(seller.payments_receivable, true); assert.equal(seller.tracking_id, 'tracking');
+  assert.equal(calls[1], '/v1/customer/partners/partner/merchant-integrations/seller');
+  p.partnerRequest = async path => path.includes('?') ? { merchant_id: 'seller', tracking_id: 'tracking' } : { merchant_id: 'other' };
+  await assert.rejects(() => p.seller('tracking'), /PAYPAL_CONNECTION_INCOMPLETE/);
+});
 test('quota order targets seller directly, instant disbursement, no platform fee or non-PayPal method', async () => {
   const p = new P2pQuotaPayPal({ P2P_QUOTA_PAYPAL_MODE: 'sandbox', P2P_PUBLIC_URL: 'https://example.test' });
   let captured;
