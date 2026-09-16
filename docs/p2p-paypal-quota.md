@@ -4,7 +4,7 @@ Il modulo quote è distinto dagli abbonamenti di accesso BYS e dallo Store. Il d
 
 ## Stato del rilascio
 
-Codice e test automatici pronti per sandbox; collaudo PayPal end-to-end e abilitazione live ancora da completare. Non abilitare in produzione sulla sola base dei test simulati. L'app sandbox Platform Partner App è stata provisionata nel Developer Dashboard italiano e supporta onboarding Business; Casual seller e Mixed sono disabilitati. L'app live BYS-Platform esistente non mostra le capacità Multiparty. Serve approvazione PayPal prima della configurazione live.
+Codice e test automatici pronti per sandbox; collaudo PayPal end-to-end e abilitazione live ancora da completare. Non abilitare in produzione sulla sola base dei test simulati. L’app sandbox Platform Partner App è configurata con onboarding Mixed, PayPal Checkout standard, senza Expanded Checkout, platform fee o accredito ritardato. PayPal documenta l’idoneità dei conti personali in Italia per onboarding prima del pagamento. La verifica completa con un conto personale resta parte del collaudo. L'app live BYS-Platform esistente non mostra le capacità Multiparty. Serve approvazione PayPal prima della configurazione live.
 
 ## Configurazione separata
 

@@ -9,7 +9,7 @@ const messages = {
   P2P_QUOTA_NOT_ENABLED: 'I pagamenti diretti PayPal sono in preparazione. Non inviare quote fuori da questo flusso.',
   P2P_QUOTA_NOT_CONFIGURED: 'Il collegamento PayPal dei capigruppo non è ancora disponibile.',
   P2P_QUOTA_LIVE_NOT_APPROVED: 'L’attivazione dei pagamenti diretti è in attesa di abilitazione PayPal.',
-  PAYPAL_CONNECTION_REQUIRED: 'Collega prima il tuo conto PayPal Business.',
+  PAYPAL_CONNECTION_REQUIRED: 'Collega prima il tuo conto PayPal.',
   PAYPAL_CONNECTION_INCOMPLETE: 'Completa il collegamento, conferma l’email su PayPal e aggiorna lo stato.',
   PAYPAL_CONNECTION_REVOKED: 'Il consenso PayPal è stato revocato. Contatta l’assistenza per collegare nuovamente il conto.',
   PAYPAL_PAYMENT_REVIEW_REQUIRED: 'Pagamento da verificare. Non effettuare un secondo pagamento: contatta l’assistenza.',
@@ -111,7 +111,7 @@ export async function renderP2pAccess(container, route, user) {
     if (route === '#crea') {
       const payee = await api('/api/p2p/payee');
       if (payee.status !== 'verified' || !payee.available) {
-        shell(`<h2>Collega il PayPal del capogruppo</h2><p>Serve un conto PayPal Business abilitato a ricevere pagamenti. Le quote arriveranno direttamente a quel conto; possono applicarsi le tariffe e le verifiche di PayPal.</p>
+        shell(`<h2>Collega il PayPal del capogruppo</h2><p>Collega il tuo conto PayPal personale o Business, abilitato a ricevere pagamenti. Le quote arriveranno direttamente a quel conto; possono applicarsi le tariffe e le verifiche di PayPal.</p>
           <p>Stato: ${esc(payee.status === 'not_connected' ? 'Da collegare' : payee.status === 'revoked' ? 'Consenso revocato' : 'Collegamento da completare')}</p>
           ${!payee.available ? `<p>${esc(messages[payee.reason] || 'Collegamento non disponibile.')}</p>` : `<form id="p2pPayee"><label>Email PayPal <input type="email" name="email" value="${esc(payee.email)}" required></label>
           <label><input name="consent" type="checkbox" required> Acconsento a condividere l’email e a collegare il mio conto PayPal a BYS per ricevere e verificare le quote. Confermerò le autorizzazioni su PayPal.</label>
