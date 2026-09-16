@@ -3,9 +3,18 @@ import { authService } from '../services/authService.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = cents => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 const date = value => value ? new Date(value).toLocaleDateString('it-IT') : '—';
-const direct = 'Le quote dei gruppi si pagano direttamente al capogruppo. BYS non incassa, custodisce né distribuisce tali somme e non offre un deposito a garanzia. L’abbonamento BYS paga esclusivamente l’accesso al P2P.';
+const direct = 'Le quote dei gruppi si pagano esclusivamente con PayPal, direttamente al conto collegato del capogruppo. BYS non incassa, custodisce né distribuisce tali somme e non offre un deposito a garanzia. L’abbonamento BYS paga esclusivamente l’accesso al P2P.';
 const statuses = { inactive: 'Da attivare', pending: 'Pagamento o approvazione in attesa', active: 'Attivo', past_due: 'Pagamento da regolarizzare', suspended: 'Sospeso', canceled: 'Cancellato' };
 const messages = {
+  P2P_QUOTA_NOT_ENABLED: 'I pagamenti diretti PayPal sono in preparazione. Non inviare quote fuori da questo flusso.',
+  P2P_QUOTA_NOT_CONFIGURED: 'Il collegamento PayPal dei capigruppo non è ancora disponibile.',
+  P2P_QUOTA_LIVE_NOT_APPROVED: 'L’attivazione dei pagamenti diretti è in attesa di abilitazione PayPal.',
+  PAYPAL_CONNECTION_REQUIRED: 'Collega prima il tuo conto PayPal Business.',
+  PAYPAL_CONNECTION_INCOMPLETE: 'Completa il collegamento, conferma l’email su PayPal e aggiorna lo stato.',
+  PAYPAL_CONNECTION_REVOKED: 'Il consenso PayPal è stato revocato. Contatta l’assistenza per collegare nuovamente il conto.',
+  PAYPAL_PAYMENT_REVIEW_REQUIRED: 'Pagamento da verificare. Non effettuare un secondo pagamento: contatta l’assistenza.',
+  PAYPAL_ACCOUNT_CHANGE_REQUIRES_REVIEW: 'Per cambiare il conto destinatario contatta l’assistenza.',
+  SLOT_RESERVED: 'Il posto è riservato da un pagamento in corso.',
   P2P_ACTIVE_SUBSCRIPTION_REQUIRED: 'Attiva o regolarizza l’abbonamento P2P per continuare.',
   P2P_LEADER_PLAN_REQUIRED: 'Conferma il passaggio al piano capogruppo prima di creare il gruppo.',
   MEMBER_SUBSCRIPTION_INACTIVE: 'Il membro deve prima attivare o regolarizzare il proprio abbonamento BYS.',
@@ -100,6 +109,22 @@ export async function renderP2pAccess(container, route, user) {
       shell(`<h2>Notifiche</h2>${notifications.map(n => `<article><h3>${esc(n.title)}</h3><p>${esc(n.message)}</p></article>`).join('') || '<p>Nessuna notifica.</p>'}`); return;
     }
     if (route === '#crea') {
+      const payee = await api('/api/p2p/payee');
+      if (payee.status !== 'verified' || !payee.available) {
+        shell(`<h2>Collega il PayPal del capogruppo</h2><p>Serve un conto PayPal Business abilitato a ricevere pagamenti. Le quote arriveranno direttamente a quel conto; possono applicarsi le tariffe e le verifiche di PayPal.</p>
+          <p>Stato: ${esc(payee.status === 'not_connected' ? 'Da collegare' : payee.status === 'revoked' ? 'Consenso revocato' : 'Collegamento da completare')}</p>
+          ${!payee.available ? `<p>${esc(messages[payee.reason] || 'Collegamento non disponibile.')}</p>` : `<form id="p2pPayee"><label>Email PayPal <input type="email" name="email" value="${esc(payee.email)}" required></label>
+          <label><input name="consent" type="checkbox" required> Acconsento a condividere l’email e a collegare il mio conto PayPal a BYS per ricevere e verificare le quote. Confermerò le autorizzazioni su PayPal.</label>
+          <button class="btn btn-primary">Collega con PayPal</button></form>${button('payeeRefresh', 'Ho completato: verifica collegamento')}`}
+          <p>Consulta la <a href="https://www.paypal.com/it/legalhub/paypal/seller-protection" target="_blank" rel="noopener">Protezione vendite PayPal</a> e le relative condizioni: non tutti i pagamenti sono coperti.</p>`);
+        container.querySelector('#p2pPayee')?.addEventListener('submit', async e => {
+          e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true;
+          try { const values = new FormData(e.target); const result = await api('/api/p2p/payee/connect', { email: values.get('email'), consent: values.get('consent') === 'on' }); window.location.assign(result.approvalUrl); }
+          catch (err) { container.querySelector('#p2pMessage').textContent = err.message; btn.disabled = false; }
+        });
+        bind('payeeRefresh', async () => { await api('/api/p2p/payee/refresh', {}); await reload(); });
+        return;
+      }
       shell(`<h2>Crea un gruppo</h2><p>Piano capogruppo ${money(s.priceCents)}/mese. Nessuna commissione BYS sulle quote.</p>
         <form id="p2pCreate" style="display:grid;gap:16px;max-width:600px">
         <label>Nome servizio <input name="customServiceName" required maxlength="100"></label>
@@ -107,7 +132,7 @@ export async function renderP2pAccess(container, route, user) {
         <label>Costo totale mensile (€) <input name="realCostEuros" type="number" min="0.01" step="0.01" required></label>
         <label>Posti totali <input name="totalSlots" type="number" min="2" max="50" value="6" required></label>
         <label>Posti riservati al capogruppo <input name="ownerSlots" type="number" min="1" max="49" value="1" required></label>
-        <label>Istruzioni di pagamento diretto (visibili a chi richiede un posto) <textarea name="directPaymentInstructions" maxlength="2000" required></textarea></label>
+        <p>Destinatario delle quote: il tuo conto PayPal collegato. Pagamento mensile della quota con conferma automatica; nessun addebito automatico della quota.</p>
         <label>Istruzioni di accesso (solo membri confermati) <textarea name="instructions" maxlength="2000" required></textarea></label>
         <label>Regole del gruppo <textarea name="rulesAndRequirements" maxlength="2000"></textarea></label>
         <button class="btn btn-primary" type="submit">Crea gruppo</button></form>`);
@@ -131,8 +156,7 @@ export async function renderP2pAccess(container, route, user) {
         <div>${button('p2pInstructions', 'Istruzioni di accesso')}${link(`#chat-${id}`, 'Chat gruppo')}${owner ? button('p2pClose', 'Chiudi gruppo') : ''}</div><pre id="p2pDetails" style="white-space:pre-wrap"></pre>`);
       for (const slot of g.slotsInfo.slots) bind(`request${slot.slotNumber}`, async () => {
         await api(`/api/p2p/groups/${encodeURIComponent(id)}/request`, { slotNumber: slot.slotNumber });
-        const pay = await api(`/api/p2p/groups/${encodeURIComponent(id)}/direct-payment`);
-        container.querySelector('#p2pDetails').textContent = `${pay.message}\n${pay.ownerName}\n${pay.contactEmail || ''}\n${pay.instructions}\nAttendi l’accordo sul posto prima di pagare. Il capogruppo confermerà la ricezione.`;
+        window.location.hash = '#miei-abbonamenti';
       });
       bind('p2pInstructions', async () => { const r = await api(`/api/access/${encodeURIComponent(id)}`); container.querySelector('#p2pDetails').textContent = [r.instructions?.instructions, r.instructions?.accessUrl, r.instructions?.additionalInfo].filter(Boolean).join('\n') || 'Istruzioni non ancora disponibili.'; });
       bind('p2pClose', async () => { if (window.confirm('Chiudere questo gruppo? Il piano capogruppo rimane invariato.')) { await api(`/api/groups/${encodeURIComponent(id)}/cancel`, {}); window.location.hash = '#miei-gruppi'; } });
@@ -140,21 +164,29 @@ export async function renderP2pAccess(container, route, user) {
     }
     if (route === '#miei-abbonamenti' || route === '#miei-gruppi') {
       const { requests, memberships } = await api('/api/p2p/direct-memberships');
+      const { payments } = await api('/api/p2p/quota-payments');
       const { groups } = await api('/api/groups/my');
       const own = new Set(groups.map(g => g.id));
+      const pending = requests.filter(r => r.status === 'pending');
+      const paymentLabel = { creating: 'Richiesta in verifica', awaiting_approval: 'Da approvare su PayPal', capturing: 'Pagamento in verifica', pending: 'PayPal: pagamento in attesa', completed: 'Incasso confermato da PayPal', received_needs_review: 'Incasso ricevuto: assistenza necessaria', failed: 'Pagamento non riuscito', refunded: 'Pagamento rimborsato', reversed: 'Pagamento stornato' };
       shell(`<h2>${route === '#miei-gruppi' ? 'I miei gruppi' : 'Le mie partecipazioni'}</h2>
         ${groups.map(g => `<p>${link(`#gruppo-${g.id}`, esc(g.customServiceName))}</p>`).join('')}
-        <h3>Richieste di partecipazione</h3><p>Conferma solo quote ricevute direttamente. BYS non verifica né esegue questi pagamenti. Ogni conferma assegna un mese di accesso al gruppo; per un nuovo periodo il membro invia una nuova richiesta.</p>
-        ${requests.filter(r => r.status === 'pending').map((r, i) => `<article style="padding:16px;border:1px solid #cbd5e1;margin-bottom:12px">
-          <p>${esc(r.memberName)} · posto ${r.slotNumber} ${link(`#gruppo-${r.groupId}`, 'Apri gruppo')}</p>
-          ${own.has(r.groupId) ? button(`confirm${i}`, 'Conferma quota ricevuta direttamente') : button(`pay${i}`, 'Mostra istruzioni pagamento diretto')}
-          ${button(`cancelRequest${i}`, 'Annulla richiesta')}</article>`).join('') || '<p>Nessuna richiesta in attesa.</p>'}
-        <h3>Partecipazioni confermate</h3>${memberships.map(m => `<p>${link(`#gruppo-${m.groupId}`, `Posto ${m.slotNumber}`)} · quota ${money(m.paidShareCents)} · fino al ${date(m.currentPeriodEnd)} · pagamento diretto, senza addebito automatico BYS</p>`).join('') || '<p>Nessuna partecipazione confermata.</p>'}
-        <pre id="p2pDetails" style="white-space:pre-wrap"></pre>`);
-      requests.filter(r => r.status === 'pending').forEach((r, i) => {
-        bind(`confirm${i}`, async () => { if (window.confirm('Confermi di avere ricevuto direttamente la quota per questo posto?')) { await api(`/api/p2p/requests/${encodeURIComponent(r.id)}/confirm`, { paymentReceived: true }); await reload(); } });
+        <h3>Quote PayPal</h3><p>Ogni quota copre un mese e non si rinnova automaticamente. Dopo l’approvazione su PayPal, premi «Verifica e completa pagamento». L’accesso si attiva solo dopo l’incasso confermato. Eventuali rimborsi o storni aggiornano lo stato.</p>
+        ${pending.map((r, i) => {
+          const p = payments.find(p => p.requestId === r.id);
+          return `<article style="padding:16px;border:1px solid #cbd5e1;margin-bottom:12px"><p>${esc(r.memberName)} · posto ${r.slotNumber} ${link(`#gruppo-${r.groupId}`, 'Apri gruppo')}</p>
+          ${p ? `<p>${esc(paymentLabel[p.status] || p.status)} · ${money(p.amountCents)}</p>` : ''}
+          ${!own.has(r.groupId) && (!p || p.status === 'creating') ? button(`pay${i}`, p ? 'Recupera richiesta PayPal' : 'Prepara pagamento PayPal') : ''}
+          ${!own.has(r.groupId) && p?.approvalUrl ? `<a class="btn btn-primary" href="${esc(p.approvalUrl)}">Paga ${money(p.amountCents)} con PayPal</a>` : ''}
+          ${p ? button(`verify${i}`, own.has(r.groupId) ? 'Verifica incasso PayPal' : 'Verifica e completa pagamento') : button(`cancelRequest${i}`, 'Annulla richiesta')}</article>`;
+        }).join('') || '<p>Nessuna quota in attesa.</p>'}
+        <h3>Storico pagamenti</h3>${payments.map(p => `<p>${link(`#gruppo-${p.groupId}`, 'Gruppo')} · ${money(p.amountCents)} · ${esc(paymentLabel[p.status] || p.status)}${p.captureId ? ` · transazione ${esc(p.captureId)}` : ''}</p>`).join('') || '<p>Nessun pagamento.</p>'}
+        <h3>Partecipazioni</h3>${memberships.map(m => `<p>${link(`#gruppo-${m.groupId}`, `Posto ${m.slotNumber}`)} · quota ${money(m.paidShareCents)} · fino al ${date(m.currentPeriodEnd)} · ${esc(m.status)} · PayPal diretto, nessun rinnovo automatico della quota</p>`).join('') || '<p>Nessuna partecipazione confermata.</p>'}`);
+      pending.forEach((r, i) => {
+        const p = payments.find(p => p.requestId === r.id);
+        bind(`pay${i}`, async () => { await api(`/api/p2p/requests/${encodeURIComponent(r.id)}/order`, {}); await reload(); });
+        bind(`verify${i}`, async () => { await api(`/api/p2p/quota-payments/${encodeURIComponent(p.id)}/refresh`, {}); await reload(); });
         bind(`cancelRequest${i}`, async () => { await api(`/api/p2p/requests/${encodeURIComponent(r.id)}/cancel`, {}); await reload(); });
-        bind(`pay${i}`, async () => { const p = await api(`/api/p2p/groups/${encodeURIComponent(r.groupId)}/direct-payment`); container.querySelector('#p2pDetails').textContent = `${p.ownerName}\n${p.contactEmail || ''}\n${p.instructions}\n${p.message}`; });
       }); return;
     }
     const { groups } = await api('/api/groups');

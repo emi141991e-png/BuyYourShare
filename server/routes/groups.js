@@ -169,15 +169,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       payoutBankName
     } = req.body || {};
 
-    // Se forniti dati IBAN nel wizard di creazione, salvali subito sul profilo
-    if (payoutIban && payoutIban.trim()) {
-      await dataRepository.updateUser(user.id, {
-        iban: payoutIban.trim().toUpperCase(),
-        bankName: payoutBankName ? payoutBankName.trim() : (user.bankName || ''),
-        legalName: payoutLegalName ? payoutLegalName.trim() : (user.legalName || user.fullName)
-      });
-    }
-
+    await req.app.locals.p2pQuota.refreshPayee(user.id);
     const realCostCents = Math.round((parseFloat(realCostEuros) || 0) * 100);
     const tSlots = parseInt(totalSlots, 10) || 6;
     const oSlots = parseInt(ownerSlots, 10) || 1;
@@ -216,7 +208,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       ownerSpotifyAddress: (ownerSpotifyAddress || '').trim(),
       rulesAndRequirements: (rulesAndRequirements || 'Rispetta le regole della community e del provider.').trim(),
       description: (description || `Gruppo condivisione ${customServiceName}`).trim(),
-      directPaymentInstructions: typeof req.body.directPaymentInstructions === 'string' ? req.body.directPaymentInstructions.trim().slice(0, 2000) : '',
+      paymentMethod: 'PAYPAL_DIRECT',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -268,6 +260,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       isPayoutReady: isPayoutReady
     });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[CREATE GROUP ERROR]', err);
     return res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Errore interno durante la creazione del gruppo.' });
   }
@@ -297,6 +290,7 @@ groupsRouter.post('/:id/publish', requireAuth, async (req, res) => {
       group: sanitizeGroupForPublic(updated, req.user)
     });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[PUBLISH GROUP ERROR]', err);
     return res.status(500).json({ error: 'INTERNAL_ERROR' });
   }
@@ -312,6 +306,7 @@ groupsRouter.post('/:id/cancel', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Non puoi modificare questo gruppo.' });
     }
 
+    if (req.app.locals.p2pQuota.hasOpenPayments(group.id)) return res.status(409).json({ error: 'PAYPAL_PAYMENT_REVIEW_REQUIRED' });
     const memberships = await dataRepository.getMemberships({ groupId: group.id, status: 'ACTIVE' });
     const payingMembers = memberships.filter(m => m.role === 'MEMBER');
 

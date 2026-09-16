@@ -53,30 +53,20 @@ test('legacy collection, payout onboarding and unsigned webhooks cannot move mon
   assert.equal((await request('/api/webhooks/paypal', null, {})).status, 503);
   assert.equal((await request('/api/webhooks/p2p-paypal', null, {})).status, 400);
 });
-test('direct group flow enforces owner confirmation, membership privacy and idempotency without payments', async () => {
+test('manual confirmation is disabled and unconfigured PayPal quota fails closed', async () => {
   assert.equal((await request('/api/access/group')).status, 403);
-  assert.equal((await request('/api/p2p/groups/group/direct-payment', 'other')).status, 403);
-  const join = await request('/api/p2p/groups/group/request', 'member', { slotNumber: 2 });
-  assert.equal(join.status, 200);
-  const id = join.body.request.id;
-  assert.equal((await request(`/api/p2p/requests/${id}/confirm`, 'other', { paymentReceived: true })).status, 403);
-  assert.equal((await request(`/api/p2p/requests/${id}/confirm`, 'leader', {})).status, 400);
-  const first = await request(`/api/p2p/requests/${id}/confirm`, 'leader', { paymentReceived: true });
-  assert.equal(first.status, 200); assert.equal(first.body.membership.paidFeeCents, 0);
-  const repeated = await request(`/api/p2p/requests/${id}/confirm`, 'leader', { paymentReceived: true });
-  assert.equal(repeated.body.membership.id, first.body.membership.id);
-  assert.equal((await request('/api/access/group')).status, 200);
-  assert.equal((await request('/api/access/group', 'other')).status, 403);
-  assert.equal((await request('/api/p2p/groups/group/request', 'other', { slotNumber: 2 })).status, 409);
+  assert.equal((await request('/api/p2p/requests/unknown/confirm', 'leader', { paymentReceived: true })).status, 410);
+  assert.equal((await request('/api/p2p/groups/group/direct-payment', 'member')).status, 410);
+  assert.equal((await request('/api/p2p/groups/group/request', 'member', { slotNumber: 2 })).status, 503);
+  const payee = await request('/api/p2p/payee', 'leader');
+  assert.equal(payee.body.available, false);
   const stored = JSON.parse(readFileSync(dbFile, 'utf8'));
-  assert.equal(stored.memberships.length, 1); assert.equal(stored.financialAuditLogs.length, 0);
-  assert.equal(stored.memberships[0].paypalSubscriptionId, undefined);
+  assert.equal(stored.memberships.length, 0);
 });
-test('leader creates group with zero fee and no payout account or second subscription', async () => {
-  const r = await request('/api/groups', 'leader', { customServiceName: 'New group', realCostEuros: '12', totalSlots: '4', ownerSlots: '1', directPaymentInstructions: 'Agree directly with me' });
-  assert.equal(r.status, 201); assert.equal(r.body.group.platformFeeCents, 0); assert.equal(r.body.group.memberTotalCents, 300);
-  const stored = JSON.parse(readFileSync(dbFile, 'utf8'));
-  assert.equal(stored.p2pSubscriptions.length, 4);
+test('leader cannot publish a group without a verified PayPal recipient', async () => {
+  const r = await request('/api/groups', 'leader', { customServiceName: 'New group', realCostEuros: '12', totalSlots: '4', ownerSlots: '1' });
+  assert.equal(r.status, 503);
+  assert.equal(JSON.parse(readFileSync(dbFile, 'utf8')).groups.length, 1);
 });
 test('legacy administrative cleanup cannot orphan paying users or erase subscription history', async () => {
   assert.equal((await request('/api/admin/clean-all-data', 'admin', {})).status, 409);

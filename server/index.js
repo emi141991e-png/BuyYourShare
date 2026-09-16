@@ -10,6 +10,8 @@ import { fileURLToPath } from 'url';
 import { config } from './config/env.js';
 import { authenticate } from './middleware/auth.js';
 import { dataRepository } from './db/dataRepository.js';
+import { P2pQuotaPayPal } from './services/p2pQuotaPayPal.js';
+import { P2pQuota } from './services/p2pQuota.js';
 import { P2pPayPal } from './services/p2pPayPal.js';
 import { P2pSubscriptions } from './services/p2pSubscription.js';
 import { prepareLegacyMigration } from './services/p2pLegacyMigration.js';
@@ -53,6 +55,9 @@ if (process.env.P2P_LEGACY_CLEANUP_IDS) {
   }
 }
 export const p2pSubscriptions = new P2pSubscriptions(dataRepository, p2pProvider);
+const quotaProvider = new P2pQuotaPayPal();
+const p2pQuota = new P2pQuota(p2pSubscriptions, quotaProvider);
+app.locals.p2pQuota = p2pQuota;
 const p2pGate = requireP2p(p2pSubscriptions);
 app.set('trust proxy', 1);
 
@@ -61,6 +66,12 @@ app.post('/api/webhooks/p2p-paypal', express.json({ limit: '256kb' }), async (re
   try {
     if (!await p2pProvider.verify(req.headers, req.body)) return res.status(400).json({ error: 'INVALID_SIGNATURE' });
     res.json(await p2pSubscriptions.webhook(req.body));
+  } catch (e) { p2pError(res, e); }
+});
+app.post('/api/webhooks/p2p-quota-paypal', express.json({ limit: '256kb' }), async (req, res) => {
+  try {
+    if (!await quotaProvider.verify(req.headers, req.body)) return res.status(400).json({ error: 'INVALID_SIGNATURE' });
+    res.json(await p2pQuota.webhook(req.body));
   } catch (e) { p2pError(res, e); }
 });
 // Old group collection/payout handlers are deliberately unreachable. Return a retryable
@@ -91,7 +102,7 @@ app.use('/api/auth', (req, res, next) => {
   }
   next();
 }, authRouter);
-app.use('/api/p2p', createP2pRoutes(p2pSubscriptions));
+app.use('/api/p2p', createP2pRoutes(p2pSubscriptions, p2pQuota));
 app.use('/api/groups', p2pGate, (req, res, next) => {
   if (req.method === 'POST' && req.path === '/' && p2pSubscriptions.find(req.user.id)?.role !== 'GROUP_LEADER') {
     return res.status(409).json({ error: 'P2P_LEADER_PLAN_REQUIRED', message: 'Conferma prima il piano capogruppo da 0,49 EUR/mese.' });
