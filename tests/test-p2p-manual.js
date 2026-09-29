@@ -8,6 +8,16 @@ function setup() {
   const service = new P2pManual({ repo, find: id => id === 'unpaid' ? null : { status: 'active', currentPeriodEnd: '2030-01-01' }, exclusive: fn => { const p = queue.catch(() => {}).then(fn); queue = p; return p; } }, () => now);
   return { service, repo, time: value => { now = Date.parse(value); } };
 }
+test('chat retries are deduplicated and unread markers are private and monotonic', async()=>{
+  const {service:s}=setup();const r=await s.request('m','g',2);
+  await s.send('m',r.id,'Ciao','msg-one');await s.send('m',r.id,'Ciao','msg-one');
+  assert.equal(s.chat('o',r.id).filter(m=>m.senderId==='m').length,1);
+  assert.equal(s.list('o')[0].unreadMessages,1);
+  const first=s.chat('o',r.id).at(-1);await assert.rejects(s.markRead('stranger',r.id,first.id));
+  await s.markRead('o',r.id,first.id);assert.equal(s.list('o')[0].unreadMessages,0);
+  await s.send('m',r.id,'Rinnovo?','msg-two');assert.equal(s.list('o')[0].unreadMessages,1);
+  await s.markRead('o',r.id,first.id);assert.equal(s.list('o')[0].unreadMessages,1);
+});
 
 test('personal group list keeps closed groups private to their owner', () => {
   const { service, repo } = setup();

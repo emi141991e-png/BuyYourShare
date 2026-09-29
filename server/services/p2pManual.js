@@ -54,6 +54,7 @@ export class P2pManual {
       groupName: this.group(r.groupId).customServiceName, groupStatus: this.group(r.groupId).status, ownerId: this.group(r.groupId).ownerId,
       memberName: (this.repo.data.users || []).find(u => u.id === r.userId)?.fullName || 'Membro',
       ownerName: (this.repo.data.users || []).find(u => u.id === this.group(r.groupId).ownerId)?.fullName || 'Capogruppo',
+      unreadMessages: (this.repo.data.p2pPrivateMessages || []).filter(m => m.requestId === r.id).slice(r.chatReadCount?.[userId] || 0).filter(m => m.senderId && m.senderId !== userId).length,
       paymentDestination: ['accepted', 'reported', 'confirmed'].includes(r.status) ? r.destination : undefined, destination: undefined }));
   }
   ownedGroups(userId) {
@@ -120,10 +121,21 @@ export class P2pManual {
     await this.repo.save(); return r;
   }); }
   chat(userId, id) { const r = this.authorized(id, userId); return (this.repo.data.p2pPrivateMessages || []).filter(m => m.requestId === r.id); }
-  send(userId, id, content) { return this.exclusive(async () => {
+  markRead(userId, id, lastMessageId) { return this.exclusive(async () => {
+    const r = this.authorized(id, userId);
+    const messages = (this.repo.data.p2pPrivateMessages || []).filter(m => m.requestId === id);
+    const count = messages.findIndex(m => m.id === lastMessageId) + 1;
+    if (!count || (r.chatReadCount?.[userId] || 0) >= count) return;
+    (r.chatReadCount ||= {})[userId] = count;
+    await this.repo.save();
+  }); }
+  send(userId, id, content, clientMessageId) { return this.exclusive(async () => {
     const r = this.authorized(id, userId);
     if (typeof content !== 'string' || !content.trim() || content.length > 2000) throw new P2pError('INVALID_MESSAGE', 400);
+    if (clientMessageId && (typeof clientMessageId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(clientMessageId))) throw new P2pError('INVALID_MESSAGE', 400);
+    if (clientMessageId && (this.repo.data.p2pPrivateMessages || []).some(m => m.requestId === id && m.senderId === userId && m.clientMessageId === clientMessageId)) return;
     this.message(r, content.trim(), userId);
+    if (clientMessageId) this.repo.data.p2pPrivateMessages.at(-1).clientMessageId = clientMessageId;
     this.notify(userId === r.userId ? this.group(r.groupId).ownerId : r.userId, `chat:${randomUUID()}`, 'Hai ricevuto un messaggio nella chat privata del gruppo.', r.id);
     await this.repo.save();
   }); }

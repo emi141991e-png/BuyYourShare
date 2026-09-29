@@ -117,6 +117,10 @@ export function renderApp() {
     }
 
     const routePath = (currentRoute || '#home').split('?')[0];
+    if (routePath === '#admin') {
+      window.location.replace('https://buyyourshare.it/admin');
+      return;
+    }
 
     // Rotte pubbliche esplicite di login / registrazione / recupero password
     if (routePath.startsWith('#reset-password')) {

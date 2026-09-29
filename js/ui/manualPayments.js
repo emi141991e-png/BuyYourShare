@@ -26,7 +26,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       ${!owner && (r.status === 'accepted' || (r.status === 'confirmed' && Date.parse(r.periodEnd) - Date.now() <= 3 * 86400000)) ? button(`report${i}`, 'Ho pagato al capogruppo') : ''}
       ${owner && r.status === 'reported' ? button(`confirm${i}`, 'Confermo: quota accreditata') : ''}
       ${['pending','accepted'].includes(r.status) || (r.status === 'confirmed' && Date.parse(r.periodEnd) <= Date.now()) ? button(`cancel${i}`, 'Annulla partecipazione') : ''}
-      ${selected ? "" : link(`#privata-${r.id}`, 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${groupShareLink({ id: r.groupId, customServiceName: r.groupName })}${r.periodEnd && Date.parse(r.periodEnd) > Date.now() ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
+      ${selected ? "" : link(`#privata-${r.id}`, r.unreadMessages ? 'Chat · ' + r.unreadMessages + ' non letti' : 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${groupShareLink({ id: r.groupId, customServiceName: r.groupName })}${r.periodEnd && Date.parse(r.periodEnd) > Date.now() ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
     }).join('') || `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">${managing ? '+' : '↗'}</span><h3>${managing ? 'Le richieste arriveranno qui' : 'Trova il tuo prossimo gruppo'}</h3><p>${managing ? 'Crea un gruppo e condividilo su WhatsApp. Potrai accettare i membri e verificare le quote da questa pagina.' : 'Non hai ancora richieste di partecipazione. Esplora il marketplace e scegli un gruppo.'}</p>${link(managing ? '#crea' : '#cerca', managing ? 'Crea un gruppo' : 'Esplora i gruppi')}</div>`}
     ${selected ? '<section class="private-chat"><h3>La vostra conversazione</h3><div id="privateMessages" aria-live="polite" role="log" aria-label="Messaggi della chat privata"></div><form id="privateForm"><label>Messaggio privato<textarea name="content" required maxlength="2000" style="width:100%"></textarea></label><button class="btn btn-primary">Invia messaggio</button></form></section>' : ''}`);
   const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna stato delle richieste'; refresh.type = 'button';
@@ -56,7 +56,25 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     const { messages } = await api(`/api/manual/${encodeURIComponent(selected.id)}/messages`);
     const feed = container.querySelector('#privateMessages');
     if (!feed) return;
-    feed.innerHTML = chatMarkup(messages);
+    const form = container.querySelector('#privateForm');
+    const textarea = form.querySelector('textarea');
+    textarea.placeholder = 'Scrivi al ' + (selected.ownerId === user.id ? 'membro' : 'capogruppo') + '…';
+    const shortcuts = document.createElement('div'); shortcuts.className = 'chat-shortcuts';
+    const suggestions = selected.ownerId === user.id ? ['Ciao! Puoi scrivermi qui per qualsiasi dubbio sul gruppo.', 'Il rinnovo si avvicina: trovi le coordinate nei dettagli della quota.', 'Controllo l’accredito e ti confermo appena lo ricevo.'] : ['Ciao! Vorrei informazioni sul gruppo.', 'Vorrei concordare il prossimo rinnovo.', 'Ho un dubbio sulle coordinate di pagamento.'];
+    for (const [i, text] of suggestions.entries()) { const b=document.createElement('button');b.type='button';b.className='btn btn-secondary';b.textContent=['Saluta','Parla del rinnovo','Chiedi chiarimenti'][i];b.onclick=()=>{textarea.value=text;textarea.focus();};shortcuts.append(b); }
+    form.prepend(shortcuts);
+    const connection=document.createElement('p');connection.setAttribute('role','status');form.append(connection);
+    let lastMessageId = null;
+    const updateFeed = async items => {
+      const latest=items.at(-1)?.id;
+      if(latest===lastMessageId)return;
+      const nearBottom=feed.scrollHeight-feed.scrollTop-feed.clientHeight<100;
+      feed.innerHTML=chatMarkup(items);
+      if(!lastMessageId||nearBottom)feed.scrollTop=feed.scrollHeight;
+      lastMessageId=latest;
+      if(latest)try {await api(`/api/manual/${encodeURIComponent(selected.id)}/read`,{lastMessageId:latest});}catch{/* Read marker can retry on the next visit. */}
+    };
+    await updateFeed(messages);
     let loading = false;
     chatTimer = setInterval(async () => {
       if (!feed.isConnected) { clearInterval(chatTimer); return; }
@@ -64,14 +82,18 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       loading = true;
       try {
         const result = await api(`/api/manual/${encodeURIComponent(selected.id)}/messages`);
-        if (feed.isConnected) feed.innerHTML = chatMarkup(result.messages);
-      } catch { /* Keep the last messages visible during a connection interruption. */ }
+        if (feed.isConnected) { await updateFeed(result.messages); connection.textContent=''; }
+      } catch { connection.textContent='Collegamento interrotto. I messaggi restano visibili; riprovo automaticamente.'; }
       finally { loading = false; }
     }, 10000);
-    container.querySelector('#privateForm').addEventListener('submit', async e => {
-      e.preventDefault(); const btn = e.target.querySelector('button'); btn.disabled = true;
-      try { await api(`/api/manual/${encodeURIComponent(selected.id)}/messages`, { content: new FormData(e.target).get('content') }); await reload(); }
-      catch (err) { container.querySelector('#p2pMessage').textContent = err.message; btn.disabled = false; }
+    let pendingSend;
+    form.addEventListener('submit', async e => {
+      e.preventDefault(); const btn = form.querySelector('button:not([type="button"])'); btn.disabled = true;
+      const content=textarea.value;
+      if(!pendingSend||pendingSend.content!==content)pendingSend={content,clientMessageId:crypto.randomUUID()};
+      try { await api(`/api/manual/${encodeURIComponent(selected.id)}/messages`, pendingSend); if(textarea.value===content)textarea.value='';pendingSend=null;connection.textContent='Messaggio inviato.';const result=await api(`/api/manual/${encodeURIComponent(selected.id)}/messages`);await updateFeed(result.messages); }
+      catch (err) { connection.textContent=err.message+' Il testo è conservato: puoi riprovare.'; }
+      finally {btn.disabled=false;}
     });
   }
 }
