@@ -3271,7 +3271,7 @@ async function openAccessModal(groupId, currentUser) {
   if (!instructions || !instructions.accessUrl) {
     if (group) {
       instructions = {
-        accessUrl: group.accessUrl || 'https://buyyourshare-production.up.railway.app/#chat-' + groupId,
+        accessUrl: group.accessUrl || 'https://marketplace.buyyourshare.it/#chat-' + groupId,
         instructions: group.instructions || 'Accedi alla chat privata del gruppo per ricevere il link di invito e le credenziali dal Capogruppo.',
         accessCode: group.inviteCode || '',
         ownerSpotifyAccount: group.ownerSpotifyAccount || ''

@@ -200,7 +200,7 @@ class EmailService {
             </div>
 
             <div style="text-align: center; margin: 24px 0;">
-              <a href="https://buyyourshare-production.up.railway.app/#cerca" class="btn-cta">
+              <a href="https://marketplace.buyyourshare.it/#cerca" class="btn-cta">
                 🔍 Esplora il Marketplace Gruppi
               </a>
             </div>
@@ -210,7 +210,7 @@ class EmailService {
             </p>
           </div>
           <div class="footer">
-            © ${new Date().getFullYear()} BuyYourShare • Tutti i diritti riservati • <a href="https://buyyourshare-production.up.railway.app" style="color:#0070ba; text-decoration:none;">buyyourshare.com</a>
+            © ${new Date().getFullYear()} BuyYourShare • Tutti i diritti riservati • <a href="https://marketplace.buyyourshare.it" style="color:#0070ba; text-decoration:none;">buyyourshare.com</a>
           </div>
         </div>
       </body>
@@ -221,7 +221,7 @@ class EmailService {
       to: user.email,
       subject,
       html,
-      text: `Benvenuto su BuyYourShare ${user.fullName}! Il tuo account (${user.email}) è ora attivo. Accedi su https://buyyourshare-production.up.railway.app/#login`
+      text: `Benvenuto su BuyYourShare ${user.fullName}! Il tuo account (${user.email}) è ora attivo. Accedi su https://marketplace.buyyourshare.it/#login`
     });
   }
 
@@ -229,7 +229,7 @@ class EmailService {
    * 2. Email per Recupero Password con Link Diretto Cliccabile
    */
   async sendPasswordResetEmail(user, resetCode, customResetLink = null) {
-    const baseUrl = process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://buyyourshare-production.up.railway.app');
+    const baseUrl = process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://marketplace.buyyourshare.it');
     const resetLink = customResetLink || `${baseUrl}/#reset-password?email=${encodeURIComponent(user.email)}&token=${encodeURIComponent(resetCode)}`;
     const subject = '🔐 Link per Reimpostare la Password - BuyYourShare';
     const html = `

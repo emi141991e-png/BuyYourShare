@@ -311,7 +311,7 @@ authRouter.post('/forgot-password', async (req, res) => {
         resetPasswordExpires: expiresAt
       });
 
-      const host = req.get('host') || 'buyyourshare-production.up.railway.app';
+      const host = req.get('host') || 'marketplace.buyyourshare.it';
       const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
       const resetLink = `${proto}://${host}/#reset-password?email=${encodeURIComponent(cleanEmail)}&token=${encodeURIComponent(resetToken)}`;
       emailService.sendPasswordResetEmail(user, resetToken, resetLink).catch(err => {
