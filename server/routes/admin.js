@@ -11,6 +11,7 @@ import { dataRepository } from '../db/dataRepository.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getGroupSlotsBreakdown } from '../engine/MoneyEngine.js';
 import { adminOverview } from '../services/adminOverview.js';
+import { bankCode } from '../services/p2pBank.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,17 @@ export const adminRouter = express.Router();
 
 // 🔒 BLOCCO DI SICUREZZA SERVER-SIDE: Tutti gli endpoint richiedono autenticazione e ruolo 'admin'
 adminRouter.use(requireAuth, requireRole('admin'));
+adminRouter.get('/bank-payments', (req, res) => res.json({ payments: req.app.locals.p2pBank.records().map(p => ({ ...p, name: dataRepository.data.users.find(u => u.id === p.userId)?.fullName || 'Utente' })) }));
+adminRouter.post('/bank-payments/report-by-code', async (req, res) => {
+  const matches = dataRepository.data.users.filter(u => bankCode(u.id) === String(req.body.code || '').trim().toUpperCase());
+  if (matches.length !== 1) return res.status(404).json({ error: 'Codice utente non trovato o ambiguo.' });
+  try { res.json(await req.app.locals.p2pBank.report(matches[0].id)); }
+  catch (e) { res.status(e.status || 503).json({ error: e.message }); }
+});
+adminRouter.post('/bank-payments/:id/confirm', async (req, res) => {
+  try { res.json(await req.app.locals.p2pBank.confirm(req.params.id, req.user.id, req.body.reference)); }
+  catch (e) { res.status(e.status || 503).json({ error: e.message }); }
+});
 adminRouter.get('/p2p-overview', (req, res) => res.json(adminOverview(dataRepository.data)));
 // These legacy repair actions manufacture billing records or overwrite live slot state.
 adminRouter.use((req, res, next) => {
@@ -30,7 +42,7 @@ adminRouter.use((req, res, next) => {
 // Billing identities and event deduplication must never be erased by legacy reset tools.
 adminRouter.use((req, res, next) => {
   if (req.method === 'POST' && ['/clean-all-data', '/sync-database-clean'].includes(req.path) &&
-      ((dataRepository.data.p2pSubscriptions || []).length || (dataRepository.data.p2pManualRequests || []).length)) {
+      ((dataRepository.data.p2pBankPayments || []).length || (dataRepository.data.p2pSubscriptions || []).length || (dataRepository.data.p2pManualRequests || []).length)) {
     return res.status(409).json({ error: 'P2P_BILLING_RECORDS_PROTECTED', message: 'La pulizia legacy non può rimuovere utenti o dati collegati agli abbonamenti P2P.' });
   }
   next();

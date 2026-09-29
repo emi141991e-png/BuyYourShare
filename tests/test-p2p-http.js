@@ -38,6 +38,9 @@ async function request(url, user = 'member', body) {
   return { status: r.status, body: await r.json() };
 }
 test('actual server gates every user P2P surface and retains subscription management for unpaid users', async () => {
+  assert.equal((await request('/api/p2p/subscription/sdk-start', null, {})).status, 401);
+  assert.equal((await request('/api/p2p/subscription/sdk-start', 'unpaid', {})).status, 404);
+  assert.deepEqual((await request('/api/p2p/subscription', 'unpaid')).body.checkout, { enabled: false });
   for (const url of ['/api/groups/my', '/api/memberships/my', '/api/access/group', '/api/chat/group', '/api/ledger', '/api/p2p/direct-memberships']) {
     assert.equal((await request(url, null)).status, 401, url);
     assert.equal((await request(url, 'unpaid')).status, 402, url);
@@ -157,3 +160,14 @@ test('personal area isolates owned groups and only leaders can edit access instr
   await request('/api/notifications/read', 'member', {});
   assert.ok((await request('/api/notifications', 'member')).body.notifications.every(n => n.isRead));
  });
+
+test('bank HTTP flow requires administrator confirmation and isolates user history', async () => {
+  assert.equal((await request('/api/p2p/bank', null)).status, 401);
+  const payment = (await request('/api/p2p/bank/report', 'expired', {})).body;
+  assert.equal((await request('/api/p2p/subscription', 'expired')).body.subscription.accessAllowed, false);
+  assert.equal((await request('/api/admin/bank-payments', 'member')).status, 403);
+  assert.equal((await request(`/api/admin/bank-payments/${payment.id}/confirm`, 'expired', {reference:'TEST-TRN-HTTP'})).status, 403);
+  assert.equal((await request(`/api/admin/bank-payments/${payment.id}/confirm`, 'admin', {reference:'TEST-TRN-HTTP'})).status, 200);
+  assert.equal((await request('/api/p2p/subscription', 'expired')).body.subscription.accessAllowed, true);
+  assert.equal((await request('/api/p2p/bank', 'unpaid')).body.payments.length, 0);
+});

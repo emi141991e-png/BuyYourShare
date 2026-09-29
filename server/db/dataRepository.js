@@ -189,6 +189,7 @@ class DataRepository {
   }
 
   async deleteUser(id) {
+    if ((this.data.p2pBankPayments || []).some(p => p.userId === id)) throw Object.assign(new Error('BANK_HISTORY_REQUIRES_REVIEW'), { status: 409 });
     const owned = new Set((this.data.groups || []).filter(g => g.ownerId === id).map(g => g.id));
     if ((this.data.p2pManualRequests || []).some(r => r.userId === id || owned.has(r.groupId))) {
       throw Object.assign(new Error('MANUAL_HISTORY_REQUIRES_REVIEW'), { status: 409 });

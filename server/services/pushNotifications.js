@@ -73,6 +73,12 @@ export class PushNotifications {
     this.jobs().push(job); await this.repo.save(); return { queued: true };
   }); }
   relevant(notification) {
+    if (notification?.id.startsWith('bank-renew:')) {
+      const s = this.subscriptions.find(notification.userId);
+      if (s?.paymentMethod !== 'BANK' || s.currentPeriodEnd !== notification.bankPeriodEnd) return false;
+      const remaining = Date.parse(s.currentPeriodEnd) - this.now();
+      return notification.id.endsWith(':before') ? remaining > 0 && remaining <= 3 * DAY : remaining <= 0;
+    }
     const r = (this.repo.data.p2pManualRequests || []).find(r => r.id === notification?.requestId);
     if (!r || r.status !== 'confirmed' || !r.periodEnd || !notification.id.startsWith(`renew:${r.id}:${r.periodEnd}:`)) return false;
     const remaining = Date.parse(r.periodEnd) - this.now();
@@ -83,7 +89,7 @@ export class PushNotifications {
     this.running = true;
     try {
       const selected = await this.exclusive(async () => {
-        const notifications = (this.repo.data.notifications || []).filter(n => n.id.startsWith('renew:') && this.relevant(n) && this.now() - Date.parse(n.createdAt) <= DAY);
+        const notifications = (this.repo.data.notifications || []).filter(n => (n.id.startsWith('renew:') || n.id.startsWith('bank-renew:')) && this.relevant(n) && this.now() - Date.parse(n.createdAt) <= DAY);
         let changed = false;
         for (const n of notifications) for (const d of this.devices().filter(d => d.userId === n.userId && Date.parse(d.createdAt) <= Date.parse(n.createdAt))) {
           const id = `${n.id}:${d.id}`;
@@ -105,7 +111,7 @@ export class PushNotifications {
         }
         const tag = createHash('sha256').update(job.id).digest('hex').slice(0, 32);
         // Generic lock-screen content: never disclose names, IBAN, amounts or messages.
-        const payload = JSON.stringify({ title: 'BuyYourShare', body: job.test ? 'Le notifiche push sono pronte su questo dispositivo.' : 'Hai un promemoria per la quota del gruppo. Apri il marketplace per i dettagli.', tag, url: '/#notifiche' });
+        const payload = JSON.stringify({ title: 'BuyYourShare', body: job.test ? 'Le notifiche push sono pronte su questo dispositivo.' : 'Hai un promemoria di pagamento. Apri il marketplace per i dettagli.', tag, url: '/#notifiche' });
         let status = 'sent', errorCode = null;
         try {
           await this.send(device.subscription, payload, { TTL: 3600, timeout: 10000, urgency: 'normal', topic: tag,

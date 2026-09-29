@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import { P2pBank } from './services/p2pBank.js';
 import { PushNotifications } from './services/pushNotifications.js';
 import { pushRoutes } from './routes/push.js';
 import Stripe from 'stripe';
@@ -59,6 +60,8 @@ if (process.env.P2P_LEGACY_CLEANUP_IDS) {
   }
 }
 export const p2pSubscriptions = new P2pSubscriptions(dataRepository, p2pProvider);
+const bank = new P2pBank(p2pSubscriptions);
+app.locals.p2pBank = bank;
 const quotaProvider = new P2pQuotaPayPal();
 const p2pQuota = new P2pQuota(p2pSubscriptions, quotaProvider);
 app.locals.p2pQuota = p2pQuota;
@@ -69,7 +72,7 @@ let backgroundRunning = false;
 const background = async () => {
   if (backgroundRunning) return;
   backgroundRunning = true;
-  try { await manual.reminders(); await pushNotifications.flush(); }
+  try { await manual.reminders(); await bank.reminders(); await pushNotifications.flush(); }
   catch { console.error('[P2P] Reminder delivery will retry.'); }
   finally { backgroundRunning = false; }
 };

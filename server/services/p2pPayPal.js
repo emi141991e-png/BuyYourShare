@@ -3,6 +3,12 @@ import { config } from '../config/env.js';
 // Dedicated access plans. Store Orders v2 and legacy group billing never use this client.
 export class P2pPayPal {
   constructor(env = process.env, transport = fetch) { this.env = env; this.transport = transport; }
+  checkoutConfig() {
+    const s = this.settings();
+    // Experimental SDK is deliberately unavailable in live mode, even if misconfigured.
+    return this.env.P2P_PAYPAL_SDK_SANDBOX === 'true' && s.mode === 'sandbox' && s.clientId
+      ? { enabled: true, mode: 'sandbox', clientId: s.clientId } : { enabled: false };
+  }
   settings() {
     const e = this.env;
     const mode = e.P2P_PAYPAL_MODE || config.paypal.mode;

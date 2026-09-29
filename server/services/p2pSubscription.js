@@ -14,7 +14,7 @@ export function publicSubscription(s, now = Date.now()) {
     accessAllowed: active, currentPeriodStart: s?.currentPeriodStart || null, currentPeriodEnd: s?.currentPeriodEnd || null,
     nextBillingDate: s?.cancelAtPeriodEnd ? null : s?.nextBillingDate || null,
     cancelAtPeriodEnd: !!s?.cancelAtPeriodEnd, pendingRole: s?.pendingRole || null,
-    approvalUrl: s?.approvalUrl || null, providerStatus: s?.providerStatus || null };
+    approvalUrl: s?.approvalUrl || null, providerStatus: s?.providerStatus || null, paymentMethod: s?.paymentMethod || 'PAYPAL' };
 }
 function approval(result) {
   const link = result.links?.find(l => l.rel === 'approve')?.href;
@@ -46,6 +46,7 @@ export class P2pSubscriptions {
     return publicSubscription(this.find(userId) || { role: this.roleFor(userId), status: 'inactive' }, this.now());
   }
   async reconcile(s) {
+    if (s?.paymentMethod === 'BANK') return s;
     if (!s?.providerSubscriptionId) return s;
     const remote = await this.provider.get(s.providerSubscriptionId);
     if (remote.id !== s.providerSubscriptionId || remote.custom_id !== s.customId ||
@@ -90,6 +91,7 @@ export class P2pSubscriptions {
     this.ready();
     if (!Object.hasOwn(PRICES, requestedRole)) throw new P2pError('P2P_ROLE_INVALID', 400);
     let s = this.find(userId);
+    if ((this.repo.data.p2pBankPayments || []).some(p => p.userId === userId && p.status === 'reported') || s?.paymentMethod === 'BANK') throw new P2pError('BANK_PAYMENT_IN_PROGRESS');
     if (s?.migrationCredit && accessAllowed(s, this.now())) return this.view(userId);
     if (s?.providerSubscriptionId) {
       await this.reconcile(s); await this.save();
