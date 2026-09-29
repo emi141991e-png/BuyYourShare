@@ -53,7 +53,7 @@ export async function renderP2pAccess(container, route, user) {
     if (generation !== turn) return;
     const tabs = [['#home','Esplora'],['#crea','Crea gruppo'],['#miei-abbonamenti','Partecipazioni'],['#miei-gruppi','I miei gruppi'],['#notifiche','Notifiche'],['#p2p-abbonamento','Accesso BYS']];
     container.innerHTML = `<section class="p2p-access ${billing ? 'p2p-billing' : ''}">
-      <div class="workspace-heading"><div><span class="eyebrow">BUYYOURSHARE / MARKETPLACE</span><h1>Il tuo spazio di condivisione.</h1></div><a class="workspace-help" href="https://buyyourshare.it/support">Hai bisogno di aiuto? ↗</a></div>
+      <div class="workspace-heading"><div><span class="eyebrow">BUYYOURSHARE / MARKETPLACE</span><h1>Il tuo spazio di condivisione.</h1></div><div class="workspace-links"><a class="back-to-bys" href="https://buyyourshare.it/">← Torna a BuyYourShare</a><a class="workspace-help" href="https://buyyourshare.it/support">Hai bisogno di aiuto? ↗</a></div></div>
       <nav class="workspace-nav" aria-label="Marketplace">${tabs.map(([hash,label]) => `<a href="${hash}" class="workspace-tab ${route === hash || hash === '#home' && route === '#cerca' ? 'is-current' : ''}" ${route === hash ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
       <div id="p2pMessage" role="status" aria-live="polite"></div>${content}
       <details class="payment-note"><summary>Come funzionano l’accesso BYS e le quote?</summary><p>${direct}</p></details></section>`;
