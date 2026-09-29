@@ -106,10 +106,10 @@ export async function renderP2pAccess(container, route, user) {
       shell(`<div class="billing-grid"><article class="billing-card">
         <div class="billing-top"><span class="billing-eyebrow">ABBONAMENTO BYS</span><span class="billing-status ${s.accessAllowed ? 'is-active' : ''}">${esc(statuses[s.status] || s.status)}</span></div>
         <h2>Un unico piano.<br>Il tuo modo di condividere.</h2>
-        <p class="billing-intro">Entra nei gruppi o diventa capogruppo, allo stesso prezzo.</p>
+        <p class="billing-intro">${route === '#crea' ? 'Per creare il tuo gruppo, attiva l’accesso BYS. Sarai il capogruppo dei gruppi che crei.' : 'Partecipa ai gruppi e crea i tuoi con un unico abbonamento.'}</p>
         <div class="billing-price">${money(s.priceCents)}<span>/ mese</span></div>
         <p class="billing-caption">Rinnovo automatico mensile · Puoi disattivarlo quando vuoi</p>
-        <dl class="billing-details"><div><dt>Il tuo ruolo</dt><dd>${s.role === 'GROUP_LEADER' ? 'Capogruppo' : 'Membro'}</dd></div><div><dt>${s.cancelAtPeriodEnd ? 'Accesso fino al' : 'Prossimo rinnovo'}</dt><dd>${s.cancelAtPeriodEnd ? date(s.currentPeriodEnd) : s.nextBillingDate ? date(s.nextBillingDate) : 'Dopo l’attivazione'}</dd></div></dl>
+        <dl class="billing-details"><div><dt>Il piano include</dt><dd>Membro e capogruppo</dd></div><div><dt>${s.cancelAtPeriodEnd ? 'Accesso fino al' : 'Prossimo rinnovo'}</dt><dd>${s.cancelAtPeriodEnd ? date(s.currentPeriodEnd) : s.nextBillingDate ? date(s.nextBillingDate) : 'Dopo l’attivazione'}</dd></div></dl>
         ${!s.accessAllowed ? '<p class="billing-notice">Completa l’attivazione su PayPal per accedere alle funzioni P2P.</p>' : '<p class="billing-notice is-active">Il tuo accesso P2P è attivo.</p>'}
         ${s.cancelAtPeriodEnd ? '<p class="billing-notice">Rinnovo disattivato: conservi il periodo già pagato.</p>' : ''}
         ${s.pendingRole ? '<p class="billing-notice">Cambio ruolo in attesa di conferma PayPal.</p>' : ''}
@@ -118,12 +118,11 @@ export async function renderP2pAccess(container, route, user) {
         ${state.available && ['inactive', 'canceled'].includes(s.status) ? button(s.role === 'GROUP_LEADER' ? 'p2pLeader' : 'p2pMember', 'Attiva il tuo accesso · 0,99 €/mese') : ''}
         ${state.available && s.status === 'pending' && !s.providerStatus ? button('p2pRetry', 'Recupera richiesta PayPal') : ''}
         ${s.approvalUrl ? `<a class="btn btn-primary" href="${esc(s.approvalUrl)}">Continua su PayPal <span aria-hidden="true">↗</span></a>` : ''}
-        ${state.available && s.accessAllowed && s.role === 'MEMBER' && !s.cancelAtPeriodEnd ? button('p2pUpgrade', 'Diventa capogruppo · stesso prezzo') : ''}
+        ${state.available && s.accessAllowed ? link('#crea', 'Continua · Crea il tuo gruppo') : ''}
         <button class="billing-refresh" id="p2pRefresh" type="button">Aggiorna stato del pagamento</button></div>
         ${s.providerStatus && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? '<div class="billing-manage"><button id="p2pCancel" type="button">Disattiva rinnovo automatico</button></div>' : ''}
         </article><aside class="billing-aside"><span class="billing-eyebrow">SEMPLICE, TRASPARENTE</span><h3>Un accesso,<br>due possibilità.</h3><div><span class="billing-step">01</span><h4>Partecipa a un gruppo</h4><p>Scegli il gruppo e gestisci le tue partecipazioni in un unico spazio.</p></div><div><span class="billing-step">02</span><h4>Crea il tuo gruppo</h4><p>Diventa capogruppo senza un secondo abbonamento o costi aggiuntivi di accesso.</p></div><div class="billing-separate"><h4>Le quote restano separate</h4><p>Le quote dei membri vanno direttamente al capogruppo tramite bonifico o PayPal. BYS incassa solo l’abbonamento di accesso.</p></div></aside></div>`, true);
       for (const [id, role] of [['p2pMember', 'MEMBER'], ['p2pLeader', 'GROUP_LEADER']]) bind(id, async () => { await api('/api/p2p/subscription/start', { role }); await reload(); });
-      bind('p2pUpgrade', async () => { await api('/api/p2p/subscription/upgrade', {}); await reload(); });
       bind('p2pRetry', async () => { await api('/api/p2p/subscription/start', { role: s.role }); await reload(); });
       bind('p2pRefresh', async () => { await api('/api/p2p/subscription/refresh', {}); await reload(); });
       bind('p2pCancel', async () => {
@@ -148,7 +147,7 @@ export async function renderP2pAccess(container, route, user) {
       shell(`<h2>Notifiche</h2>${notifications.map(n => `<article><h3>${esc(n.title)}</h3><p>${esc(n.message)}</p></article>`).join('') || '<p>Nessuna notifica.</p>'}`); return;
     }
     if (route === '#crea') {
-      shell(`<h2>Crea un gruppo</h2><p>Piano capogruppo ${money(s.priceCents)}/mese. Nessuna commissione BYS sulle quote.</p>
+      shell(`<h2>Crea un gruppo</h2><p>Il tuo accesso BYS da ${money(s.priceCents)}/mese include la creazione di gruppi. Sarai il capogruppo di questo gruppo, senza un secondo abbonamento. Nessuna commissione BYS sulle quote.</p>
         <form id="p2pCreate" style="display:grid;gap:16px;max-width:600px">
         <label>Nome servizio <input name="customServiceName" required maxlength="100"></label>
         <label>Nome piano <input name="planName" required maxlength="100"></label>
@@ -170,3 +169,4 @@ export async function renderP2pAccess(container, route, user) {
     shell('<p>Seleziona una voce del marketplace.</p>');
   } catch (e) { shell(`<p role="alert">${esc(e.message)}</p>${link('#p2p-abbonamento', 'Gestisci abbonamento')}`); }
 }
+
