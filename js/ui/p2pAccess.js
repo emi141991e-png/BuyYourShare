@@ -100,7 +100,7 @@ export async function renderP2pAccess(container, route, user) {
   }
   if (!user) {
     shell(`<h2>Un abbonamento per accedere al P2P</h2><p>Membro: <strong>0,99 €/mese</strong>. Capogruppo: <strong>0,99 €/mese</strong>.</p>
-      <p>Attiva con bonifico e conferma dell’incasso. Puoi impostare il bonifico periodico nella tua banca. Le quote dei gruppi sono separate.</p>${link('#login', 'Accedi')}${link('#register', 'Registrati')}`); return;
+      <p>Google Pay, quando disponibile, attiva automaticamente 30 giorni dopo la conferma del pagamento. Con bonifico serve la verifica dell’incasso. Puoi impostare il bonifico periodico nella tua banca. Le quote dei gruppi sono separate.</p>${link('#login', 'Accedi')}${link('#register', 'Registrati')}`); return;
   }
   try {
     if (route === '#miei-gruppi' || route === '#miei-abbonamenti' || route.startsWith('#privata-')) {
