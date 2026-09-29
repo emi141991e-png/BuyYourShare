@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { dataRepository } from '../db/dataRepository.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getGroupSlotsBreakdown } from '../engine/MoneyEngine.js';
+import { adminOverview } from '../services/adminOverview.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,14 @@ export const adminRouter = express.Router();
 
 // 🔒 BLOCCO DI SICUREZZA SERVER-SIDE: Tutti gli endpoint richiedono autenticazione e ruolo 'admin'
 adminRouter.use(requireAuth, requireRole('admin'));
+adminRouter.get('/p2p-overview', (req, res) => res.json(adminOverview(dataRepository.data)));
+// These legacy repair actions manufacture billing records or overwrite live slot state.
+adminRouter.use((req, res, next) => {
+  if (req.method === 'POST' && ['/assign-membership', '/sync-group-slots'].includes(req.path)) {
+    return res.status(410).json({ error: 'LEGACY_ACTION_RETIRED', message: 'Usa le richieste e conferme del modello P2P corrente.' });
+  }
+  next();
+});
 // Billing identities and event deduplication must never be erased by legacy reset tools.
 adminRouter.use((req, res, next) => {
   if (req.method === 'POST' && ['/clean-all-data', '/sync-database-clean'].includes(req.path) &&
@@ -226,9 +235,10 @@ adminRouter.put('/groups/:id/status', async (req, res) => {
 
     const previousStatus = group.status;
     const updates = { status, updatedAt: new Date().toISOString() };
-    if (status === 'PUBLISHED' && !group.publishedAt) {
-      updates.publishedAt = new Date().toISOString();
+    if (status === 'PUBLISHED') {
+      updates.publishedAt = group.publishedAt || new Date().toISOString();
       updates.isPublished = true;
+      updates.closedAt = null;
     }
     if (status === 'CLOSED') {
       updates.closedAt = new Date().toISOString();

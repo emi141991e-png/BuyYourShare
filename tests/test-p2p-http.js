@@ -77,6 +77,27 @@ test('legacy administrative cleanup cannot orphan paying users or erase subscrip
   assert.equal(stored.users.length, 6); assert.equal(stored.p2pSubscriptions.length, 4);
 });
 
+test('admin overview is protected, current and excludes private chat and payment destinations', async () => {
+  assert.equal((await request('/api/admin/p2p-overview', null)).status, 401);
+  assert.equal((await request('/api/admin/p2p-overview', 'member')).status, 403);
+  const r = await request('/api/admin/p2p-overview', 'admin');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.activeCount, 3);
+  assert.equal(r.body.subscriptions.find(s => s.userId === 'expired').status, 'past_due');
+  assert.equal(JSON.stringify(r.body).includes('private@example.test'), false);
+  assert.equal((await request('/api/admin/assign-membership', 'admin', {})).status, 410);
+  assert.equal((await request('/api/admin/sync-group-slots', 'admin', {})).status, 410);
+});
+
+test('admin can close and republish a group without leaving it hidden', async () => {
+  for (const status of ['CLOSED', 'PUBLISHED']) {
+    const r = await fetch(base + '/api/admin/groups/group/status', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-admin' }, body: JSON.stringify({ status }) });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.group.isPublished, status === 'PUBLISHED');
+  }
+});
+
 test('manual HTTP lifecycle protects recipient and private messages', async () => {
   const catalogue = await request('/api/groups', null);
   assert.equal(JSON.stringify(catalogue.body).includes('private@example.test'), false);

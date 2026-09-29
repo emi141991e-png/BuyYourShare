@@ -590,7 +590,7 @@ class DataRepository {
     });
 
     const totalVolumeCents = logs.reduce((acc, l) => acc + (l.totalAmountCents || 0), 0);
-    const totalGrossFeesCents = logs.reduce((acc, l) => acc + (l.buyyourshareFeeCents || 149), 0);
+    const totalGrossFeesCents = logs.reduce((acc, l) => acc + (l.buyyourshareFeeCents || 0), 0);
     const totalProviderFeesCents = logs.reduce((acc, l) => acc + (l.paymentProviderFeeCents || 0), 0);
     const totalNetPlatformRevenueCents = logs.reduce((acc, l) => acc + (l.netPlatformAmountCents || 0), 0);
     const totalTransferredToOwnersCents = logs.filter(l => l.transferStatus === 'TRANSFERRED' || l.payoutStatus === 'PAID')

@@ -1,3 +1,4 @@
+import { renderAdminOverview } from './ui/adminOverview.js';
 /**
  * BuyYourShare - Standalone Marketplace Controller & SPA Router
  * Modello P2P con Quote Mensili, Commissione 0,99€, Chat Privata Nativa e Accesso Automatico
@@ -2665,17 +2666,10 @@ async function renderAdminView(container, currentUser) {
     console.warn('[ADMIN VIEW] Fallito fetch server-side admin, fallback locale:', err.message);
   }
 
-  // Fallback se offline/local
   if (!metrics) {
-    const localSummary = financialAuditService.getFinancialSummary();
-    metrics = {
-      users: { total: db.data.users.length, members: db.data.users.filter(u => u.role === 'user').length, owners: db.data.users.filter(u => u.role === 'owner').length, admins: 1 },
-      groups: { total: db.data.groups.length, published: db.data.groups.filter(g => g.status === 'PUBLISHED' || g.status === 'active').length, draft: db.data.groups.filter(g => g.status === 'DRAFT').length, closed: db.data.groups.filter(g => g.status === 'CLOSED').length, availableSlots: 5, occupiedSlots: 1, totalSlots: 6 },
-      finance: { totalVolumeCents: localSummary.totalGrossFeesCents, totalGrossFeesCents: localSummary.totalGrossFeesCents, totalProviderFeesCents: localSummary.totalProviderFeesCents, totalNetPlatformRevenueCents: localSummary.totalNetPlatformRevenueCents, totalTransferredToOwnersCents: 0, transactionsCount: localSummary.totalTransactionsCount }
-    };
-    allGroups = db.getGroups();
-    allUsers = db.data.users;
-    financialLogs = financialAuditService.getAllLogs();
+    container.innerHTML = '<section class="billing-card"><h1>Pannello admin non disponibile</h1><p role="alert">Non è stato possibile caricare i dati verificati del server. Accedi nuovamente o riprova.</p><a href="#login">Accedi</a> <button id="retryAdmin" class="btn btn-secondary">Riprova</button></section>';
+    container.querySelector('#retryAdmin').onclick = () => renderAdminView(container, currentUser);
+    return;
   }
 
   function getTabBtnStyle(tabName) {
@@ -2693,7 +2687,7 @@ async function renderAdminView(container, currentUser) {
             <span style="background:#f3e8ff; color:#6b21a8; font-size:11px; font-weight:800; padding:2px 8px; border-radius:var(--radius-full);">RISERVATO</span>
           </div>
           <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
-            Gestione globale BuyYourShare, moderazione gruppi, utenti e supervisione contabile immutabile.
+            Gestione marketplace: accessi BYS, richieste, gruppi e utenti. Le quote sono esterne a BYS.
           </p>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
@@ -2714,7 +2708,7 @@ async function renderAdminView(container, currentUser) {
           👥 Gestione Utenti (${metrics.users.total || allUsers.length})
         </button>
         <button type="button" class="btn-admin-tab" data-tab="ledger" style="${getTabBtnStyle('ledger')}">
-          📜 Audit Ledger & Azioni
+          📜 Storico legacy e azioni
         </button>
         <button type="button" class="btn-admin-tab" data-tab="gateway" style="${getTabBtnStyle('gateway')}">
           🅿️ Config Gateway
@@ -2724,58 +2718,7 @@ async function renderAdminView(container, currentUser) {
       <!-- ========================================== -->
       <!-- TAB 1: DASHBOARD KPI                       -->
       <!-- ========================================== -->
-      ${currentAdminTab === 'dashboard' ? `
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:24px;">
-          <!-- Card Utenti -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">👥 Utenti Totali</span>
-            <div style="font-size:26px; font-weight:900; color:#003087; margin:6px 0;">${metrics.users.total}</div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              <strong>${metrics.users.members}</strong> Membri • <strong>${metrics.users.owners}</strong> Capigruppo
-            </div>
-          </div>
-
-          <!-- Card Gruppi -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">📁 Gruppi a Sistema</span>
-            <div style="font-size:26px; font-weight:900; color:#166534; margin:6px 0;">${metrics.groups.total}</div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              <span style="color:#166534; font-weight:700;">${metrics.groups.published} Pubblicati</span> • 
-              <span style="color:#d97706; font-weight:700;">${metrics.groups.draft || 0} Draft</span> • 
-              <span style="color:#991b1b; font-weight:700;">${metrics.groups.closed || 0} Chiusi</span>
-            </div>
-          </div>
-
-          <!-- Card Posti -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">🟢 Posti Marketplace</span>
-            <div style="font-size:26px; font-weight:900; color:#0284c7; margin:6px 0;">${metrics.groups.availableSlots || 0} <span style="font-size:14px; color:var(--text-muted); font-weight:500;">liberi</span></div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              Totali: <strong>${metrics.groups.totalSlots || 0}</strong> • Occupati: <strong>${metrics.groups.occupiedSlots || 0}</strong>
-            </div>
-          </div>
-
-          <!-- Card Finanziaria -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">💰 Fee Lorde Incassate</span>
-            <div style="font-size:26px; font-weight:900; color:var(--accent); margin:6px 0;">${formatCents(metrics.finance.totalGrossFeesCents)}</div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              Netto: <strong style="color:#166534;">${formatCents(metrics.finance.totalNetPlatformRevenueCents)}</strong> (${metrics.finance.transactionsCount || 0} cicli)
-            </div>
-          </div>
-        </div>
-
-        <!-- Riepilogo Finanziario Rapido -->
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; margin-bottom:24px;">
-          <h3 style="font-size:14px; font-weight:800; color:var(--text-main); margin-bottom:8px;">📊 Riepilogo Economico Piattaforma</h3>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:12.5px;">
-            <div>Volume Totale Transato: <strong>${formatCents(metrics.finance.totalVolumeCents)}</strong></div>
-            <div>Fee BYS Lorde (1,49 €/quota): <strong>${formatCents(metrics.finance.totalGrossFeesCents)}</strong></div>
-            <div>Costi Gateway Stimati: <strong>${formatCents(metrics.finance.totalProviderFeesCents)}</strong></div>
-            <div>Quote Trasferite ai Capigruppo: <strong style="color:#1e40af;">${formatCents(metrics.finance.totalTransferredToOwnersCents)}</strong></div>
-          </div>
-        </div>
-      ` : ''}
+      ${currentAdminTab === 'dashboard' ? '<div id="adminP2pOverview"></div>' : ''}
 
       <!-- ========================================== -->
       <!-- TAB 2: GESTIONE GRUPPI                     -->
@@ -3117,6 +3060,7 @@ async function renderAdminView(container, currentUser) {
   `;
 
   // Bind Tab Click Listeners
+  if (currentAdminTab === 'dashboard') await renderAdminOverview(container.querySelector('#adminP2pOverview'), token, escapeHtml);
   container.querySelectorAll('.btn-admin-tab').forEach(btn => {
     btn.onclick = () => {
       currentAdminTab = btn.dataset.tab;
