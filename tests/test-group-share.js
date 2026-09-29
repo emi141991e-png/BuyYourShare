@@ -25,3 +25,12 @@ test('notification links only navigate to internal marketplace destinations', ()
  assert.equal(notificationTarget({ actionUrl: '#miei-gruppi' }), '#miei-gruppi');
  for (const actionUrl of ['javascript:alert(1)', 'https://evil.example', '#privata-x" onclick=bad', '#admin']) assert.equal(notificationTarget({ actionUrl }), null);
 });
+
+import { requestsForView } from '../js/ui/manualPayments.js';
+test('group management and member participation lists remain separate for the same account', () => {
+ const requests = [{id:'owned',ownerId:'me',userId:'someone'},{id:'joined',ownerId:'someone',userId:'me'}];
+ assert.deepEqual(requestsForView(requests, '#miei-gruppi', 'me').map(r=>r.id), ['owned']);
+ assert.deepEqual(requestsForView(requests, '#miei-abbonamenti', 'me').map(r=>r.id), ['joined']);
+ assert.deepEqual(requestsForView(requests, '#privata-joined', 'me').map(r=>r.id), ['joined']);
+ assert.deepEqual(requestsForView(requests, '#privata-missing', 'me'), []);
+});
