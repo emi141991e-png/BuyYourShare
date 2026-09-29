@@ -5,6 +5,7 @@
  */
 
 import fs from 'fs';
+import { migrateAdminEmail } from './adminEmailMigration.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createSecureToken, hashPassword } from '../services/passwordSecurity.js';
@@ -70,6 +71,8 @@ class DataRepository {
         this.saveSync();
       }
     }
+
+    if (process.env.RAILWAY_ENVIRONMENT_ID === 'b5065388-ca4f-4d0a-9c71-8e6aff2a834e' && migrateAdminEmail(this.data)) this.saveSync();
 
     // MIGRAZIONE DI PRODUZIONE: Pulizia definitiva da qualsiasi vecchio gruppo demo legacy per ID
     if (this.data && Array.isArray(this.data.groups)) {
