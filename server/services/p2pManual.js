@@ -51,8 +51,15 @@ export class P2pManual {
   }
   list(userId) {
     return this.records().filter(r => this.repo.data.groups.some(g => g.id === r.groupId && (r.userId === userId || g.ownerId === userId))).map(r => ({ ...r,
-      groupName: this.group(r.groupId).customServiceName, ownerId: this.group(r.groupId).ownerId,
+      groupName: this.group(r.groupId).customServiceName, groupStatus: this.group(r.groupId).status, ownerId: this.group(r.groupId).ownerId,
+      memberName: (this.repo.data.users || []).find(u => u.id === r.userId)?.fullName || 'Membro',
+      ownerName: (this.repo.data.users || []).find(u => u.id === this.group(r.groupId).ownerId)?.fullName || 'Capogruppo',
       paymentDestination: ['accepted', 'reported', 'confirmed'].includes(r.status) ? r.destination : undefined, destination: undefined }));
+  }
+  ownedGroups(userId) {
+    return this.repo.data.groups.filter(g => g.ownerId === userId).map(g => ({
+      id: g.id, ownerId: g.ownerId, customServiceName: g.customServiceName, status: g.status,
+    }));
   }
   slotFree(g, slot, exceptId) {
     if (!['PUBLISHED', 'FULL', 'active', 'available'].includes(g.status) || !Number.isInteger(slot) || slot <= g.ownerSlots || slot > g.totalSlots) throw new P2pError('SLOT_UNAVAILABLE');
@@ -123,7 +130,14 @@ export class P2pManual {
   reminders() { return this.exclusive(async () => {
     let changed = false;
     for (const r of this.records()) {
-      if (r.status === 'accepted' && Date.parse(r.reservedUntil) <= this.now()) { r.status = 'canceled'; this.message(r, 'Prenotazione scaduta senza dichiarazione di pagamento. Richiedi nuovamente il posto prima di pagare.'); changed = true; }
+      if (r.status === 'accepted' && Date.parse(r.reservedUntil) <= this.now()) {
+        r.status = 'canceled';
+        const text = 'Prenotazione scaduta senza dichiarazione di pagamento. Richiedi nuovamente il posto prima di pagare.';
+        this.message(r, text);
+        this.notify(r.userId, `reservation-expired:${r.id}`, text, r.id);
+        this.notify(this.group(r.groupId).ownerId, `reservation-expired-owner:${r.id}`, 'Una prenotazione è scaduta. Il posto è nuovamente disponibile.', r.id);
+        changed = true;
+      }
       if (r.status !== 'confirmed' || !r.periodEnd) continue;
       const remaining = Date.parse(r.periodEnd) - this.now();
       if (remaining > 3 * 86400000) continue;
@@ -131,6 +145,7 @@ export class P2pManual {
       if ((this.repo.data.notifications || []).some(n => n.id === key)) continue;
       const text = remaining > 0 ? 'La quota scade entro 3 giorni. Organizza il pagamento diretto al capogruppo.' : 'Rinnovo in attesa: paga la quota al capogruppo e indica «Ho pagato». Se hai già pagato, attendi la sua conferma.';
       this.notify(r.userId, key, text, r.id); this.message(r, text); changed = true;
+      if (phase === 'due') this.notify(this.group(r.groupId).ownerId, `leader-${key}`, 'Una quota è scaduta. Contatta il membro in chat e verifica l’accredito prima di confermare il rinnovo.', r.id);
     }
     if (changed) await this.repo.save();
   }); }

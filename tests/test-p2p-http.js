@@ -133,6 +133,18 @@ test('push registration requires authentication and explicit consent; devices ca
   assert.equal((await fetch(base+'/server/data/push-vapid.json')).status,404);
 });
 
+test('personal area isolates owned groups and only leaders can edit access instructions', async () => {
+  const leader = (await request('/api/manual', 'leader')).body;
+  assert.equal(leader.ownedGroups.length, 1);
+  assert.equal((await request('/api/manual', 'member')).body.ownedGroups.length, 0);
+  assert.equal(leader.requests[0].memberName, 'member');
+  assert.equal((await request('/api/manual', 'member')).body.requests[0].ownerName, 'leader');
+  assert.equal((await request('/api/access/group', 'member', { instructions:'not allowed' })).status, 403);
+  assert.equal((await request('/api/access/group', 'leader', { instructions:'Updated test instructions', accessUrl:'https://example.test/' })).status, 200);
+  assert.equal((await request('/api/access/group', 'member')).body.instructions.instructions, 'Updated test instructions');
+  assert.equal((await request('/api/access/group', 'other')).status, 403);
+});
+
  test('notification read actions are authenticated, selective and isolated by owner', async () => {
   assert.equal((await request('/api/notifications/read', null, {})).status, 401);
   assert.equal((await request('/api/notifications/read', 'member', { ids: 'bad' })).status, 400);

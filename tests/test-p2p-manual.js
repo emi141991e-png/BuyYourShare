@@ -8,6 +8,25 @@ function setup() {
   const service = new P2pManual({ repo, find: id => id === 'unpaid' ? null : { status: 'active', currentPeriodEnd: '2030-01-01' }, exclusive: fn => { const p = queue.catch(() => {}).then(fn); queue = p; return p; } }, () => now);
   return { service, repo, time: value => { now = Date.parse(value); } };
 }
+
+test('personal group list keeps closed groups private to their owner', () => {
+  const { service, repo } = setup();
+  repo.data.groups[0].status = 'CLOSED';
+  assert.equal(service.ownedGroups('o').length, 1);
+  assert.equal(service.ownedGroups('m').length, 0);
+  assert.equal(service.ownedGroups('o')[0].manualPaymentDestination, undefined);
+});
+
+test('expiry and renewal reminders notify both participants without duplicates', async () => {
+  const { service: s, repo, time } = setup();
+  const first = await s.request('m', 'g', 2); await s.action('o', first.id, 'accept');
+  time('2026-02-03T12:00:00Z'); await s.reminders(); await s.reminders();
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('reservation-expired')).length, 2);
+  const second = await s.request('m', 'g', 2); await s.action('o', second.id, 'accept'); await s.action('m', second.id, 'report'); await s.action('o', second.id, 'confirm');
+  time('2026-03-04T12:00:00Z'); await s.reminders(); await s.reminders();
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('leader-renew:')).length, 1);
+  assert.equal(repo.data.notifications.find(n => n.id.startsWith('leader-renew:')).userId, 'o');
+});
 test('destination requires valid IBAN checksum or PayPal email', () => {
   assert.throws(() => paymentDestination({})); assert.throws(() => paymentDestination({ payoutIban: 'IT00X0542811101000000123456', payoutLegalName: 'Test' }));
   assert.equal(paymentDestination({ paypalEmail: 'OWNER@example.com' }).paypalEmail, 'owner@example.com');
