@@ -56,7 +56,7 @@ export function getGroupSlotsBreakdown(group, memberships = [], requestingUser =
 
   const shares = allocateMoneySplit(realCostCents, totalSlots);
   const groupMemberships = memberships.filter(m => m.groupId === group.id && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED') &&
-    (m.paymentMethod !== 'DIRECT' || Date.parse(m.currentPeriodEnd) > Date.now()));
+    (m.paymentProvider === 'MANUAL' || m.paymentMethod !== 'DIRECT' || Date.parse(m.currentPeriodEnd) > Date.now()));
 
   const slots = [];
   for (let i = 1; i <= totalSlots; i++) {
@@ -73,8 +73,8 @@ export function getGroupSlotsBreakdown(group, memberships = [], requestingUser =
       baseShareCents: baseShare,
       platformFeeCents: isOwner ? 0 : feeCents,
       memberTotalCents: isOwner ? baseShare : (baseShare + feeCents),
-      assignedUserId: isOwner ? group.ownerId : (assignedMembership ? assignedMembership.userId : null),
-      assignedUser: isOwner ? (group.owner ? { fullName: group.owner.fullName } : null) : (mUser ? { fullName: mUser.fullName } : null)
+      assignedUserId: isOwner ? group.ownerId : (assignedMembership && (requestingUser?.id === group.ownerId || requestingUser?.id === assignedMembership.userId) ? assignedMembership.userId : null),
+      assignedUser: isOwner ? (group.owner ? { fullName: group.owner.fullName } : null) : (mUser && (requestingUser?.id === group.ownerId || requestingUser?.id === mUser.id) ? { fullName: mUser.fullName } : null)
     });
   }
 

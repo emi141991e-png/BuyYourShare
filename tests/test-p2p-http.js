@@ -12,7 +12,7 @@ before(async () => {
   const users = ['member', 'leader', 'unpaid', 'other', 'expired', 'admin'].map(id => ({ id, email: `${id}@example.test`, fullName: id, role: id === 'admin' ? 'admin' : 'user' }));
   writeFileSync(dbFile, JSON.stringify({ users,
     sessions: users.map(u => ({ userId: u.id, token: `test-${u.id}`, createdAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(), expiresAt: end })),
-    groups: [{ id: 'group', ownerId: 'leader', customServiceName: 'Test Group', planName: 'Test Plan', totalSlots: 3, ownerSlots: 1, availableSlots: 2, realSubscriptionCostCents: 900, baseMemberShareCents: 300, status: 'PUBLISHED' }],
+    groups: [{ id: 'group', ownerId: 'leader', customServiceName: 'Test Group', planName: 'Test Plan', totalSlots: 3, ownerSlots: 1, availableSlots: 2, realSubscriptionCostCents: 900, baseMemberShareCents: 300, status: 'PUBLISHED', manualPaymentDestination: { paypalEmail: 'private@example.test' } }],
     memberships: [], services: [], accessInstructions: [{ groupId: 'group', instructions: 'private access' }],
     chats: [], chatMessages: [], connectedAccounts: [], notifications: [], financialAuditLogs: [],
     systemConfig: { securityHardeningV1: 'fixture' },
@@ -38,13 +38,15 @@ async function request(url, user = 'member', body) {
   return { status: r.status, body: await r.json() };
 }
 test('actual server gates every user P2P surface and retains subscription management for unpaid users', async () => {
-  for (const url of ['/api/groups', '/api/groups/my', '/api/memberships/my', '/api/access/group', '/api/chat/group', '/api/ledger', '/api/notifications', '/api/p2p/direct-memberships']) {
+  for (const url of ['/api/groups/my', '/api/memberships/my', '/api/access/group', '/api/chat/group', '/api/ledger', '/api/p2p/direct-memberships']) {
     assert.equal((await request(url, null)).status, 401, url);
     assert.equal((await request(url, 'unpaid')).status, 402, url);
     assert.equal((await request(url, 'expired')).status, 402, url);
   }
   assert.equal((await request('/api/p2p/subscription', 'unpaid')).status, 200);
-  assert.equal((await request('/api/groups', 'member', {})).body.error, 'P2P_LEADER_PLAN_REQUIRED');
+  assert.equal((await request('/api/groups', 'member', {})).body.error, 'PAYMENT_DESTINATION_REQUIRED');
+  for (const user of [null, 'unpaid', 'expired']) assert.equal((await request('/api/groups', user)).status, 200);
+  assert.equal((await request('/api/notifications', 'unpaid')).status, 200);
 });
 test('legacy collection, payout onboarding and unsigned webhooks cannot move money', async () => {
   for (const url of ['/api/checkout/create-session', '/api/checkout/paypal/activate', '/api/connect/onboarding-link']) {
@@ -57,15 +59,15 @@ test('manual confirmation is disabled and unconfigured PayPal quota fails closed
   assert.equal((await request('/api/access/group')).status, 403);
   assert.equal((await request('/api/p2p/requests/unknown/confirm', 'leader', { paymentReceived: true })).status, 410);
   assert.equal((await request('/api/p2p/groups/group/direct-payment', 'member')).status, 410);
-  assert.equal((await request('/api/p2p/groups/group/request', 'member', { slotNumber: 2 })).status, 503);
+  assert.equal((await request('/api/p2p/groups/group/request', 'member', { slotNumber: 2 })).status, 410);
   const payee = await request('/api/p2p/payee', 'leader');
   assert.equal(payee.body.available, false);
   const stored = JSON.parse(readFileSync(dbFile, 'utf8'));
   assert.equal(stored.memberships.length, 0);
 });
-test('leader cannot publish a group without a verified PayPal recipient', async () => {
+test('leader cannot publish without manual payment destination', async () => {
   const r = await request('/api/groups', 'leader', { customServiceName: 'New group', realCostEuros: '12', totalSlots: '4', ownerSlots: '1' });
-  assert.equal(r.status, 503);
+  assert.equal(r.status, 400);
   assert.equal(JSON.parse(readFileSync(dbFile, 'utf8')).groups.length, 1);
 });
 test('legacy administrative cleanup cannot orphan paying users or erase subscription history', async () => {
@@ -73,4 +75,25 @@ test('legacy administrative cleanup cannot orphan paying users or erase subscrip
   assert.equal((await request('/api/admin/sync-database-clean', 'admin', {})).status, 409);
   const stored = JSON.parse(readFileSync(dbFile, 'utf8'));
   assert.equal(stored.users.length, 6); assert.equal(stored.p2pSubscriptions.length, 4);
+});
+
+test('manual HTTP lifecycle protects recipient and private messages', async () => {
+  const catalogue = await request('/api/groups', null);
+  assert.equal(JSON.stringify(catalogue.body).includes('private@example.test'), false);
+  assert.equal((await request('/api/manual/groups/group/request', 'unpaid', { slotNumber: 2 })).status, 402);
+  assert.equal((await request('/api/manual/groups/group/request', 'member', { slotNumber: 2 })).status, 200);
+  const r = (await request('/api/manual')).body.requests[0];
+  assert.equal(r.paymentDestination, undefined);
+  assert.equal((await request(`/api/manual/${r.id}/messages`, 'other')).status, 403);
+  assert.equal((await request(`/api/manual/${r.id}/accept`, 'leader', {})).status, 200);
+  assert.equal((await request('/api/manual')).body.requests[0].paymentDestination.paypalEmail, 'private@example.test');
+  await request(`/api/manual/${r.id}/messages`, 'member', { content: 'Accordiamoci sul pagamento' });
+  assert.ok((await request(`/api/manual/${r.id}/messages`, 'leader')).body.messages.some(m => m.messageContent === 'Accordiamoci sul pagamento'));
+  assert.equal((await request(`/api/manual/${r.id}/report`, 'member', {})).status, 200);
+  assert.equal((await request('/api/access/group')).status, 403);
+  assert.equal((await request(`/api/manual/${r.id}/confirm`, 'leader', {})).status, 200);
+  assert.equal((await request('/api/access/group')).status, 200);
+  const publicGroup = await request('/api/groups/group', null);
+  assert.equal(publicGroup.body.group.slotsInfo.slots[1].assignedUser, null);
+  assert.equal((await request(`/api/manual/${r.id}/messages`, 'other', { content: 'intrusion' })).status, 403);
 });

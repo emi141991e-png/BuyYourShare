@@ -1,3 +1,4 @@
+import { paymentDestination } from '../services/p2pManual.js';
 /**
  * BuyYourShare - Server Groups Routes
  * Macchina a stati rigorosa (DRAFT, PAYOUT_NOT_READY, PUBLISHED, FULL, CLOSED)
@@ -10,6 +11,12 @@ import { requireAuth } from '../middleware/auth.js';
 import { calculatePricingBreakdown, getGroupSlotsBreakdown } from '../engine/MoneyEngine.js';
 
 export const groupsRouter = express.Router();
+
+function withReservations(memberships) {
+  return [...memberships, ...(dataRepository.data.p2pManualRequests || [])
+    .filter(r => r.status === 'reported' && !r.membershipId || r.status === 'accepted' && Date.parse(r.reservedUntil) > Date.now())
+    .map(r => ({ groupId: r.groupId, slotNumber: r.slotNumber, status: 'ACTIVE' }))];
+}
 
 /**
  * Sanitizza le informazioni del gruppo per il catalogo pubblico.
@@ -68,7 +75,7 @@ groupsRouter.get('/', async (req, res) => {
     const result = publishedGroups.map(g => {
       const owner = users.find(u => u.id === g.ownerId);
       const safe = sanitizeGroupForPublic(g, owner);
-      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user, users);
+      safe.slotsInfo = getGroupSlotsBreakdown(g, withReservations(memberships), req.user, users);
       return safe;
     });
 
@@ -105,7 +112,7 @@ groupsRouter.get('/my', requireAuth, async (req, res) => {
         };
       });
 
-      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user, users);
+      safe.slotsInfo = getGroupSlotsBreakdown(g, withReservations(memberships), req.user, users);
       return safe;
     });
 
@@ -136,7 +143,7 @@ groupsRouter.get('/:id', async (req, res) => {
     const memberships = await dataRepository.getMemberships({ groupId: group.id });
     const users = dataRepository.data.users;
     const safe = sanitizeGroupForPublic(group, owner);
-    safe.slotsInfo = getGroupSlotsBreakdown(group, memberships, req.user, users);
+    safe.slotsInfo = getGroupSlotsBreakdown(group, withReservations(memberships), req.user, users);
 
     return res.json({ group: safe });
   } catch (err) {
@@ -169,7 +176,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       payoutBankName
     } = req.body || {};
 
-    await req.app.locals.p2pQuota.refreshPayee(user.id);
+    const manualPaymentDestination = paymentDestination(req.body);
     const realCostCents = Math.round((parseFloat(realCostEuros) || 0) * 100);
     const tSlots = parseInt(totalSlots, 10) || 6;
     const oSlots = parseInt(ownerSlots, 10) || 1;
@@ -208,7 +215,8 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       ownerSpotifyAddress: (ownerSpotifyAddress || '').trim(),
       rulesAndRequirements: (rulesAndRequirements || 'Rispetta le regole della community e del provider.').trim(),
       description: (description || `Gruppo condivisione ${customServiceName}`).trim(),
-      paymentMethod: 'PAYPAL_DIRECT',
+      paymentMethod: 'MANUAL_DIRECT',
+      manualPaymentDestination,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -309,9 +317,11 @@ groupsRouter.post('/:id/cancel', requireAuth, async (req, res) => {
     if (req.app.locals.p2pQuota.hasOpenPayments(group.id)) return res.status(409).json({ error: 'PAYPAL_PAYMENT_REVIEW_REQUIRED' });
     const memberships = await dataRepository.getMemberships({ groupId: group.id, status: 'ACTIVE' });
     const payingMembers = memberships.filter(m => m.role === 'MEMBER');
+    if (req.app.locals.p2pManual.records().some(r => r.groupId === group.id)) return res.status(409).json({ error: 'MANUAL_GROUP_HAS_HISTORY', message: 'Contatta assistenza per chiudere un gruppo con richieste o pagamenti: la cronologia deve essere conservata.' });
 
     if (payingMembers.length === 0) {
-      await dataRepository.deleteGroup(group.id);
+      if (req.app.locals.p2pManual.records().some(r => r.groupId === group.id)) return res.status(409).json({ error: 'MANUAL_GROUP_HAS_HISTORY' });
+    await dataRepository.deleteGroup(group.id);
       return res.json({ success: true, deleted: true, message: 'Gruppo annullato ed eliminato con successo.' });
     }
 
@@ -350,6 +360,7 @@ groupsRouter.delete('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Non puoi eliminare questo gruppo.' });
     }
 
+    if (req.app.locals.p2pManual.records().some(r => r.groupId === group.id)) return res.status(409).json({ error: 'MANUAL_GROUP_HAS_HISTORY' });
     await dataRepository.deleteGroup(group.id);
     return res.json({ success: true, message: 'Gruppo eliminato definitivamente.' });
   } catch (err) {

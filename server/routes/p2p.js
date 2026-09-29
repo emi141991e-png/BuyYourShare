@@ -40,8 +40,8 @@ export function createP2pRoutes(service, quota) {
   router.post('/payee/connect', handle(async (req, res) => res.json(await quota.onboard(req.user.id, req.body.email, req.body.consent))));
   router.post('/payee/refresh', handle(async (req, res) => res.json(await quota.refreshPayee(req.user.id))));
   router.get('/quota-payments', handle(async (req, res) => res.json({ payments: quota.payments().filter(p => p.userId === req.user.id || p.ownerId === req.user.id).map(p => quota.publicPayment(p)) })));
-  router.post('/groups/:id/request', handle(async (req, res) => res.json({ request: await quota.request(req.user.id, req.params.id, req.body.slotNumber) })));
-  router.post('/requests/:id/order', handle(async (req, res) => res.json({ payment: await quota.order(req.user.id, req.params.id) })));
+  router.post('/groups/:id/request', (req, res) => res.status(410).json({ error: 'USE_MANUAL_REQUEST' }));
+  router.post('/requests/:id/order', (req, res) => res.status(410).json({ error: 'USE_MANUAL_REQUEST' }));
   router.post('/quota-payments/:id/refresh', handle(async (req, res) => res.json({ payment: await quota.refresh(req.user.id, req.params.id) })));
   router.get('/groups/:id/direct-payment', (req, res) => res.status(410).json({ error: 'PAYPAL_CHECKOUT_REQUIRED' }));
   router.post('/requests/:id/confirm', (req, res) => res.status(410).json({ error: 'PAYPAL_VERIFIED_CAPTURE_REQUIRED' }));

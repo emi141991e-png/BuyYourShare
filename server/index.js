@@ -11,6 +11,8 @@ import { config } from './config/env.js';
 import { authenticate } from './middleware/auth.js';
 import { dataRepository } from './db/dataRepository.js';
 import { P2pQuotaPayPal } from './services/p2pQuotaPayPal.js';
+import { P2pManual } from './services/p2pManual.js';
+import { manualRoutes } from './routes/manual.js';
 import { P2pQuota } from './services/p2pQuota.js';
 import { P2pPayPal } from './services/p2pPayPal.js';
 import { P2pSubscriptions } from './services/p2pSubscription.js';
@@ -58,6 +60,9 @@ export const p2pSubscriptions = new P2pSubscriptions(dataRepository, p2pProvider
 const quotaProvider = new P2pQuotaPayPal();
 const p2pQuota = new P2pQuota(p2pSubscriptions, quotaProvider);
 app.locals.p2pQuota = p2pQuota;
+const manual = new P2pManual(p2pSubscriptions);
+app.locals.p2pManual = manual;
+setInterval(() => manual.reminders().catch(e => console.error('[REMINDERS]', e.message)), 60000).unref();
 const p2pGate = requireP2p(p2pSubscriptions);
 app.set('trust proxy', 1);
 
@@ -103,18 +108,14 @@ app.use('/api/auth', (req, res, next) => {
   next();
 }, authRouter);
 app.use('/api/p2p', createP2pRoutes(p2pSubscriptions, p2pQuota));
-app.use('/api/groups', p2pGate, (req, res, next) => {
-  if (req.method === 'POST' && req.path === '/' && p2pSubscriptions.find(req.user.id)?.role !== 'GROUP_LEADER') {
-    return res.status(409).json({ error: 'P2P_LEADER_PLAN_REQUIRED', message: 'Conferma prima il piano capogruppo da 0,49 EUR/mese.' });
-  }
-  next();
-}, groupsRouter);
+app.use('/api/manual', manualRoutes(manual));
+app.use('/api/groups', (req, res, next) => req.method === 'GET' && req.path !== '/my' ? next() : p2pGate(req, res, next), groupsRouter);
 app.use('/api/memberships', p2pGate, membershipsRouter);
 app.use('/api/access', p2pGate, accessRouter);
 app.use('/api/chat', p2pGate, chatRouter);
 app.use(['/api/connect', '/api/checkout'], (req, res) => res.status(410).json({ error: 'DIRECT_GROUP_PAYMENTS_ONLY', message: 'Le quote si pagano direttamente al capogruppo. BYS incassa solo l’abbonamento P2P.' }));
 app.use('/api/ledger', p2pGate, ledgerRouter);
-app.use('/api/notifications', p2pGate, notificationsRouter);
+app.use('/api/notifications', notificationsRouter);
 app.use('/api/admin', adminRouter);
 
 // Endpoint Health Check
