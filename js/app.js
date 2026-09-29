@@ -1,3 +1,4 @@
+import { renderMarketplaceWelcome } from './ui/marketplaceWelcome.js';
 import { renderAdminOverview } from './ui/adminOverview.js';
 /**
  * BuyYourShare - Standalone Marketplace Controller & SPA Router
@@ -125,11 +126,15 @@ export function renderApp() {
       return;
     }
     if (routePath === '#login') {
-      renderAuthLandingView(container, 'login');
+      renderMarketplaceWelcome(container);
       return;
     }
     if (routePath === '#register') {
-      renderAuthLandingView(container, 'register');
+      renderMarketplaceWelcome(container);
+      return;
+    }
+    if (routePath === '#login-locale') {
+      renderAuthLandingView(container, 'login');
       return;
     }
 
@@ -139,7 +144,7 @@ export function renderApp() {
     const isProtected = protectedRoutes.includes(routePath) || isChatRoute;
 
     if (!isAuth && isProtected) {
-      renderAuthLandingView(container, 'login');
+      renderMarketplaceWelcome(container);
       return;
     }
 
