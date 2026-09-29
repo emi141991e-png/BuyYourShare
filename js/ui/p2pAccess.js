@@ -1,3 +1,4 @@
+import { groupShareLink } from './groupShare.js';
 import { renderManual } from './manualPayments.js';
 import { renderPushSettings } from './pushSettings.js';
 import { authService } from '../services/authService.js';
@@ -75,7 +76,7 @@ export async function renderP2pAccess(container, route, user) {
         shell(`<h2>Esplora i gruppi, gratuitamente</h2><p>Per creare un gruppo o richiedere un posto serve l’abbonamento BYS da 0,99 €/mese, con rinnovo automatico. Le quote sono separate.</p><div class="billing-grid">${groups.map(g => `<article class="billing-card"><h3>${esc(g.customServiceName)}</h3><p>${esc(g.planName)}</p><p>Quota da ${money(g.baseMemberShareCents)}/mese al capogruppo</p>${link(`#gruppo-${g.id}`, 'Vedi posti')}</article>`).join('') || '<p>Nessun gruppo disponibile.</p>'}</div>`);
       } else {
         const { group: g } = await api(`/api/groups/${encodeURIComponent(route.slice(8))}`);
-        shell(`<h2>${esc(g.customServiceName)} · ${esc(g.planName)}</h2><p>${esc(g.rulesAndRequirements)}</p><p>Capogruppo: ${esc(g.owner?.fullName)}</p><p>Richiedi un posto, attendi l’accettazione e concorda il pagamento nella chat privata.</p>${g.slotsInfo.slots.map(slot => `<article class="billing-card"><h3>Posto ${slot.slotNumber} · ${money(slot.baseShareCents)}/mese</h3>${slot.isOccupied ? '<p>Occupato</p>' : g.ownerId === user?.id ? '<p>Disponibile</p>' : button(`join${slot.slotNumber}`, 'Richiedi il posto')}</article>`).join('')}${link('#miei-gruppi', 'Gestisci richieste e chat')}`);
+        shell(`<h2>${esc(g.customServiceName)} · ${esc(g.planName)}</h2><div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">${groupShareLink(g)}</div><p>${esc(g.rulesAndRequirements)}</p><p>Capogruppo: ${esc(g.owner?.fullName)}</p><p>Richiedi un posto, attendi l’accettazione e concorda il pagamento nella chat privata.</p>${g.slotsInfo.slots.map(slot => `<article class="billing-card"><h3>Posto ${slot.slotNumber} · ${money(slot.baseShareCents)}/mese</h3>${slot.isOccupied ? '<p>Occupato</p>' : g.ownerId === user?.id ? '<p>Disponibile</p>' : button(`join${slot.slotNumber}`, 'Richiedi il posto')}</article>`).join('')}${link('#miei-gruppi', 'Gestisci richieste e chat')}`);
         g.slotsInfo.slots.forEach(slot => bind(`join${slot.slotNumber}`, async () => {
           if (!user) { window.location.hash = '#login'; return; }
           const { subscription } = await api('/api/p2p/subscription');

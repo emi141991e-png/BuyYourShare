@@ -1,3 +1,4 @@
+import { groupShareLink } from './groupShare.js';
 let chatTimer;
 export async function renderManual({ container, route, user, api, shell, esc, money, date, button, link, bind, reload }) {
   clearInterval(chatTimer);
@@ -6,7 +7,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
   const selected = route.startsWith('#privata-') ? requests.find(r => r.id === route.slice(9)) : null;
   const list = selected ? [selected] : requests;
   const { groups } = selected ? { groups: [] } : await api('/api/groups');
-  shell(`<h2>${selected ? 'Chat privata e quota' : 'Richieste e rinnovi'}</h2>${groups.filter(g => g.ownerId === user.id).map(g => link(`#gruppo-${g.id}`, esc(g.customServiceName))).join('')}<p>Solo tu e il capogruppo potete leggere la conversazione. BYS non verifica gli accrediti. Per automatizzare un bonifico periodico, impostalo nella tua banca e concordalo con il capogruppo. I promemoria vengono pubblicati qui e nella sezione Notifiche, tre giorni prima e alla scadenza.</p>${link('#notifiche','Notifiche')}
+  shell(`<h2>${selected ? 'Chat privata e quota' : 'Richieste e rinnovi'}</h2>${groups.filter(g => g.ownerId === user.id).map(g => `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0">${link(`#gruppo-${g.id}`, esc(g.customServiceName))}${groupShareLink(g)}</div>`).join('')}<p>Solo tu e il capogruppo potete leggere la conversazione. BYS non verifica gli accrediti. Per automatizzare un bonifico periodico, impostalo nella tua banca e concordalo con il capogruppo. I promemoria vengono pubblicati qui e nella sezione Notifiche, tre giorni prima e alla scadenza.</p>${link('#notifiche','Notifiche')}
     ${list.map((r, i) => {
       const owner = r.ownerId === user.id, d = r.paymentDestination;
       return `<article class="billing-card" style="margin-bottom:20px"><h3>${esc(r.groupName)} · posto ${r.slotNumber}</h3><p>${money(r.amountCents)} / mese · ${esc(labels[r.status])}</p>
@@ -17,7 +18,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       ${!owner && (r.status === 'accepted' || (r.status === 'confirmed' && Date.parse(r.periodEnd) - Date.now() <= 3 * 86400000)) ? button(`report${i}`, 'Ho pagato al capogruppo') : ''}
       ${owner && r.status === 'reported' ? button(`confirm${i}`, 'Confermo: quota accreditata') : ''}
       ${['pending','accepted'].includes(r.status) || (r.status === 'confirmed' && Date.parse(r.periodEnd) <= Date.now()) ? button(`cancel${i}`, 'Annulla partecipazione') : ''}
-      ${link(`#privata-${r.id}`, 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${r.periodEnd ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
+      ${link(`#privata-${r.id}`, 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${groupShareLink({ id: r.groupId, customServiceName: r.groupName })}${r.periodEnd ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
     }).join('') || '<p>Nessuna richiesta. Esplora i gruppi e richiedi un posto.</p>'}
     ${selected ? '<div id="privateMessages" aria-live="polite"></div><form id="privateForm"><label>Messaggio privato<textarea name="content" required maxlength="2000" style="width:100%"></textarea></label><button class="btn btn-primary">Invia</button></form>' : ''}`);
   const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna stato delle richieste'; refresh.type = 'button';
@@ -53,3 +54,4 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     });
   }
 }
+
