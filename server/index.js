@@ -31,6 +31,7 @@ import { chatRouter } from './routes/chat.js';
 import { ledgerRouter } from './routes/ledger.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { adminRouter } from './routes/admin.js';
+import { bysBankAdminRouter } from './routes/bysBankAdmin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -137,6 +138,7 @@ app.use(['/api/connect', '/api/checkout'], (req, res) => res.status(410).json({ 
 app.use('/api/ledger', p2pGate, ledgerRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/bys-admin/bank-payments', bysBankAdminRouter);
 
 // Endpoint Health Check
 app.get('/api/health', (req, res) => {

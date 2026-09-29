@@ -4,6 +4,7 @@ import { addOneMonth } from '../engine/DateEngine.js';
 
 export const bankDetails = { iban: 'LT933250037466060894', accountHolder: 'Caruso Emilio', amountCents: 99, currency: 'EUR' };
 export const bankCode = id => 'BYS-' + createHash('sha256').update(String(id)).digest('hex').slice(0, 16).toUpperCase();
+const BYS_ADMIN_AUTHORITY = Symbol('verified-bys-admin');
 export class P2pBank {
   constructor(subscriptions) { this.s = subscriptions; this.repo = subscriptions.repo; }
   records() { return this.repo.data.p2pBankPayments ||= []; }
@@ -34,9 +35,13 @@ export class P2pBank {
     for (const u of this.repo.data.users || []) if (u.role === 'admin') this.notify(u.id, `bank-report:${p.id}:${u.id}`, `Bonifico BYS da verificare: ${p.code}.`);
     return p;
   }); }
-  confirm(id, adminId, reference) { return this.transaction(async () => {
+  confirmFromBys(id, bysAdminId, reference) {
+    if (typeof bysAdminId !== 'string' || !bysAdminId.trim()) throw new P2pError('FORBIDDEN', 403);
+    return this.confirm(id, `bys:${bysAdminId}`, reference, BYS_ADMIN_AUTHORITY);
+  }
+  confirm(id, adminId, reference, authority) { return this.transaction(async () => {
     this.s.ready();
-    if (!(this.repo.data.users || []).some(u => u.id === adminId && u.role === 'admin')) throw new P2pError('FORBIDDEN', 403);
+    if (authority !== BYS_ADMIN_AUTHORITY && !(this.repo.data.users || []).some(u => u.id === adminId && u.role === 'admin')) throw new P2pError('FORBIDDEN', 403);
     const p = this.records().find(p => p.id === id);
     if (!p) throw new P2pError('NOT_FOUND', 404);
     if (p.status === 'confirmed') return p;

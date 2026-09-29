@@ -1,4 +1,3 @@
-import { renderAdminBank } from './bankAccess.js';
 export async function renderAdminOverview(target, token, esc) {
   target.innerHTML = '<p role="status">Caricamento abbonamenti e richieste…</p>';
   try {
@@ -12,6 +11,6 @@ export async function renderAdminOverview(target, token, esc) {
     <section class="billing-card"><h3>Richieste e quote (${data.requests.length})</h3><div style="overflow-x:auto"><table class="admin-overview-table"><thead><tr><th>Gruppo</th><th>Membro</th><th>Capogruppo</th><th>Stato</th><th>Quota</th><th>Periodo fino al</th></tr></thead><tbody>${data.requests.map(r=>`<tr><td>${esc(r.groupName)}</td><td>${esc(r.member)}</td><td>${esc(r.leader)}</td><td>${esc(statuses[r.status] || r.status)}</td><td>${esc(((r.amountCents || 0)/100).toLocaleString('it-IT',{style:'currency',currency:'EUR'}))}</td><td>${esc(date(r.periodEnd))}</td></tr>`).join('') || '<tr><td colspan="6">Nessuna richiesta registrata.</td></tr>'}</tbody></table></div></section>`;
     target.querySelector('#refreshAdminOverview').onclick = () => renderAdminOverview(target, token, esc);
     const bank = document.createElement('section'); bank.className = 'billing-card'; target.prepend(bank);
-    void renderAdminBank(bank, token, esc);
+    bank.innerHTML = '<h3>Bonifici abbonamento BYS</h3><p>Gestisci le segnalazioni e conferma gli accrediti dal pannello principale BuyYourShare.</p><a class="btn btn-primary" href="https://buyyourshare.it/admin/marketplace-payments">Apri Bonifici marketplace su BYS →</a>';
   } catch (error) { target.innerHTML = `<p role="alert">${esc(error.message)}</p><button type="button" class="btn btn-secondary">Riprova</button>`; target.querySelector('button').onclick = () => renderAdminOverview(target, token, esc); }
 }

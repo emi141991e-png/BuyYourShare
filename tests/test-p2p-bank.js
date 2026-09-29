@@ -9,6 +9,15 @@ function fixture() {
   const s = new P2pSubscriptions(repo, {}, { enabled: () => true, now: () => now });
   return { repo, s, b: new P2pBank(s), advance: days => { now += days * 86400000; } };
 }
+test('BYS admin confirmation shares ledger and cannot be impersonated by a local member', async () => {
+  const { b, s } = fixture(); const p = await b.report('u');
+  await assert.rejects(b.confirm(p.id, 'bys:admin-bys', 'TRN-BYS-1'), /FORBIDDEN/);
+  const confirmed = await b.confirmFromBys(p.id, 'admin-bys', 'TRN-BYS-1');
+  assert.equal(confirmed.confirmedBy, 'bys:admin-bys');
+  const end = s.view('u').currentPeriodEnd;
+  await b.confirm(p.id, 'a', 'TRN-BYS-1');
+  assert.equal(s.view('u').currentPeriodEnd, end);
+});
 test('bank report does not unlock; only admin confirms once; renewal preserves paid days', async () => {
   const { b, s } = fixture();
   const [p, duplicate] = await Promise.all([b.report('u'), b.report('u')]);
