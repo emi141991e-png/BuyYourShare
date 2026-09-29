@@ -48,7 +48,12 @@ export async function renderPushSettings(target, user, api, esc) {
         let subscription = await registration.pushManager.getSubscription();
         if (subscription && device && device.userId !== user.id) { await subscription.unsubscribe(); subscription = null; localStorage.removeItem(STORAGE); }
         if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decode(config.publicKey) });
-        const result = await api('/api/push/subscribe', { subscription: subscription.toJSON(), consent: true, label: /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone / iPad' : /Android/i.test(navigator.userAgent) ? 'Android' : 'Browser computer' });
+        let result;
+        try { result = await api('/api/push/subscribe', { subscription: subscription.toJSON(), consent: true, label: /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone / iPad' : /Android/i.test(navigator.userAgent) ? 'Android' : 'Browser computer' }); }
+        catch (error) {
+          if (error.message === 'UNSUPPORTED_PUSH_PROVIDER') throw new Error(`Il servizio notifiche di questo browser (${new URL(subscription.endpoint).hostname}) non è supportato. Apri il marketplace in Chrome, Edge o Safari per attivare le push.`);
+          throw error;
+        }
         localStorage.setItem(STORAGE, JSON.stringify({ userId: user.id, id: result.id }));
         await renderPushSettings(target, user, api, esc);
       });
@@ -74,3 +79,4 @@ export async function renderPushSettings(target, user, api, esc) {
     })));
   } catch (e) { target.innerHTML = `<p role="status">${esc(text[e.message] || 'Le impostazioni push non sono disponibili. Riprova più tardi.')}</p>`; }
 }
+
