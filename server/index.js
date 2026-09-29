@@ -5,6 +5,7 @@
 
 import express from 'express';
 import { P2pBank } from './services/p2pBank.js';
+import { P2pGooglePay } from './services/p2pGooglePay.js';
 import { PushNotifications } from './services/pushNotifications.js';
 import { pushRoutes } from './routes/push.js';
 import Stripe from 'stripe';
@@ -64,6 +65,8 @@ if (process.env.P2P_LEGACY_CLEANUP_IDS) {
 export const p2pSubscriptions = new P2pSubscriptions(dataRepository, p2pProvider);
 const bank = new P2pBank(p2pSubscriptions);
 app.locals.p2pBank = bank;
+const googlePay = new P2pGooglePay(p2pSubscriptions, bank);
+app.locals.p2pGooglePay = googlePay;
 const quotaProvider = new P2pQuotaPayPal();
 const p2pQuota = new P2pQuota(p2pSubscriptions, quotaProvider);
 app.locals.p2pQuota = p2pQuota;
@@ -80,6 +83,13 @@ const background = async () => {
 };
 setInterval(background, 20000).unref();
 void background();
+let recoveringGoogle = false;
+setInterval(async () => {
+  if (recoveringGoogle) return;
+  recoveringGoogle = true;
+  try { await googlePay.recover(); } catch { console.error('[P2P] Google Pay reconciliation will retry.'); }
+  finally { recoveringGoogle = false; }
+}, 60000).unref();
 const p2pGate = requireP2p(p2pSubscriptions);
 app.set('trust proxy', 1);
 
@@ -87,6 +97,7 @@ app.set('trust proxy', 1);
 app.post('/api/webhooks/p2p-paypal', express.json({ limit: '256kb' }), async (req, res) => {
   try {
     if (!await p2pProvider.verify(req.headers, req.body)) return res.status(400).json({ error: 'INVALID_SIGNATURE' });
+    if (req.body.event_type?.startsWith('PAYMENT.CAPTURE.')) return res.json(await googlePay.webhook(req.body));
     res.json(await p2pSubscriptions.webhook(req.body));
   } catch (e) { p2pError(res, e); }
 });

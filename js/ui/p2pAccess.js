@@ -1,4 +1,5 @@
 import { renderBankAccess } from './bankAccess.js';
+import { mountGooglePayAccess } from './googlePayAccess.js';
 import { groupShareLink } from './groupShare.js';
 import { renderManual } from './manualPayments.js';
 import { renderNotificationCenter } from './notificationCenter.js';
@@ -128,17 +129,24 @@ export async function renderP2pAccess(container, route, user) {
         ${state.paypalAvailable && s.approvalUrl ? `<a class="btn btn-primary" href="${esc(s.approvalUrl)}">Continua su PayPal <span aria-hidden="true">↗</span></a>` : ''}
         ${state.available && s.accessAllowed ? link('#crea', 'Continua · Crea il tuo gruppo') : ''}
         <button class="billing-refresh" id="p2pRefresh" type="button">Aggiorna stato del pagamento</button></div>
-        ${s.providerStatus && s.providerStatus !== 'APPROVAL_PENDING' && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? '<div class="billing-manage"><button id="p2pCancel" type="button">Disattiva rinnovo automatico</button></div>' : ''}
+        ${s.paymentMethod === 'PAYPAL' && s.providerStatus && !['APPROVAL_PENDING', 'CANCELLED', 'EXPIRED'].includes(s.providerStatus) && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? '<div class="billing-manage"><button id="p2pCancel" type="button">Disattiva rinnovo automatico</button></div>' : ''}
         </article><aside class="billing-aside"><span class="billing-eyebrow">SEMPLICE, TRASPARENTE</span><h3>Un accesso,<br>due possibilità.</h3><div><span class="billing-step">01</span><h4>Partecipa a un gruppo</h4><p>Scegli il gruppo e gestisci le tue partecipazioni in un unico spazio.</p></div><div><span class="billing-step">02</span><h4>Crea il tuo gruppo</h4><p>Diventa capogruppo senza un secondo abbonamento o costi aggiuntivi di accesso.</p></div><div class="billing-separate"><h4>Le quote restano separate</h4><p>Le quote dei membri vanno direttamente al capogruppo tramite bonifico o PayPal. BYS incassa solo l’abbonamento di accesso.</p></div></aside></div>`, true);
-      if (s.paymentMethod === 'BANK') {
+      if (['BANK', 'GOOGLE_PAY'].includes(s.paymentMethod)) {
         const details = container.querySelector('.billing-details');
         details.innerHTML = `<div><dt>Il piano include</dt><dd>Membro e capogruppo</dd></div><div><dt>Accesso fino al</dt><dd>${date(s.currentPeriodEnd)}</dd></div>`;
         const notice = container.querySelector('.billing-notice');
-        if (notice) notice.textContent = s.accessAllowed ? 'Il tuo accesso BYS è attivo.' : 'Rinnova con bonifico: l’accesso riprende dopo la conferma dell’incasso.';
+        if (notice) notice.textContent = s.accessAllowed ? 'Il tuo accesso BYS è attivo.' : 'Accesso e assistenza inclusa sospesi: rinnova per riattivarli. Il supporto per problemi di pagamento resta disponibile.';
+        if (s.paymentMethod === 'GOOGLE_PAY') {
+          container.querySelector('.billing-price span').textContent = '/ 30 giorni';
+          container.querySelector('.billing-caption').textContent = 'Google Pay · Pagamento singolo, senza rinnovo automatico';
+        }
       }
       const bankTarget = document.createElement('section'); bankTarget.className = 'billing-card';
       container.querySelector('.billing-grid').after(bankTarget);
       void renderBankAccess(bankTarget, api, esc, reload);
+      const googleTarget = document.createElement('section'); googleTarget.className = 'billing-card';
+      bankTarget.before(googleTarget);
+      void mountGooglePayAccess(googleTarget, api, reload);
       const sdkTarget = container.querySelector('#p2pSdkButton');
       if (sdkTarget) void mountSubscriptionButton(sdkTarget, state.checkout, api, message => {
         if (sdkTarget.isConnected) container.querySelector('#p2pMessage').textContent = message;

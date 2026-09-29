@@ -27,6 +27,7 @@ export class P2pBank {
   }
   report(userId) { return this.transaction(async () => {
     this.s.ready();
+    if ((this.repo.data.p2pGooglePayments || []).some(p => p.userId === userId && p.status === 'pending')) throw new P2pError('PAYPAL_PAYMENT_REVIEW_REQUIRED');
     await this.verifyChoice(userId);
     const existing = this.records().find(p => p.userId === userId && p.status === 'reported');
     if (existing) return existing;
@@ -67,11 +68,14 @@ export class P2pBank {
   }); }
   reminders() { return this.transaction(async () => {
     for (const s of this.s.records()) {
-      if (s.paymentMethod !== 'BANK' || !s.currentPeriodEnd) continue;
+      if (!['BANK', 'GOOGLE_PAY'].includes(s.paymentMethod) || !s.currentPeriodEnd) continue;
       const remaining = Date.parse(s.currentPeriodEnd) - this.s.now();
       if (remaining > 3 * 86400000) continue;
       const phase = remaining > 0 ? 'before' : 'due';
-      this.notify(s.userId, `bank-renew:${s.userId}:${s.currentPeriodEnd}:${phase}`, remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Verifica il bonifico periodico da 0,99 € e segnala il pagamento.' : 'Il tuo accesso BYS è scaduto. Segnala il bonifico per rinnovarlo dopo la verifica dell’incasso.', { bankPeriodEnd: s.currentPeriodEnd });
+      const message = s.paymentMethod === 'GOOGLE_PAY'
+        ? (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Rinnova con un nuovo pagamento di 0,99 €: non ci sono addebiti automatici.' : 'Accesso BYS scaduto: funzioni riservate e assistenza inclusa sono sospese fino al rinnovo. Puoi ancora accedere al conto e chiedere supporto sui pagamenti.')
+        : (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Verifica il bonifico periodico da 0,99 € e segnala il pagamento.' : 'Il tuo accesso BYS è scaduto. Segnala il bonifico per rinnovarlo dopo la verifica dell’incasso.');
+      this.notify(s.userId, `bank-renew:${s.userId}:${s.currentPeriodEnd}:${phase}`, message, { bankPeriodEnd: s.currentPeriodEnd });
     }
   }); }
 }

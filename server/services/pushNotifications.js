@@ -75,7 +75,7 @@ export class PushNotifications {
   relevant(notification) {
     if (notification?.id.startsWith('bank-renew:')) {
       const s = this.subscriptions.find(notification.userId);
-      if (s?.paymentMethod !== 'BANK' || s.currentPeriodEnd !== notification.bankPeriodEnd) return false;
+      if (!['BANK', 'GOOGLE_PAY'].includes(s?.paymentMethod) || s.currentPeriodEnd !== notification.bankPeriodEnd) return false;
       const remaining = Date.parse(s.currentPeriodEnd) - this.now();
       return notification.id.endsWith(':before') ? remaining > 0 && remaining <= 3 * DAY : remaining <= 0;
     }
