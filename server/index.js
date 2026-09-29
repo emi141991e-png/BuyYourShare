@@ -4,6 +4,8 @@
  */
 
 import express from 'express';
+import { PushNotifications } from './services/pushNotifications.js';
+import { pushRoutes } from './routes/push.js';
 import Stripe from 'stripe';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -62,7 +64,17 @@ const p2pQuota = new P2pQuota(p2pSubscriptions, quotaProvider);
 app.locals.p2pQuota = p2pQuota;
 const manual = new P2pManual(p2pSubscriptions);
 app.locals.p2pManual = manual;
-setInterval(() => manual.reminders().catch(e => console.error('[REMINDERS]', e.message)), 60000).unref();
+const pushNotifications = new PushNotifications(p2pSubscriptions);
+let backgroundRunning = false;
+const background = async () => {
+  if (backgroundRunning) return;
+  backgroundRunning = true;
+  try { await manual.reminders(); await pushNotifications.flush(); }
+  catch { console.error('[P2P] Reminder delivery will retry.'); }
+  finally { backgroundRunning = false; }
+};
+setInterval(background, 20000).unref();
+void background();
 const p2pGate = requireP2p(p2pSubscriptions);
 app.set('trust proxy', 1);
 
@@ -91,6 +103,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'private, no-store');
   next();
 });
 
@@ -100,6 +113,9 @@ app.use(authenticate);
 // 4. API Endpoints
 app.use('/api/auth', (req, res, next) => {
   if ((req.method === 'DELETE' && req.path === '/account') || (req.method === 'POST' && req.path === '/delete-account')) {
+    if (req.user && manual.records().some(r => r.userId === req.user.id || dataRepository.data.groups.some(g => g.id === r.groupId && g.ownerId === req.user.id))) {
+      return res.status(409).json({ error: 'MANUAL_HISTORY_REQUIRES_REVIEW', message: 'Contatta assistenza per eliminare un account con richieste o quote: occorre prima gestire le partecipazioni e la cronologia.' });
+    }
     const subscription = req.user && p2pSubscriptions.find(req.user.id);
     if (subscription && !['CANCELLED', 'EXPIRED'].includes(subscription.providerStatus)) {
       return res.status(409).json({ error: 'CANCEL_P2P_SUBSCRIPTION_FIRST', message: 'Disattiva prima il rinnovo nella pagina Abbonamento P2P.' });
@@ -109,7 +125,8 @@ app.use('/api/auth', (req, res, next) => {
 }, authRouter);
 app.use('/api/p2p', createP2pRoutes(p2pSubscriptions, p2pQuota));
 app.use('/api/manual', manualRoutes(manual));
-app.use('/api/groups', (req, res, next) => req.method === 'GET' && req.path !== '/my' ? next() : p2pGate(req, res, next), groupsRouter);
+app.use('/api/push', pushRoutes(pushNotifications));
+app.use('/api/groups', (req, res, next) => req.method === 'GET' && req.path.replace(/\/+$/, '') !== '/my' ? next() : p2pGate(req, res, next), groupsRouter);
 app.use('/api/memberships', p2pGate, membershipsRouter);
 app.use('/api/access', p2pGate, accessRouter);
 app.use('/api/chat', p2pGate, chatRouter);
@@ -148,6 +165,9 @@ const staticOptions = {
 // Publish only browser assets. Never expose server/, package files or the database.
 app.use('/css', express.static(path.join(ROOT_DIR, 'css'), staticOptions));
 app.use('/js', express.static(path.join(ROOT_DIR, 'js'), staticOptions));
+for (const asset of ['push-sw.js', 'manifest.webmanifest', 'push-icon-192.png', 'push-icon-512.png']) {
+  app.get(`/${asset}`, (req, res) => res.sendFile(path.join(ROOT_DIR, asset)));
+}
 app.get('/', (req, res) => res.sendFile(path.join(ROOT_DIR, 'index.html')));
 
 app.use((req, res, next) => {

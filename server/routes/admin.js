@@ -21,7 +21,7 @@ adminRouter.use(requireAuth, requireRole('admin'));
 // Billing identities and event deduplication must never be erased by legacy reset tools.
 adminRouter.use((req, res, next) => {
   if (req.method === 'POST' && ['/clean-all-data', '/sync-database-clean'].includes(req.path) &&
-      (dataRepository.data.p2pSubscriptions || []).length) {
+      ((dataRepository.data.p2pSubscriptions || []).length || (dataRepository.data.p2pManualRequests || []).length)) {
     return res.status(409).json({ error: 'P2P_BILLING_RECORDS_PROTECTED', message: 'La pulizia legacy non può rimuovere utenti o dati collegati agli abbonamenti P2P.' });
   }
   next();
@@ -263,6 +263,7 @@ adminRouter.put('/groups/:id/status', async (req, res) => {
 adminRouter.delete('/groups/:id', async (req, res) => {
   try {
     const groupId = req.params.id;
+    if ((dataRepository.data.p2pManualRequests || []).some(r => r.groupId === groupId)) return res.status(409).json({ error: 'MANUAL_HISTORY_REQUIRES_REVIEW', message: 'Conserva la cronologia delle quote: chiudi il gruppo dopo aver gestito le partecipazioni.' });
     const result = await dataRepository.deleteGroup(groupId, req.user);
 
     if (!result) {

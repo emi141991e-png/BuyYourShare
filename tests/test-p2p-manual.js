@@ -41,3 +41,22 @@ test('reservation expires but reported payments and late renewals retain their s
   time('2026-03-03T12:00:00Z'); await s.reminders(); assert.equal(next.status,'reported');
   await assert.rejects(s.request('other','g',2));
 });
+
+test('competing acceptances serialize and never reserve a slot twice', async () => {
+  const { service: s } = setup();
+  const a = await s.request('a','g',2), b = await s.request('b','g',2);
+  const results = await Promise.allSettled([s.action('o',a.id,'accept'),s.action('o',b.id,'accept')]);
+  assert.equal(results.filter(r => r.status === 'fulfilled').length,1);
+  assert.equal(s.records().filter(r => r.status === 'accepted').length,1);
+});
+test('failed reminder persistence retries without losing the reminder', async () => {
+  const { service: s, repo, time } = setup();
+  const r = await s.request('m','g',2); await s.action('o',r.id,'accept'); await s.action('m',r.id,'report'); await s.action('o',r.id,'confirm');
+  time('2026-02-26T12:00:00Z'); repo.save = async () => { throw new Error('disk failure'); };
+  await assert.rejects(s.reminders());
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('renew:')).length,0);
+  repo.save = async () => {}; await s.reminders();
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('renew:')).length,1);
+  time('2026-02-28T12:00:00Z'); await s.reminders(); await s.reminders();
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('renew:')).length,2);
+});

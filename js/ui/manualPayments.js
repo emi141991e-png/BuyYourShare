@@ -20,6 +20,8 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       ${link(`#privata-${r.id}`, 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${r.periodEnd ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
     }).join('') || '<p>Nessuna richiesta. Esplora i gruppi e richiedi un posto.</p>'}
     ${selected ? '<div id="privateMessages" aria-live="polite"></div><form id="privateForm"><label>Messaggio privato<textarea name="content" required maxlength="2000" style="width:100%"></textarea></label><button class="btn btn-primary">Invia</button></form>' : ''}`);
+  const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna stato delle richieste'; refresh.type = 'button';
+  container.querySelector('#p2pMessage').append(refresh); refresh.addEventListener('click', reload);
   list.forEach((r, i) => ['accept','report','confirm','cancel'].forEach(action => bind(`${action}${i}`, async () => {
     if (action === 'confirm' && !window.confirm('Hai verificato l’effettivo accredito sul tuo conto? Confermi un mese di accesso al gruppo.')) return;
     await api(`/api/manual/${encodeURIComponent(r.id)}/${action}`, { periodEnd: r.periodEnd || null }); await reload();

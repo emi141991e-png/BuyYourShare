@@ -96,4 +96,18 @@ test('manual HTTP lifecycle protects recipient and private messages', async () =
   const publicGroup = await request('/api/groups/group', null);
   assert.equal(publicGroup.body.group.slotsInfo.slots[1].assignedUser, null);
   assert.equal((await request(`/api/manual/${r.id}/messages`, 'other', { content: 'intrusion' })).status, 403);
+  assert.equal((await request('/api/auth/delete-account', 'member', {})).status,409);
+  assert.equal((await request('/api/groups/my/', 'unpaid')).status,402);
+});
+
+test('push registration requires authentication and explicit consent; devices cannot be removed by others', async () => {
+  assert.equal((await request('/api/push/config', null)).status,401);
+  const config = await request('/api/push/config'); assert.equal(config.status,200); assert.ok(config.body.publicKey); assert.equal(config.body.privateKey,undefined);
+  const subscription = { endpoint:'https://fcm.googleapis.com/fcm/send/http-test-only', keys:{ p256dh:Buffer.alloc(65,4).toString('base64url'), auth:Buffer.alloc(16,1).toString('base64url') } };
+  assert.equal((await request('/api/push/subscribe', 'member', { subscription })).status,400);
+  const registered = await request('/api/push/subscribe', 'member', { subscription, consent:true }); assert.equal(registered.status,200);
+  assert.equal((await request(`/api/push/${registered.body.id}/remove`, 'other', {})).status,404);
+  assert.equal((await request(`/api/push/${registered.body.id}/remove`, 'member', {})).status,200);
+  for (const asset of ['/push-sw.js','/manifest.webmanifest','/push-icon-192.png']) assert.equal((await fetch(base+asset)).status,200);
+  assert.equal((await fetch(base+'/server/data/push-vapid.json')).status,404);
 });

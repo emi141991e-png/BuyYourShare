@@ -23,7 +23,17 @@ export function paymentDestination(body) {
 export class P2pManual {
   constructor(subscriptions, now = () => Date.now()) { this.subscriptions = subscriptions; this.repo = subscriptions.repo; this.now = now; }
   records() { return this.repo.data.p2pManualRequests ||= []; }
-  exclusive(fn) { return this.subscriptions.exclusive(fn); }
+  exclusive(fn) { return this.subscriptions.exclusive(async () => {
+    // Restore only collections owned by this workflow when an atomic save fails.
+    const fields = ['p2pManualRequests', 'p2pPrivateMessages', 'p2pManualConfirmations', 'notifications', 'memberships'];
+    const snapshot = Object.fromEntries(fields.map(key => [key, structuredClone(this.repo.data[key])]));
+    const occupancy = this.repo.data.groups.map(g => [g.id, g.occupiedMemberSlots]);
+    try { return await fn(); } catch (e) {
+      for (const key of fields) if (JSON.stringify(this.repo.data[key]) !== JSON.stringify(snapshot[key])) this.repo.data[key] = snapshot[key];
+      for (const [id, count] of occupancy) { const g = this.repo.data.groups.find(g => g.id === id); if (g) g.occupiedMemberSlots = count; }
+      throw e;
+    }
+  }); }
   active(id) { if (!accessAllowed(this.subscriptions.find(id), this.now())) throw new P2pError('P2P_ACTIVE_SUBSCRIPTION_REQUIRED', 402); }
   group(id) { const g = this.repo.data.groups.find(g => g.id === id); if (!g) throw new P2pError('GROUP_NOT_FOUND', 404); return g; }
   authorized(id, userId) {
@@ -40,7 +50,7 @@ export class P2pManual {
     (this.repo.data.p2pPrivateMessages ||= []).push({ id: randomUUID(), requestId: r.id, senderId, messageContent: text, createdAt: new Date(this.now()).toISOString() });
   }
   list(userId) {
-    return this.records().filter(r => r.userId === userId || this.group(r.groupId).ownerId === userId).map(r => ({ ...r,
+    return this.records().filter(r => this.repo.data.groups.some(g => g.id === r.groupId && (r.userId === userId || g.ownerId === userId))).map(r => ({ ...r,
       groupName: this.group(r.groupId).customServiceName, ownerId: this.group(r.groupId).ownerId,
       paymentDestination: ['accepted', 'reported', 'confirmed'].includes(r.status) ? r.destination : undefined, destination: undefined }));
   }
@@ -51,7 +61,7 @@ export class P2pManual {
     if ((this.repo.data.p2pQuotaPayments || []).some(p => p.groupId === g.id && p.slotNumber === slot && !['failed', 'canceled', 'refunded', 'reversed'].includes(p.status) && (p.status !== 'completed' || Date.parse(p.periodEnd) > this.now()))) throw new P2pError('SLOT_RESERVED');
   }
   request(userId, groupId, slot) { return this.exclusive(async () => {
-    this.active(userId); const g = this.group(groupId);
+    this.subscriptions.ready?.(); this.active(userId); const g = this.group(groupId);
     if (g.ownerId === userId) throw new P2pError('OWN_GROUP');
     if (!g.manualPaymentDestination) throw new P2pError('PAYMENT_DESTINATION_REQUIRED');
     const previous = this.records().find(r => r.groupId === groupId && r.userId === userId && !['canceled', 'rejected'].includes(r.status));

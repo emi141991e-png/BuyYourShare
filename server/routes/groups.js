@@ -177,12 +177,15 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
     } = req.body || {};
 
     const manualPaymentDestination = paymentDestination(req.body);
-    const realCostCents = Math.round((parseFloat(realCostEuros) || 0) * 100);
-    const tSlots = parseInt(totalSlots, 10) || 6;
-    const oSlots = parseInt(ownerSlots, 10) || 1;
+    const realCostCents = Math.round(Number(realCostEuros) * 100);
+    const tSlots = Number(totalSlots ?? 6);
+    const oSlots = Number(ownerSlots ?? 1);
     const feeCents = 0; // Group shares are direct; platform access has its own subscription.
 
-    if (!customServiceName || realCostCents <= 0 || tSlots < 2 || tSlots > 50 || oSlots < 1 || oSlots >= tSlots) {
+    if (typeof customServiceName !== 'string' || !customServiceName.trim() || customServiceName.length > 100 ||
+        (planName !== undefined && (typeof planName !== 'string' || planName.length > 100)) ||
+        !Number.isSafeInteger(realCostCents) || realCostCents <= 0 || !Number.isInteger(tSlots) || !Number.isInteger(oSlots) ||
+        tSlots < 2 || tSlots > 50 || oSlots < 1 || oSlots >= tSlots) {
       return res.status(400).json({ error: 'INVALID_INPUT', message: 'Dati del gruppo non validi.' });
     }
 

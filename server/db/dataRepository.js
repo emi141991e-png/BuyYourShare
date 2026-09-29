@@ -189,6 +189,12 @@ class DataRepository {
   }
 
   async deleteUser(id) {
+    const owned = new Set((this.data.groups || []).filter(g => g.ownerId === id).map(g => g.id));
+    if ((this.data.p2pManualRequests || []).some(r => r.userId === id || owned.has(r.groupId))) {
+      throw Object.assign(new Error('MANUAL_HISTORY_REQUIRES_REVIEW'), { status: 409 });
+    }
+    this.data.pushSubscriptions = (this.data.pushSubscriptions || []).filter(d => d.userId !== id);
+    this.data.pushDeliveries = (this.data.pushDeliveries || []).filter(d => d.userId !== id);
     this.data.users = (this.data.users || []).filter(u => u.id !== id);
     this.data.sessions = (this.data.sessions || []).filter(s => s.userId !== id);
     this.data.notifications = (this.data.notifications || []).filter(n => n.userId !== id);
@@ -306,6 +312,9 @@ class DataRepository {
   }
 
   async deleteGroup(id) {
+    if ((this.data.p2pManualRequests || []).some(r => r.groupId === id)) {
+      throw Object.assign(new Error('MANUAL_HISTORY_REQUIRES_REVIEW'), { status: 409 });
+    }
     this.data.groups = this.data.groups.filter(g => g.id !== id);
     this.data.accessInstructions = this.data.accessInstructions.filter(a => a.groupId !== id);
     this.data.chats = this.data.chats.filter(c => c.groupId !== id);

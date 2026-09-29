@@ -5,6 +5,7 @@
  */
 
 import { db } from '../db/database.js';
+import { stopPushOnLogout } from '../ui/pushSettings.js';
 
 const SESSION_TOKEN_KEY = 'buyyourshare_session_token';
 const SESSION_USER_ID_KEY = 'buyyourshare_current_user_id';
@@ -287,6 +288,7 @@ class AuthService {
    * Logout utente corrente
    */
   async logout() {
+    await stopPushOnLogout(this.sessionToken);
     try {
       if (this.sessionToken) {
         await fetch('/api/auth/logout', {

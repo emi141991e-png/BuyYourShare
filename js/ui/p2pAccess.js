@@ -1,4 +1,5 @@
 import { renderManual } from './manualPayments.js';
+import { renderPushSettings } from './pushSettings.js';
 import { authService } from '../services/authService.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -36,7 +37,7 @@ async function api(path, body) {
     headers: { Authorization: `Bearer ${authService.getToken()}`, 'Content-Type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const result = await response.json();
-  if (!response.ok) throw new Error(messages[result.error] || result.message || 'Operazione non completata. Riprova.');
+  if (!response.ok) throw new Error(messages[result.error] || result.message || result.error || 'Operazione non completata. Riprova.');
   return result;
 }
 const button = (id, text) => `<button class="btn btn-primary" id="${id}" type="button">${text}</button>`;
@@ -95,7 +96,8 @@ export async function renderP2pAccess(container, route, user) {
     }
     if (route === '#notifiche') {
       const { notifications } = await api('/api/notifications');
-      shell(`<h2>Notifiche</h2>${notifications.map(n => `<article><h3>${esc(n.title)}</h3><p>${esc(n.message)}</p>${n.requestId ? link(`#privata-${n.requestId}`, 'Apri chat privata') : ''}</article>`).join('') || '<p>Nessuna notifica.</p>'}`); return;
+      shell(`<h2>Notifiche e promemoria</h2><section id="pushSettings" class="billing-card"></section>${notifications.map(n => `<article class="billing-card"><h3>${esc(n.title)}</h3><p>${esc(n.message)}</p>${n.requestId ? link(`#privata-${n.requestId}`, 'Apri chat privata') : ''}</article>`).join('') || '<p>Nessuna notifica.</p>'}`);
+      await renderPushSettings(container.querySelector('#pushSettings'), user, api, esc); return;
     }
     const state = await api('/api/p2p/subscription');
     if (generation !== turn) return;
