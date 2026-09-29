@@ -19,3 +19,9 @@ test('sharing keeps sandbox origins and safely encodes service names and identif
   assert.throws(() => whatsappGroupUrl({ id: '' }, 'https://marketplace.buyyourshare.it'));
 });
 
+import { notificationTarget } from '../js/ui/notificationCenter.js';
+test('notification links only navigate to internal marketplace destinations', () => {
+ assert.equal(notificationTarget({ requestId: 'request-1' }), '#privata-request-1');
+ assert.equal(notificationTarget({ actionUrl: '#miei-gruppi' }), '#miei-gruppi');
+ for (const actionUrl of ['javascript:alert(1)', 'https://evil.example', '#privata-x" onclick=bad', '#admin']) assert.equal(notificationTarget({ actionUrl }), null);
+});

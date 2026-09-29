@@ -22,7 +22,11 @@ notificationsRouter.get('/', requireAuth, async (req, res) => {
 // 2. Segna come lette
 notificationsRouter.post('/read', requireAuth, async (req, res) => {
   try {
-    await dataRepository.markNotificationsRead(req.user.id);
+    const ids = req.body?.ids;
+    if (ids !== undefined && (!Array.isArray(ids) || ids.length > 200 || ids.some(id => typeof id !== 'string' || id.length > 250))) {
+      return res.status(400).json({ error: 'INVALID_NOTIFICATION_IDS' });
+    }
+    await dataRepository.markNotificationsRead(req.user.id, ids);
     return res.json({ success: true });
   } catch (err) {
     console.error('[NOTIFICATIONS READ ERROR]', err);

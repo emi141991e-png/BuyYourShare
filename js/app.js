@@ -234,10 +234,11 @@ function updateHeader(currentUser) {
   const roleColor = currentUser.role === 'admin' ? '#6b21a8' : (roleLabel.includes('Capogruppo') ? '#92400e' : '#0369a1');
 
   const unreadNotifs = db.getNotifications(currentUser.id).filter(n => !n.isRead).length;
+  const accountOpen = headerActions.querySelector('.account-menu')?.open;
 
   headerActions.innerHTML = `
     <!-- User Badge & Name -->
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div class="header-user" style="display:flex; align-items:center; gap:8px;">
       <span style="font-size:11px; background:${roleBg}; color:${roleColor}; padding:3px 8px; border-radius:var(--radius-full); font-weight:800; white-space:nowrap;">
         ${roleLabel}
       </span>
@@ -247,7 +248,7 @@ function updateHeader(currentUser) {
     </div>
 
     <!-- Notifiche Button -->
-    <a href="#notifiche" class="notif-btn" title="Notifiche">
+    <a href="#notifiche" class="notif-btn" title="Notifiche" aria-label="Notifiche: ${unreadNotifs} da leggere">
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
       </svg>
@@ -267,6 +268,7 @@ function updateHeader(currentUser) {
       </button>
     ` : ''}
 
+    <details class="account-menu"><summary>Account</summary><div class="account-menu-panel">
     <!-- Payment and Payout Settings Button -->
     <a href="#p2p-abbonamento" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;">Abbonamento P2P</a>
 
@@ -281,7 +283,10 @@ function updateHeader(currentUser) {
     <button id="btnLogoutHeader" class="btn btn-secondary btn-sm" style="font-size:11.5px; padding:4px 8px; color:#dc2626; border-color:#fca5a5;" title="Disconnetti account">
       🚪 Esci
     </button>
+    </div></details>
   `;
+
+  if (accountOpen) headerActions.querySelector('.account-menu').open = true;
 
   // Bind Payment Modal
   const btnPayment = document.getElementById('btnOpenPaymentSettingsHeader');

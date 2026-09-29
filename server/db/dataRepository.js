@@ -548,10 +548,10 @@ class DataRepository {
     return notif;
   }
 
-  async markNotificationsRead(userId) {
+  async markNotificationsRead(userId, ids) {
     if (!this.data.notifications) return;
     this.data.notifications.forEach(n => {
-      if (n.userId === userId) n.isRead = true;
+      if (n.userId === userId && (ids === undefined || ids.includes(n.id))) n.isRead = true;
     });
     await this.save();
   }

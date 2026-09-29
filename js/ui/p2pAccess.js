@@ -1,6 +1,6 @@
 import { groupShareLink } from './groupShare.js';
 import { renderManual } from './manualPayments.js';
-import { renderPushSettings } from './pushSettings.js';
+import { renderNotificationCenter } from './notificationCenter.js';
 import { authService } from '../services/authService.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -51,11 +51,13 @@ export async function renderP2pAccess(container, route, user) {
   container.innerHTML = '<p role="status">Caricamento P2P…</p>';
   const shell = (content, billing = false) => {
     if (generation !== turn) return;
-    container.innerHTML = `<section class="p2p-access ${billing ? 'p2p-billing' : ''}" style="max-width:1000px;margin:auto;padding:24px;display:grid;gap:20px">
-      <h1>${billing ? 'Il tuo spazio P2P' : 'BuyYourShare P2P'}</h1><nav style="display:flex;gap:10px;flex-wrap:wrap" aria-label="P2P">
-      ${link('#cerca', 'Gruppi')}${link('#crea', 'Crea gruppo')}${link('#miei-abbonamenti', 'Le mie partecipazioni')}${link('#miei-gruppi', 'I miei gruppi')}${link('#p2p-abbonamento', 'Abbonamento BYS')}</nav>
-      <p style="padding:16px;background:#eff6ff;border-radius:12px;color:#16345b">${direct}</p>
-      <div id="p2pMessage" role="status" aria-live="polite"></div>${content}</section>`;
+    const tabs = [['#home','Esplora'],['#crea','Crea gruppo'],['#miei-abbonamenti','Partecipazioni'],['#miei-gruppi','I miei gruppi'],['#notifiche','Notifiche'],['#p2p-abbonamento','Accesso BYS']];
+    container.innerHTML = `<section class="p2p-access ${billing ? 'p2p-billing' : ''}">
+      <div class="workspace-heading"><div><span class="eyebrow">BUYYOURSHARE / MARKETPLACE</span><h1>Il tuo spazio di condivisione.</h1></div><a class="workspace-help" href="https://buyyourshare.it/support">Hai bisogno di aiuto? ↗</a></div>
+      <nav class="workspace-nav" aria-label="Marketplace">${tabs.map(([hash,label]) => `<a href="${hash}" class="workspace-tab ${route === hash || hash === '#home' && route === '#cerca' ? 'is-current' : ''}" ${route === hash ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+      <div id="p2pMessage" role="status" aria-live="polite"></div>${content}
+      <details class="payment-note"><summary>Come funzionano l’accesso BYS e le quote?</summary><p>${direct}</p></details></section>`;
+
   };
   function bind(id, fn) {
     const el = container.querySelector(`#${id}`);
@@ -73,7 +75,11 @@ export async function renderP2pAccess(container, route, user) {
     try {
       if (!route.startsWith('#gruppo-')) {
         const { groups } = await api('/api/groups');
-        shell(`<h2>Esplora i gruppi, gratuitamente</h2><p>Per creare un gruppo o richiedere un posto serve l’abbonamento BYS da 0,99 €/mese, con rinnovo automatico. Le quote sono separate.</p><div class="billing-grid">${groups.map(g => `<article class="billing-card"><h3>${esc(g.customServiceName)}</h3><p>${esc(g.planName)}</p><p>Quota da ${money(g.baseMemberShareCents)}/mese al capogruppo</p>${link(`#gruppo-${g.id}`, 'Vedi posti')}</article>`).join('') || '<p>Nessun gruppo disponibile.</p>'}</div>`);
+        shell(`<section class="market-hero"><div><span class="hero-kicker">PIÙ CONNESSIONI. MENO COMPLICAZIONI.</span><h2>Trova il tuo gruppo.<br>Condividi le possibilità.</h2><p>Esplora gli abbonamenti disponibili, conosci il capogruppo e organizza tutto in un unico spazio.</p><a href="#crea" class="hero-cta">+ Crea un gruppo</a><a href="#miei-abbonamenti" class="hero-secondary">Le mie partecipazioni →</a></div><aside class="access-preview"><span>UN ACCESSO, DUE POSSIBILITÀ</span><strong>0,99 €<small>/ mese</small></strong><p>Partecipa ai gruppi e crea i tuoi.<br>Rinnovo automatico, disattivabile.</p><a href="#p2p-abbonamento">Scopri il tuo accesso →</a><small>Le quote ai capigruppo sono separate.</small></aside></section>
+        <div class="quick-actions"><a href="#notifiche"><span class="quick-icon">◉</span><div><strong>Notifiche e promemoria</strong><span>Richieste, messaggi e scadenze</span></div><b>↗</b></a><a href="#miei-abbonamenti"><span class="quick-icon">↗</span><div><strong>Le tue partecipazioni</strong><span>Quote, rinnovi e chat private</span></div><b>↗</b></a><a href="#miei-gruppi"><span class="quick-icon">＋</span><div><strong>Gestisci i tuoi gruppi</strong><span>Accogli membri e conferma le quote</span></div><b>↗</b></a></div>
+        <section><div class="section-heading"><div><span class="eyebrow">ESPLORA IL MARKETPLACE</span><h2>Un posto per te</h2><p>${groups.length} gruppi pubblici · consultazione gratuita</p></div>${groups.length ? '<label class="group-search">Cerca un servizio<input id="groupSearch" type="search" placeholder="Nome del servizio…"></label>' : ''}</div><div class="group-grid">${groups.map(g => `<article class="group-card" data-group-name="${esc((g.customServiceName+' '+g.planName).toLowerCase())}"><div class="group-card-top"><span class="service-monogram">${esc((g.customServiceName || 'B').slice(0,1).toUpperCase())}</span><span class="availability">${g.status === 'FULL' ? 'Completo' : 'Scopri i posti'}</span></div><h3>${esc(g.customServiceName)}</h3><p>${esc(g.planName)}</p><div class="group-price">${money(g.baseMemberShareCents)}<span>/ mese al capogruppo</span></div>${link(`#gruppo-${g.id}`, 'Vedi il gruppo →')}</article>`).join('')}</div><div class="empty-state" id="groupEmpty" ${groups.length ? 'hidden' : ''}><span class="empty-symbol" aria-hidden="true">＋</span><h3>Le condivisioni iniziano da qui</h3><p>Non ci sono ancora gruppi da mostrare. Crea il tuo e invita chi vuoi tramite WhatsApp.</p>${link('#crea','Crea il primo gruppo')}</div></section>`);
+        container.querySelector('#groupSearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); let visible = 0; container.querySelectorAll('[data-group-name]').forEach(el => { el.hidden = !el.dataset.groupName.includes(q); if (!el.hidden) visible++; }); const empty = container.querySelector('#groupEmpty'); empty.hidden = visible > 0; if (!visible) { empty.querySelector('h3').textContent = 'Nessun gruppo trovato'; empty.querySelector('p').textContent = 'Prova un altro nome oppure crea un nuovo gruppo.'; } });
+
       } else {
         const { group: g } = await api(`/api/groups/${encodeURIComponent(route.slice(8))}`);
         shell(`<h2>${esc(g.customServiceName)} · ${esc(g.planName)}</h2><div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">${groupShareLink(g)}</div><p>${esc(g.rulesAndRequirements)}</p><p>Capogruppo: ${esc(g.owner?.fullName)}</p><p>Richiedi un posto, attendi l’accettazione e concorda il pagamento nella chat privata.</p>${g.slotsInfo.slots.map(slot => `<article class="billing-card"><h3>Posto ${slot.slotNumber} · ${money(slot.baseShareCents)}/mese</h3>${slot.isOccupied ? '<p>Occupato</p>' : g.ownerId === user?.id ? '<p>Disponibile</p>' : button(`join${slot.slotNumber}`, 'Richiedi il posto')}</article>`).join('')}${link('#miei-gruppi', 'Gestisci richieste e chat')}`);
@@ -95,11 +101,7 @@ export async function renderP2pAccess(container, route, user) {
     if (route === '#miei-gruppi' || route === '#miei-abbonamenti' || route.startsWith('#privata-')) {
       await renderManual({ container, route, user, api, shell, esc, money, date, button, link, bind, reload }); return;
     }
-    if (route === '#notifiche') {
-      const { notifications } = await api('/api/notifications');
-      shell(`<h2>Notifiche e promemoria</h2><section id="pushSettings" class="billing-card"></section>${notifications.map(n => `<article class="billing-card"><h3>${esc(n.title)}</h3><p>${esc(n.message)}</p>${n.requestId ? link(`#privata-${n.requestId}`, 'Apri chat privata') : ''}</article>`).join('') || '<p>Nessuna notifica.</p>'}`);
-      await renderPushSettings(container.querySelector('#pushSettings'), user, api, esc); return;
-    }
+    if (route === '#notifiche') { await renderNotificationCenter({ container, user, api, shell, esc, bind, reload }); return; }
     const state = await api('/api/p2p/subscription');
     if (generation !== turn) return;
     const s = state.subscription;
@@ -170,4 +172,3 @@ export async function renderP2pAccess(container, route, user) {
     shell('<p>Seleziona una voce del marketplace.</p>');
   } catch (e) { shell(`<p role="alert">${esc(e.message)}</p>${link('#p2p-abbonamento', 'Gestisci abbonamento')}`); }
 }
-

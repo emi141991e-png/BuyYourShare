@@ -14,7 +14,7 @@ before(async () => {
     sessions: users.map(u => ({ userId: u.id, token: `test-${u.id}`, createdAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(), expiresAt: end })),
     groups: [{ id: 'group', ownerId: 'leader', customServiceName: 'Test Group', planName: 'Test Plan', totalSlots: 3, ownerSlots: 1, availableSlots: 2, realSubscriptionCostCents: 900, baseMemberShareCents: 300, status: 'PUBLISHED', manualPaymentDestination: { paypalEmail: 'private@example.test' } }],
     memberships: [], services: [], accessInstructions: [{ groupId: 'group', instructions: 'private access' }],
-    chats: [], chatMessages: [], connectedAccounts: [], notifications: [], financialAuditLogs: [],
+    chats: [], chatMessages: [], connectedAccounts: [], notifications: [{ id: 'n-member', userId: 'member', isRead: false }, { id: 'n-other', userId: 'other', isRead: false }, { id: 'n-second', userId: 'member', isRead: false }], financialAuditLogs: [],
     systemConfig: { securityHardeningV1: 'fixture' },
     p2pSubscriptions: ['member', 'leader', 'other', 'expired'].map(userId => ({ userId, role: userId === 'leader' ? 'GROUP_LEADER' : 'MEMBER', status: 'active', currentPeriodEnd: userId === 'expired' ? '2020-01-01' : end }))
   }));
@@ -111,3 +111,16 @@ test('push registration requires authentication and explicit consent; devices ca
   for (const asset of ['/push-sw.js','/manifest.webmanifest','/push-icon-192.png']) assert.equal((await fetch(base+asset)).status,200);
   assert.equal((await fetch(base+'/server/data/push-vapid.json')).status,404);
 });
+
+ test('notification read actions are authenticated, selective and isolated by owner', async () => {
+  assert.equal((await request('/api/notifications/read', null, {})).status, 401);
+  assert.equal((await request('/api/notifications/read', 'member', { ids: 'bad' })).status, 400);
+  assert.equal((await request('/api/notifications/read', 'member', { ids: ['n-member', 'n-other'] })).status, 200);
+  const mine = (await request('/api/notifications', 'member')).body.notifications;
+  assert.equal(mine.find(n => n.id === 'n-member').isRead, true);
+  assert.equal(mine.find(n => n.id === 'n-second').isRead, false);
+  assert.ok(!mine.some(n => n.id === 'n-other'));
+  assert.equal((await request('/api/notifications', 'other')).body.notifications.find(n => n.id === 'n-other').isRead, false);
+  await request('/api/notifications/read', 'member', {});
+  assert.ok((await request('/api/notifications', 'member')).body.notifications.every(n => n.isRead));
+ });
