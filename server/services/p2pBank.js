@@ -7,7 +7,12 @@ export const bankCode = id => 'BYS-' + createHash('sha256').update(String(id)).d
 export class P2pBank {
   constructor(subscriptions) { this.s = subscriptions; this.repo = subscriptions.repo; }
   records() { return this.repo.data.p2pBankPayments ||= []; }
-  blocked(userId) { const s = this.s.find(userId); return !!s?.providerSubscriptionId && !['CANCELLED', 'EXPIRED'].includes(s.providerStatus); }
+  blocked(userId) { const s = this.s.find(userId); return !!s?.providerSubscriptionId && (!['APPROVAL_PENDING', 'CANCELLED', 'EXPIRED'].includes(s.providerStatus) || !!s.paypalReviewRequired); }
+  async verifyChoice(userId) {
+    const s = this.s.find(userId);
+    if (s?.providerSubscriptionId && !['CANCELLED', 'EXPIRED'].includes(s.providerStatus)) await this.s.reconcile(s);
+    if (this.blocked(userId)) throw new P2pError('BANK_PAYPAL_OPEN');
+  }
   view(userId) { return { ...bankDetails, code: bankCode(userId), reference: `Abbonamento BYS - ${bankCode(userId)}`, blocked: this.blocked(userId), payments: this.records().filter(p => p.userId === userId).map(({ bankReference, confirmedBy, ...p }) => p) }; }
   transaction(fn) { return this.s.exclusive(async () => {
     const fields = ['p2pBankPayments', 'p2pSubscriptions', 'notifications'];
@@ -21,7 +26,7 @@ export class P2pBank {
   }
   report(userId) { return this.transaction(async () => {
     this.s.ready();
-    if (this.blocked(userId)) throw new P2pError('BANK_PAYPAL_OPEN');
+    await this.verifyChoice(userId);
     const existing = this.records().find(p => p.userId === userId && p.status === 'reported');
     if (existing) return existing;
     const p = { id: randomUUID(), userId, code: bankCode(userId), amountCents: 99, status: 'reported', reportedAt: new Date(this.s.now()).toISOString() };
@@ -38,14 +43,18 @@ export class P2pBank {
     const ref = String(reference || '').trim().toUpperCase();
     if (ref.length < 6 || ref.length > 120) throw new P2pError('BANK_REFERENCE_REQUIRED', 400);
     if (this.records().some(r => r.bankReference === ref)) throw new P2pError('BANK_REFERENCE_DUPLICATE');
-    if (this.blocked(p.userId)) throw new P2pError('BANK_PAYPAL_OPEN');
+    await this.verifyChoice(p.userId);
     let s = this.s.find(p.userId);
     const now = this.s.now();
     const start = Math.max(now, Date.parse(s?.currentPeriodEnd) || 0);
     const end = addOneMonth(new Date(start)).toISOString();
     if (!s) { s = { userId: p.userId, role: this.s.roleFor(p.userId) }; (this.repo.data.p2pSubscriptions ||= []).push(s); }
-    if (s.providerSubscriptionId) s.retiredIds = [...(s.retiredIds || []), s.providerSubscriptionId];
-    s.providerSubscriptionId = null; s.providerStatus = null; s.customId = null;
+    // An unapproved PayPal request remains available for support and reconciliation.
+    // Only terminal identities are retired; never cancel a provider request here.
+    if (s.providerSubscriptionId && ['CANCELLED', 'EXPIRED'].includes(s.providerStatus)) {
+      s.retiredIds = [...(s.retiredIds || []), s.providerSubscriptionId];
+      s.providerSubscriptionId = null; s.providerStatus = null; s.customId = null;
+    }
     Object.assign(s, { status: 'active', paymentMethod: 'BANK', currentPeriodStart: new Date(start).toISOString(), currentPeriodEnd: end, nextBillingDate: null, cancelAtPeriodEnd: false, approvalUrl: null });
     Object.assign(p, { status: 'confirmed', confirmedBy: adminId, confirmedAt: new Date(now).toISOString(), bankReference: ref, periodStart: s.currentPeriodStart, periodEnd: end });
     this.notify(p.userId, `bank-confirm:${p.id}`, 'Bonifico ricevuto: il tuo accesso BYS è stato attivato o rinnovato. Consulta la scadenza nella pagina Accesso BYS.');

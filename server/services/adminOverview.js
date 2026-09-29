@@ -8,7 +8,7 @@ export function adminOverview(data, now = Date.now()) {
     return { userId: s.userId, name: user?.fullName || 'Utente', email: user?.email || '',
       status: view.status, accessAllowed: view.accessAllowed, role: view.role,
       providerSubscriptionId: s.providerSubscriptionId || null, currentPeriodEnd: view.currentPeriodEnd,
-      paymentMethod: view.paymentMethod, cancelAtPeriodEnd: view.cancelAtPeriodEnd, lastPaymentAt: s.lastPaymentAt || null };
+      paymentMethod: view.paymentMethod, paypalReviewRequired: !!s.paypalReviewRequired, cancelAtPeriodEnd: view.cancelAtPeriodEnd, lastPaymentAt: s.lastPaymentAt || null };
   });
   const requests = (data.p2pManualRequests || []).map(r => ({ id: r.id, groupId: r.groupId,
     groupName: (data.groups || []).find(g => g.id === r.groupId)?.customServiceName || 'Gruppo archiviato',
@@ -16,5 +16,5 @@ export function adminOverview(data, now = Date.now()) {
     leader: users.find(u => u.id === r.ownerId)?.fullName || 'Capogruppo',
     status: r.status, amountCents: r.amountCents, periodEnd: r.periodEnd || null }));
   return { subscriptions, requests, activeCount: subscriptions.filter(s => s.accessAllowed).length,
-    attentionCount: subscriptions.filter(s => ['pending','past_due','suspended'].includes(s.status)).length };
+    attentionCount: subscriptions.filter(s => s.paypalReviewRequired || ['pending','past_due','suspended'].includes(s.status)).length };
 }

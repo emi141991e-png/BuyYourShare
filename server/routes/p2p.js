@@ -11,13 +11,22 @@ export function createP2pRoutes(service, quota) {
   const router = express.Router();
   router.use(requireAuth);
   const handle = fn => async (req, res) => { try { await fn(req, res); } catch (e) { p2pError(res, e); } };
+  const paypalAvailable = () => process.env.P2P_PAYPAL_CHECKOUT_ENABLED === 'true';
+  router.use((req, res, next) => {
+    if (req.method === 'POST' && ['/subscription/start', '/subscription/sdk-start'].includes(req.path) && !paypalAvailable()) {
+      return res.status(503).json({ error: 'P2P_PAYPAL_TEMPORARILY_DISABLED', message: 'Per attivare l’accesso usa il bonifico.' });
+    }
+    next();
+  });
   router.get('/bank', handle(async (req, res) => res.json(req.app.locals.p2pBank.view(req.user.id))));
   router.post('/bank/report', handle(async (req, res) => res.json(await req.app.locals.p2pBank.report(req.user.id))));
   router.get('/subscription', handle(async (req, res) => {
     let available = true, unavailableReason = null;
     try { service.ready(); } catch (e) { available = false; unavailableReason = e.message; }
-    res.json({ subscription: service.view(req.user.id), available, unavailableReason,
-      checkout: service.provider.checkoutConfig?.() || { enabled: false } });
+    const subscription = service.view(req.user.id);
+    if (!paypalAvailable()) subscription.approvalUrl = null;
+    res.json({ subscription, available, unavailableReason, paypalAvailable: paypalAvailable(),
+      checkout: paypalAvailable() ? service.provider.checkoutConfig?.() || { enabled: false } : { enabled: false } });
   }));
   router.post('/subscription/sdk-start', handle(async (req, res) => {
     if (!service.provider.checkoutConfig?.().enabled) throw new P2pError('P2P_SDK_DISABLED', 404);

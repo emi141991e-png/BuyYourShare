@@ -28,14 +28,36 @@ test('bank report does not unlock; only admin confirms once; renewal preserves p
   assert.equal(b.view('u').payments[0].bankReference, undefined);
   assert.equal(bankCode('u'), b.view('u').code);
 });
-test('open PayPal blocks bank; canceled identity is retired and stale webhook ignored', async () => {
+test('active PayPal blocks bank; canceled identity is retired and stale webhook ignored', async () => {
   const { b, s, repo } = fixture();
-  repo.data.p2pSubscriptions = [{ userId: 'u', providerSubscriptionId: 'I-OLD', providerStatus: 'APPROVAL_PENDING' }];
+  repo.data.p2pSubscriptions = [{ userId: 'u', providerSubscriptionId: 'I-OLD', providerStatus: 'ACTIVE', customId:'c', planId:'p' }];
+  s.provider.get = async () => ({ id:'I-OLD', status:'ACTIVE', custom_id:'c', plan_id:'p' });
   await assert.rejects(b.report('u'), /BANK_PAYPAL_OPEN/);
   s.find('u').providerStatus = 'CANCELLED';
   const p = await b.report('u'); await b.confirm(p.id, 'a', 'TRN-ONE');
   assert.deepEqual(await s.webhook({ id: 'event', event_type: 'BILLING.SUBSCRIPTION.SUSPENDED', resource: { id: 'I-OLD' } }), { ignored: true });
   assert.equal(s.view('u').accessAllowed, true);
+});
+
+test('pending PayPal survives bank activation and late payment alerts admin without replacing bank period', async () => {
+  const { b, s, repo } = fixture();
+  repo.data.p2pSubscriptions = [{ userId:'u', role:'MEMBER', providerSubscriptionId:'I-PENDING', providerStatus:'APPROVAL_PENDING', customId:'c', planId:'p' }];
+  let status = 'APPROVAL_PENDING';
+  s.provider.get = async () => ({ id:'I-PENDING', status, custom_id:'c', plan_id:'p', ...(status === 'ACTIVE' ? { billing_info:{last_payment:{time:'2026-01-31T11:59:00Z',amount:{value:'0.99',currency_code:'EUR'}}, next_billing_time:'2026-02-28T11:59:00Z'} } : {}) });
+  s.provider.cancel = () => { throw new Error('must not cancel'); };
+  const payment = await b.report('u'); await b.confirm(payment.id, 'a', 'PENDING-TRN');
+  const end = s.view('u').currentPeriodEnd;
+  assert.equal(s.find('u').providerSubscriptionId, 'I-PENDING');
+  assert.equal(b.view('u').blocked, false);
+  status = 'ACTIVE';
+  const event = { id:'late-payment', event_type:'PAYMENT.SALE.COMPLETED', resource:{billing_agreement_id:'I-PENDING'} };
+  assert.equal((await s.webhook(event)).reviewRequired, true);
+  assert.equal((await s.webhook(event)).duplicate, true);
+  assert.equal(s.view('u').currentPeriodEnd, end);
+  assert.equal(s.view('u').accessAllowed, true);
+  assert.equal(b.view('u').blocked, true);
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('bank-paypal-review:')).length, 1);
+  await assert.rejects(b.report('u'), /BANK_PAYPAL_OPEN/);
 });
 test('failed save rolls back grant; expiry blocks access and reminders are deduplicated and push eligible', async () => {
   const { b, s, repo, advance } = fixture(); const p = await b.report('u');

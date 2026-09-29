@@ -39,7 +39,9 @@ async function request(url, user = 'member', body) {
 }
 test('actual server gates every user P2P surface and retains subscription management for unpaid users', async () => {
   assert.equal((await request('/api/p2p/subscription/sdk-start', null, {})).status, 401);
-  assert.equal((await request('/api/p2p/subscription/sdk-start', 'unpaid', {})).status, 404);
+  assert.equal((await request('/api/p2p/subscription/sdk-start', 'unpaid', {})).status, 503);
+  assert.equal((await request('/api/p2p/subscription/start', 'unpaid', {role:'MEMBER'})).body.error, 'P2P_PAYPAL_TEMPORARILY_DISABLED');
+  assert.equal((await request('/api/p2p/subscription', 'unpaid')).body.paypalAvailable, false);
   assert.deepEqual((await request('/api/p2p/subscription', 'unpaid')).body.checkout, { enabled: false });
   for (const url of ['/api/groups/my', '/api/memberships/my', '/api/access/group', '/api/chat/group', '/api/ledger', '/api/p2p/direct-memberships']) {
     assert.equal((await request(url, null)).status, 401, url);

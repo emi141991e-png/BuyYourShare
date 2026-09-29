@@ -46,7 +46,23 @@ export class P2pSubscriptions {
     return publicSubscription(this.find(userId) || { role: this.roleFor(userId), status: 'inactive' }, this.now());
   }
   async reconcile(s) {
-    if (s?.paymentMethod === 'BANK') return s;
+    if (s?.paymentMethod === 'BANK') {
+      if (!s.providerSubscriptionId) return s;
+      const remoteState = { ...s, paymentMethod: 'PAYPAL', currentPeriodStart: null, currentPeriodEnd: null, lastPaymentAt: null };
+      await this.reconcile(remoteState);
+      s.providerStatus = remoteState.providerStatus;
+      s.paypalReviewRequired = !['APPROVAL_PENDING', 'CANCELLED', 'EXPIRED'].includes(remoteState.providerStatus) || !!remoteState.lastPaymentAt;
+      s.paypalObservedPaymentAt = remoteState.lastPaymentAt || null;
+      if (s.paypalReviewRequired) {
+        const notifications = this.repo.data.notifications ||= [];
+        for (const user of this.repo.data.users || []) if (user.role === 'admin') {
+          const id = `bank-paypal-review:${s.providerSubscriptionId}:${user.id}`;
+          if (!notifications.some(n => n.id === id)) notifications.push({ id, userId: user.id, title: 'Verifica pagamenti BYS',
+            message: 'Una richiesta PayPal conservata per un accesso con bonifico ha cambiato stato. Verifica eventuali incassi sovrapposti nel riepilogo admin.', isRead: false, createdAt: new Date(this.now()).toISOString() });
+        }
+      }
+      return s;
+    }
     if (!s?.providerSubscriptionId) return s;
     const remote = await this.provider.get(s.providerSubscriptionId);
     if (remote.id !== s.providerSubscriptionId || remote.custom_id !== s.customId ||
@@ -158,6 +174,13 @@ export class P2pSubscriptions {
       throw new P2pError('P2P_UNKNOWN_SUBSCRIPTION_REQUIRES_RECONCILIATION', 503);
     }
     await this.reconcile(s); // Read current provider truth: delivery order cannot resurrect stale states.
+    if (s.paymentMethod === 'BANK') {
+      // Preserve the bank-paid period; a late PayPal event is recorded and flagged,
+      // never treated as a bank renewal or allowed to revoke bank-paid access.
+      this.repo.data.p2pWebhookEvents = [...events, { id: event.id, type: event.event_type, subscriptionId: id, processedAt: new Date(this.now()).toISOString() }];
+      try { await this.save(); } catch (e) { this.repo.data.p2pWebhookEvents = events; throw e; }
+      return { processed: true, reviewRequired: !!s.paypalReviewRequired };
+    }
     const eventTime = Date.parse(event.create_time);
     const laterPayment = Number.isFinite(eventTime) && Date.parse(s.lastPaymentAt) >= eventTime;
     if (event.event_type === 'BILLING.SUBSCRIPTION.PAYMENT.FAILED' && !laterPayment) {

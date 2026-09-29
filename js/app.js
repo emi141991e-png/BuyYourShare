@@ -639,7 +639,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         </div>
 
         <p style="text-align:center; font-size:11.5px; color:var(--text-muted); margin-top:20px;">
-          Abbonamento BYS con rinnovo automatico tramite PayPal. Nessun incasso o distribuzione delle quote dei gruppi da parte di BYS.
+          Abbonamento BYS con bonifico mensile: puoi impostarlo periodico nella tua banca. Nessun incasso o distribuzione delle quote dei gruppi da parte di BYS.
         </p>
       </div>
     `;
