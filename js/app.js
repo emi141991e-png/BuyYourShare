@@ -224,14 +224,7 @@ function updateHeader(currentUser) {
   if (!headerActions) return;
 
   if (!isAuth || !currentUser) {
-    headerActions.innerHTML = `
-      <a href="#login" class="btn btn-secondary btn-sm" style="font-size:12px; font-weight:700; padding:6px 12px;">
-        🔐 Accedi
-      </a>
-      <a href="#register" class="btn btn-primary btn-sm" style="font-size:12px; font-weight:800; padding:6px 14px; background:#003087;">
-        ✨ Registrati
-      </a>
-    `;
+    headerActions.innerHTML = '';
     return;
   }
 
