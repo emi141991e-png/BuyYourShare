@@ -13,9 +13,8 @@ class EmailService {
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
     
     // 1. Gmail Dedicated App Password (Invio Universale per Libero, Outlook, Yahoo, Gmail, ecc.)
-    const defaultGmailPass = Buffer.from('cHZ5YXRlbXpsZXR6empldQ==', 'base64').toString();
     const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser || 'emi.141991e@gmail.com';
-    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass || defaultGmailPass;
+    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass;
     if (gmailUser && gmailPass) {
       return nodemailer.createTransport({
         service: 'gmail',
@@ -46,8 +45,10 @@ class EmailService {
   }
 
   async sendMail({ to, subject, html, text }) {
+    if (process.env.NODE_ENV === 'test' || process.env.EMAIL_DELIVERY_DISABLED === 'true') {
+      return { status: 'SKIPPED', to, subject };
+    }
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
-    const defaultGmailPass = Buffer.from('cHZ5YXRlbXpsZXR6empldQ==', 'base64').toString();
     const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser || 'emi.141991e@gmail.com';
 
     let fromAddress = process.env.EMAIL_FROM || emailConfig.emailFrom || `"BuyYourShare" <${gmailUser}>`;
@@ -58,12 +59,12 @@ class EmailService {
       subject,
       text: text || '',
       html,
-      status: 'DELIVERED',
+      status: 'FAILED',
       timestamp: new Date().toISOString()
     };
 
     console.log(`\n============================================================`);
-    console.log(`📧 [EMAIL AUTOMATICA INVIATA A ${to}]`);
+    console.log(`📧 [EMAIL IN ELABORAZIONE PER ${to}]`);
     console.log(`📋 Oggetto: ${subject}`);
     console.log(`============================================================\n`);
 
@@ -88,8 +89,7 @@ class EmailService {
 
     // 2. Fallback tramite Resend API se SMTP non configurato o non riuscito
     if (emailRecord.status !== 'DELIVERED_SMTP') {
-      const fallbackResendKey = Buffer.from('cmVfZ0xNb1ZQeUxfNzNBcUJBMUZZRWZIZ21rWHZxenJja3M2', 'base64').toString();
-      const resendKey = process.env.RESEND_API_KEY || emailConfig.resendApiKey || fallbackResendKey;
+      const resendKey = process.env.RESEND_API_KEY || emailConfig.resendApiKey;
       if (resendKey) {
         try {
           const resendRes = await fetch('https://api.resend.com/emails', {
@@ -119,7 +119,7 @@ class EmailService {
 
     // 3. Invio tramite Brevo REST API (se configurato)
     const brevoKey = process.env.BREVO_API_KEY || emailConfig.brevoApiKey;
-    if (brevoKey) {
+    if (brevoKey && !emailRecord.status.startsWith('DELIVERED_')) {
       try {
         const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
