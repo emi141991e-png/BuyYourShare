@@ -64,7 +64,20 @@ export class P2pSubscriptions {
       return s;
     }
     if (!s?.providerSubscriptionId) return s;
-    const remote = await this.provider.get(s.providerSubscriptionId);
+    let remote;
+    try { remote = await this.provider.get(s.providerSubscriptionId); }
+    catch (error) {
+      // An unapproved, never-paid request can disappear at PayPal. Keep its
+      // identity for late webhooks, but do not let it block a separate bank grant.
+      if (error.message === 'P2P_PROVIDER_404' && s.providerStatus === 'APPROVAL_PENDING' &&
+          !s.lastPaymentAt && !s.paypalObservedPaymentAt && !s.paypalReviewRequired) {
+        s.providerMissingAt = new Date(this.now()).toISOString();
+        s.approvalUrl = null;
+        return s;
+      }
+      throw error;
+    }
+    s.providerMissingAt = null;
     if (remote.id !== s.providerSubscriptionId || remote.custom_id !== s.customId ||
         ![s.planId, s.pendingPlanId].filter(Boolean).includes(remote.plan_id)) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
     if (s.pendingPlanId && remote.plan_id === s.pendingPlanId && remote.status === 'ACTIVE') {

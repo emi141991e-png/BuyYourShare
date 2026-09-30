@@ -92,3 +92,31 @@ test('failed save rolls back grant; expiry blocks access and reminders are dedup
   assert.equal(push.relevant(notices[0]), false);
   assert.equal(repo.data.notifications.filter(n => n.id.startsWith('bank-renew:')).length, 2);
 });
+
+
+test('missing never-approved PayPal request cannot block bank confirmation or refresh; late payment remains reviewable', async () => {
+  const { b, s, repo } = fixture();
+  const p = await b.report('u');
+  repo.data.p2pSubscriptions = [{ userId:'u', role:'MEMBER', providerSubscriptionId:'I-MISSING', providerStatus:'APPROVAL_PENDING', customId:'c', planId:'p' }];
+  s.provider.get = async () => { throw new Error('P2P_PROVIDER_404'); };
+  await b.confirmFromBys(p.id, 'bys-admin');
+  const end = s.view('u').currentPeriodEnd;
+  await b.confirmFromBys(p.id, 'bys-admin');
+  await s.refresh('u');
+  assert.equal(s.view('u').accessAllowed, true);
+  assert.equal(s.view('u').currentPeriodEnd, end);
+  assert.equal(s.find('u').providerSubscriptionId, 'I-MISSING');
+  s.provider.get = async () => ({id:'I-MISSING', status:'ACTIVE',custom_id:'c',plan_id:'p',billing_info:{last_payment:{time:'2026-01-31T11:59:00Z',amount:{value:'0.99',currency_code:'EUR'}},next_billing_time:'2026-02-28T11:59:00Z'}});
+  assert.equal((await s.webhook({id:'late-missing',event_type:'PAYMENT.SALE.COMPLETED',resource:{billing_agreement_id:'I-MISSING'}})).reviewRequired,true);
+  assert.equal(s.view('u').currentPeriodEnd,end);
+});
+test('provider errors and missing paid or active subscriptions still block bank confirmation', async () => {
+  for (const [status,paid,code] of [['ACTIVE',null,'P2P_PROVIDER_404'],['APPROVAL_PENDING','2026-01-01','P2P_PROVIDER_404'],['APPROVAL_PENDING',null,'P2P_PROVIDER_500'],['APPROVAL_PENDING',null,'P2P_PROVIDER_401']]) {
+    const {b,s,repo}=fixture();const p=await b.report('u');
+    repo.data.p2pSubscriptions=[{userId:'u',providerSubscriptionId:'I-OLD',providerStatus:status,lastPaymentAt:paid}];
+    s.provider.get=async()=>{throw new Error(code);};
+    await assert.rejects(b.confirmFromBys(p.id,'admin'),new RegExp(code));
+    assert.equal(b.records()[0].status,'reported');
+    assert.equal(s.view('u').accessAllowed,false);
+  }
+});
