@@ -1,4 +1,5 @@
 import { paymentDestination } from '../services/p2pManual.js';
+import {ratingSummary} from '../services/leaderRatings.js';
 /**
  * BuyYourShare - Server Groups Routes
  * Macchina a stati rigorosa (DRAFT, PAYOUT_NOT_READY, PUBLISHED, FULL, CLOSED)
@@ -52,6 +53,8 @@ function sanitizeGroupForPublic(group, ownerUser) {
     owner: ownerUser ? {
       id: ownerUser.id,
       fullName: ownerUser.fullName,
+      avatarUrl: ownerUser.bysUserId ? `https://buyyourshare.it/api/profile-photo/${encodeURIComponent(ownerUser.bysUserId)}` : null,
+      rating: ratingSummary(dataRepository.data,ownerUser.id),
       isVerified: !!ownerUser.isVerified
     } : null
   };

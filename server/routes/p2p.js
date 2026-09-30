@@ -1,4 +1,5 @@
 import express from 'express';
+import {LeaderRatings} from '../services/leaderRatings.js';
 import { requireAuth } from '../middleware/auth.js';
 import { P2pError, accessAllowed } from '../services/p2pSubscription.js';
 
@@ -12,6 +13,9 @@ export function createP2pRoutes(service, quota) {
   router.use(requireAuth);
   const handle = fn => async (req, res) => { try { await fn(req, res); } catch (e) { p2pError(res, e); } };
   const paypalAvailable = () => process.env.P2P_PAYPAL_CHECKOUT_ENABLED === 'true';
+  const ratings=new LeaderRatings(service);
+  router.get('/leaders/:id/rating',handle(async(req,res)=>res.json(ratings.view(req.user.id,req.params.id))));
+  router.post('/leaders/:id/rating',handle(async(req,res)=>res.json(await ratings.save(req.user.id,req.params.id,req.body.stars))));
   router.use((req, res, next) => {
     if (req.method === 'POST' && ['/subscription/start', '/subscription/sdk-start'].includes(req.path) && !paypalAvailable()) {
       return res.status(503).json({ error: 'P2P_PAYPAL_TEMPORARILY_DISABLED', message: 'Per attivare l’accesso usa il bonifico.' });
