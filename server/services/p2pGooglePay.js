@@ -6,10 +6,10 @@ const DAY = 86400000;
 export class P2pGooglePay {
   constructor(subscriptions, bank, env = process.env) { this.s = subscriptions; this.bank = bank; this.repo = subscriptions.repo; this.env = env; }
   records() { return this.repo.data.p2pGooglePayments ||= []; }
-  config() {
+  config(method = 'GOOGLE_PAY') {
     const p = this.s.provider.settings();
-    const enabled = this.env.P2P_GOOGLE_PAY_ENABLED === 'true' && !!p.clientId && !!p.secret &&
-      (p.mode === 'sandbox' || this.env.P2P_GOOGLE_PAY_LIVE_VERIFIED === 'true');
+    const enabled = this.env[`P2P_${method}_ENABLED`] === 'true' && !!p.clientId && !!p.secret &&
+      (p.mode === 'sandbox' || this.env[`P2P_${method}_LIVE_VERIFIED`] === 'true');
     return enabled ? { enabled, clientId: p.clientId, environment: p.mode === 'live' ? 'PRODUCTION' : 'TEST', amount: '0.99', currency: 'EUR', days: 30, plans: ACCESS_PLANS } : { enabled: false };
   }
   transaction(fn) { return this.s.exclusive(async () => {
@@ -17,19 +17,20 @@ export class P2pGooglePay {
     const snapshot = Object.fromEntries(fields.map(k => [k, structuredClone(this.repo.data[k])]));
     try { return await fn(); } catch (e) { for (const k of fields) this.repo.data[k] = snapshot[k]; throw e; }
   }); }
-  async choice(userId) {
+  async choice(userId, method = 'GOOGLE_PAY') {
     this.s.ready();
-    if (!this.config().enabled) throw new P2pError('GOOGLE_PAY_UNAVAILABLE', 503);
+    if (!this.config(method).enabled) throw new P2pError(`${method}_UNAVAILABLE`, 503);
     await this.bank.verifyChoice(userId);
     if ((this.repo.data.p2pBankPayments || []).some(p => p.userId === userId && p.status === 'reported')) throw new P2pError('BANK_PAYMENT_IN_PROGRESS');
   }
-  create(userId, planCode = 'MONTHLY') { return this.s.exclusive(async () => {
+  create(userId, planCode = 'MONTHLY', method = 'GOOGLE_PAY') { return this.s.exclusive(async () => {
     const plan = accessPlan(planCode);
-    await this.choice(userId);
+    await this.choice(userId, method);
     let p = this.records().find(r => r.userId === userId && r.status === 'pending');
+    if (p && (p.paymentMethod || 'GOOGLE_PAY') !== method) throw new P2pError('WALLET_PAYMENT_IN_PROGRESS');
     if (p && (p.planCode || 'MONTHLY') !== plan.code) throw new P2pError('ACCESS_PLAN_PAYMENT_PENDING');
     if (!p) {
-      p = { id: randomUUID(), userId, planCode: plan.code, amountCents: plan.amountCents, status: 'pending', createdAt: new Date(this.s.now()).toISOString() };
+      p = { id: randomUUID(), userId, paymentMethod: method, planCode: plan.code, amountCents: plan.amountCents, status: 'pending', createdAt: new Date(this.s.now()).toISOString() };
       this.records().push(p);
       try { await this.repo.save(); } catch (e) { this.repo.data.p2pGooglePayments = this.records().filter(r => r.id !== p.id); throw e; }
     }
@@ -46,6 +47,7 @@ export class P2pGooglePay {
     return { orderId: p.orderId };
   }); }
   async settle(p, order) {
+    const method = p.paymentMethod || 'GOOGLE_PAY';
     const amount = ((p.amountCents ?? 99) / 100).toFixed(2);
     const plan = accessPlan(p.planCode || 'MONTHLY');
     const units = order.purchase_units || [];
@@ -59,7 +61,7 @@ export class P2pGooglePay {
       if (!capture || capture.amount?.currency_code !== 'EUR' || capture.amount.value !== amount) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
       if (capture.status === 'REFUNDED') {
         const s = this.s.find(p.userId);
-        if (s?.paymentMethod === 'GOOGLE_PAY' && s.currentPeriodEnd === p.periodEnd) {
+        if (s?.paymentMethod === method && s.currentPeriodEnd === p.periodEnd) {
           // Only revoke this grant. A later bank/provider period requires review,
           // never an indiscriminate subtraction from unrelated paid access.
           s.currentPeriodEnd = p.previousPeriodEnd || p.periodStart;
@@ -67,15 +69,15 @@ export class P2pGooglePay {
           s.accessPlanCode = p.previousPlanCode || 'MONTHLY'; s.accessAmountCents = p.previousAmountCents ?? 99;
           s.status = Date.parse(s.currentPeriodEnd) > this.s.now() ? 'active' : 'canceled';
           p.status = 'refunded'; p.refundedAt = new Date(this.s.now()).toISOString();
-          this.bank.notify(p.userId, `google-refund:${p.id}`, 'Rimborso Google Pay confermato. Rimosso solo il periodo di quel pagamento; eventuali periodi precedenti restano validi.');
+          this.bank.notify(p.userId, `google-refund:${p.id}`, 'Rimborso del pagamento confermato. Rimosso solo il periodo di quel pagamento; eventuali periodi precedenti restano validi.');
         } else p.reviewRequired = true;
       } else if (capture.status !== 'COMPLETED') p.reviewRequired = true;
-      if (p.reviewRequired) for (const u of this.repo.data.users || []) if (u.role === 'admin') this.bank.notify(u.id, `google-review:${p.id}`, 'Pagamento Google Pay da riconciliare: verifica rimborso parziale, storno o periodi successivi prima di modificare l’accesso.');
+      if (p.reviewRequired) for (const u of this.repo.data.users || []) if (u.role === 'admin') this.bank.notify(u.id, `google-review:${p.id}`, 'Pagamento wallet da riconciliare: verifica rimborso parziale, storno o periodi successivi prima di modificare l’accesso.');
       await this.repo.save(); return { subscription: this.s.view(p.userId), reviewRequired: !!p.reviewRequired };
     }
     if (order.status !== 'COMPLETED' || captures.length !== 1 || captures[0].status !== 'COMPLETED') return { pending: true };
     const capture = captures[0];
-    if (!capture.id || capture.amount?.currency_code !== 'EUR' || capture.amount.value !== amount || !order.payment_source?.google_pay) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
+    if (!capture.id || capture.amount?.currency_code !== 'EUR' || capture.amount.value !== amount || !order.payment_source?.[method === 'APPLE_PAY' ? 'apple_pay' : 'google_pay']) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
     if (this.records().some(r => r.id !== p.id && r.captureId === capture.id)) throw new P2pError('PAYPAL_PAYMENT_REVIEW_REQUIRED');
     const paidAt = Date.parse(capture.create_time);
     if (!Number.isFinite(paidAt) || paidAt > this.s.now() + 60000) throw new P2pError('P2P_PROVIDER_RESPONSE_INVALID', 502);
@@ -89,7 +91,7 @@ export class P2pGooglePay {
     p.previousPeriodStart = s?.currentPeriodStart || null;
     p.previousPlanCode = s?.accessPlanCode || 'MONTHLY'; p.previousAmountCents = s?.accessAmountCents ?? 99;
     if (!s) { s = { userId: p.userId, role: this.s.roleFor(p.userId) }; (this.repo.data.p2pSubscriptions ||= []).push(s); }
-    Object.assign(s, { status: 'active', paymentMethod: 'GOOGLE_PAY', currentPeriodStart: new Date(start).toISOString(),
+    Object.assign(s, { status: 'active', paymentMethod: method, currentPeriodStart: new Date(start).toISOString(),
       currentPeriodEnd: accessPeriodEnd(start, plan.code), accessPlanCode: plan.code, accessAmountCents: p.amountCents ?? 99, lastPaymentAt: capture.create_time, nextBillingDate: null, cancelAtPeriodEnd: false, approvalUrl: null });
     Object.assign(p, { status: 'confirmed', captureId: capture.id, paidAt: capture.create_time, periodStart: s.currentPeriodStart, periodEnd: s.currentPeriodEnd });
     this.bank.notify(p.userId, `google-paid:${p.id}`, `Pagamento ricevuto: accesso BYS ${plan.label}, per ${plan.period}. Il rinnovo richiederà un nuovo pagamento.`, { actionUrl: '#p2p-abbonamento' });
@@ -97,13 +99,13 @@ export class P2pGooglePay {
     for (const admin of this.repo.data.users || []) if (admin.role === 'admin') this.bank.notify(admin.id, `google-paid-admin:${p.id}:${admin.id}`, `${buyer?.fullName || 'Utente'} (${buyer?.email || p.userId}) ha acquistato accesso BYS ${plan.label}: ${accessMoney(p.amountCents ?? 99)}. Attivato automaticamente.`, { actionUrl: 'https://buyyourshare.it/admin/marketplace-payments' });
     await this.repo.save(); return { subscription: this.s.view(p.userId) };
   }
-  capture(userId, id) { return this.transaction(async () => {
+  capture(userId, id, method = 'GOOGLE_PAY') { return this.transaction(async () => {
     const p = this.records().find(r => r.userId === userId && r.orderId === id);
-    if (!p) throw new P2pError('NOT_FOUND', 404);
+    if (!p || (p.paymentMethod || 'GOOGLE_PAY') !== method) throw new P2pError('NOT_FOUND', 404);
     if (p.status === 'refunded') return { subscription: this.s.view(userId) };
     let order = await this.s.provider.request(`/v2/checkout/orders/${encodeURIComponent(id)}`);
     if (order.status === 'APPROVED') {
-      await this.choice(userId);
+      await this.choice(userId, method);
       // Stable provider key survives crashes and retries. GET recovers a lost capture response.
       await this.s.provider.request(`/v2/checkout/orders/${encodeURIComponent(id)}/capture`, 'POST', {}, `capture-${p.id}`);
       order = await this.s.provider.request(`/v2/checkout/orders/${encodeURIComponent(id)}`);
@@ -124,7 +126,7 @@ export class P2pGooglePay {
     // guessing a refund amount or removing unrelated prepaid periods.
     if (event.event_type === 'PAYMENT.CAPTURE.REVERSED') {
       p.reviewRequired = true;
-      for (const u of this.repo.data.users || []) if (u.role === 'admin') this.bank.notify(u.id, `google-review:${p.id}`, 'Storno Google Pay segnalato da PayPal: verifica il pagamento e il periodo di accesso.');
+      for (const u of this.repo.data.users || []) if (u.role === 'admin') this.bank.notify(u.id, `google-review:${p.id}`, 'Storno del pagamento wallet segnalato da PayPal: verifica il pagamento e il periodo di accesso.');
     }
     // Pending provider state is deliberately retryable; background recovery also runs.
     if (result.pending) throw new P2pError('PAYMENT_RECONCILIATION_PENDING', 503);

@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { P2pSubscriptions } from '../server/services/p2pSubscription.js';
 import { P2pBank } from '../server/services/p2pBank.js';
 import { P2pGooglePay } from '../server/services/p2pGooglePay.js';
-function fixture() {
+function fixture(wallet = 'GOOGLE_PAY') {
   let now = Date.parse('2026-01-31T12:00:00Z'), order, failCreate = false;
   const calls = [];
   const repo = { data: { users: [], groups: [] }, save: async () => {} };
   const provider = { settings: () => ({ mode: 'sandbox', clientId: 'test', secret: 'test' }), request: async (path, method, body, key) => {
     calls.push({ path, method, key });
     if (path === '/v2/checkout/orders') {
-      order = { id: 'ORDER1', status: 'APPROVED', purchase_units: body.purchase_units, payment_source: { google_pay: {} } };
+      order = { id: 'ORDER1', status: 'APPROVED', purchase_units: body.purchase_units, payment_source: { [wallet === 'APPLE_PAY' ? 'apple_pay' : 'google_pay']: {} } };
       if (failCreate) throw new Error('network');
       return order;
     }
@@ -18,9 +18,30 @@ function fixture() {
     return structuredClone(order);
   } };
   const s = new P2pSubscriptions(repo, provider, { enabled: () => true, now: () => now });
-  const bank = new P2pBank(s), g = new P2pGooglePay(s, bank, { P2P_GOOGLE_PAY_ENABLED: 'true' });
+  const bank = new P2pBank(s), g = new P2pGooglePay(s, bank, { P2P_GOOGLE_PAY_ENABLED: 'true', P2P_APPLE_PAY_ENABLED: 'true' });
   return { repo, s, bank, g, calls, advance: days => { now += days * 86400000; }, order: () => order, fail: () => { failCreate = true; } };
 }
+
+test('Apple Pay verifies wallet, price and ownership; recovery activates once and reminders/refunds work', async()=>{
+  for(const plan of ['MONTHLY','QUARTERLY','YEARLY']) {
+    const f=fixture('APPLE_PAY');f.repo.data.users=[{id:'admin',role:'admin'}];
+    const {orderId}=await f.g.create('u',plan,'APPLE_PAY');
+    await assert.rejects(f.g.capture('other',orderId,'APPLE_PAY'),/NOT_FOUND/);
+    await assert.rejects(f.g.capture('u',orderId),/NOT_FOUND/);
+    await assert.rejects(f.g.create('u',plan),/WALLET_PAYMENT_IN_PROGRESS/);
+    await f.s.provider.request(`/v2/checkout/orders/${orderId}/capture`,'POST');
+    const event={id:'apple1',event_type:'PAYMENT.CAPTURE.COMPLETED',resource:{supplementary_data:{related_ids:{order_id:orderId}}}};
+    await f.g.webhook(event);const end=f.s.view('u').currentPeriodEnd;
+    await f.g.capture('u',orderId,'APPLE_PAY');await f.g.recover();
+    assert.equal(f.s.view('u').currentPeriodEnd,end);assert.equal(f.s.find('u').paymentMethod,'APPLE_PAY');
+    assert.equal(f.repo.data.notifications.filter(n=>n.id.startsWith('google-paid-admin:')).length,1);
+    if(plan==='MONTHLY'){f.advance(27);await f.bank.reminders();assert.ok(f.repo.data.notifications.some(n=>n.id.startsWith('bank-renew:')));}
+    f.order().purchase_units[0].payments.captures[0].status='REFUNDED';
+    await f.g.capture('u',orderId,'APPLE_PAY');assert.equal(f.s.view('u').accessAllowed,false);
+  }
+  const f=fixture('GOOGLE_PAY');const {orderId}=await f.g.create('u','MONTHLY','APPLE_PAY');
+  await assert.rejects(f.g.capture('u',orderId,'APPLE_PAY'),/IDENTITY/);assert.equal(f.s.view('u').accessAllowed,false);
+});
 
 test('quarterly and yearly capture use server prices, unlock automatically and notify admin once', async () => {
   for (const [planCode, amount, end] of [['QUARTERLY','2.69','2026-04-30T12:00:00.000Z'],['YEARLY','9.90','2027-01-31T12:00:00.000Z']]) {

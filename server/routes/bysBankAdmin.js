@@ -12,7 +12,7 @@ bysBankAdminRouter.use(async (req, res, next) => {
   } catch { res.status(403).json({ error: 'Collegamento amministrativo non autorizzato.' }); }
 });
 bysBankAdminRouter.get('/', (req, res) => {
-  res.json({ payments: [...req.app.locals.p2pBank.records().map(p=>({...p,paymentMethod:'BANK'})), ...req.app.locals.p2pGooglePay.records().map(p=>({...p,paymentMethod:'GOOGLE_PAY',code:bankCode(p.userId),reportedAt:p.createdAt,confirmedAt:p.paidAt}))].map(p => {
+  res.json({ payments: [...req.app.locals.p2pBank.records().map(p=>({...p,paymentMethod:'BANK'})), ...req.app.locals.p2pGooglePay.records().map(p=>({...p,paymentMethod:p.paymentMethod||'GOOGLE_PAY',code:bankCode(p.userId),reportedAt:p.createdAt,confirmedAt:p.paidAt}))].map(p => {
     const user = dataRepository.data.users.find(u => u.id === p.userId);
     return { ...p, name: user?.fullName || 'Utente', email: user?.email || '' };
   }) });

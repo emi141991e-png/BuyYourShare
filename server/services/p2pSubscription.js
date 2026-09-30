@@ -46,7 +46,7 @@ export class P2pSubscriptions {
     return publicSubscription(this.find(userId) || { role: this.roleFor(userId), status: 'inactive' }, this.now());
   }
   async reconcile(s) {
-    if (['BANK', 'GOOGLE_PAY'].includes(s?.paymentMethod)) {
+    if (['BANK', 'GOOGLE_PAY', 'APPLE_PAY'].includes(s?.paymentMethod)) {
       if (!s.providerSubscriptionId) return s;
       const remoteState = { ...s, paymentMethod: 'PAYPAL', currentPeriodStart: null, currentPeriodEnd: null, lastPaymentAt: null };
       await this.reconcile(remoteState);
@@ -120,7 +120,7 @@ export class P2pSubscriptions {
     this.ready();
     if (!Object.hasOwn(PRICES, requestedRole)) throw new P2pError('P2P_ROLE_INVALID', 400);
     let s = this.find(userId);
-    if ((this.repo.data.p2pBankPayments || []).some(p => p.userId === userId && p.status === 'reported') || ['BANK', 'GOOGLE_PAY'].includes(s?.paymentMethod)) throw new P2pError('BANK_PAYMENT_IN_PROGRESS');
+    if ((this.repo.data.p2pBankPayments || []).some(p => p.userId === userId && p.status === 'reported') || ['BANK', 'GOOGLE_PAY', 'APPLE_PAY'].includes(s?.paymentMethod)) throw new P2pError('BANK_PAYMENT_IN_PROGRESS');
     if (s?.migrationCredit && accessAllowed(s, this.now())) return this.view(userId);
     if (s?.providerSubscriptionId) {
       await this.reconcile(s); await this.save();
@@ -187,7 +187,7 @@ export class P2pSubscriptions {
       throw new P2pError('P2P_UNKNOWN_SUBSCRIPTION_REQUIRES_RECONCILIATION', 503);
     }
     await this.reconcile(s); // Read current provider truth: delivery order cannot resurrect stale states.
-    if (['BANK', 'GOOGLE_PAY'].includes(s.paymentMethod)) {
+    if (['BANK', 'GOOGLE_PAY', 'APPLE_PAY'].includes(s.paymentMethod)) {
       // Preserve the bank-paid period; a late PayPal event is recorded and flagged,
       // never treated as a bank renewal or allowed to revoke bank-paid access.
       this.repo.data.p2pWebhookEvents = [...events, { id: event.id, type: event.event_type, subscriptionId: id, processedAt: new Date(this.now()).toISOString() }];

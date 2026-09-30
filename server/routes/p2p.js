@@ -24,6 +24,9 @@ export function createP2pRoutes(service, quota) {
   });
   router.get('/bank', handle(async (req, res) => res.json(req.app.locals.p2pBank.view(req.user.id))));
   router.post('/bank/report', handle(async (req, res) => res.json(await req.app.locals.p2pBank.report(req.user.id, req.body.planCode))));
+  router.get('/apple-pay/config', handle(async (req, res) => res.json(req.app.locals.p2pGooglePay.config('APPLE_PAY'))));
+  router.post('/apple-pay/orders', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.create(req.user.id, req.body.planCode, 'APPLE_PAY'))));
+  router.post('/apple-pay/orders/:id/capture', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.capture(req.user.id, req.params.id, 'APPLE_PAY'))));
   router.get('/google-pay/config', handle(async (req, res) => res.json(req.app.locals.p2pGooglePay.config())));
   router.post('/google-pay/orders', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.create(req.user.id, req.body.planCode))));
   router.post('/google-pay/orders/:id/capture', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.capture(req.user.id, req.params.id))));
