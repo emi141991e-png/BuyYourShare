@@ -4403,7 +4403,7 @@ function setupInactivityWatchdog() {
         const u = authService.getCurrentUser();
         await db.syncAllFromServer(u);
         const routePath = (currentRoute || '#home').split('?')[0];
-        if (routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+        if (routePath !== '#crea' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
           renderApp();
         }
       }
@@ -4417,7 +4417,7 @@ function setupInactivityWatchdog() {
       const u = authService.getCurrentUser();
       await db.syncAllFromServer(u);
       const routePath = (currentRoute || '#home').split('?')[0];
-      if (routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+      if (routePath !== '#crea' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
         renderApp();
       }
     }
@@ -4449,9 +4449,12 @@ async function init() {
     renderApp();
   }
 
-  // Sincronizzazione automatica e re-render in Real-Time in background (ogni 3 secondi)
+  // Sincronizzazione automatica e re-render in Real-Time in background (ogni 15 secondi, senza richieste sovrapposte)
   let lastDataChecksum = '';
+  let backgroundSyncBusy = false;
   setInterval(async () => {
+    if (backgroundSyncBusy || document.hidden) return;
+    backgroundSyncBusy = true;
     try {
       const u = authService.getCurrentUser();
       await db.syncAllFromServer(u);
@@ -4464,12 +4467,12 @@ async function init() {
         const activeEl = document.activeElement;
         const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
         const routePath = (currentRoute || '#home').split('?')[0];
-        if (!isTyping && routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+        if (!isTyping && routePath !== '#crea' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
           renderApp();
         }
       }
-    } catch (e) {}
-  }, 3000);
+    } catch (e) {} finally { backgroundSyncBusy = false; }
+  }, 15000);
 }
 
 if (document.readyState === 'loading') {
