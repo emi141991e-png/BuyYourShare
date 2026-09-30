@@ -22,6 +22,12 @@ export class MarketplaceAdmin {
     const text=(value,max=160)=>{if(typeof value!=='string'||!value.trim()||value.length>max) throw new P2pError('Testo non valido.',400);return value.trim();};
     let before, after;
     try {
+      if(kind==='bys-users') {
+        const linked=(d.users || []).find(u=>u.bysUserId===id);
+        if(!linked) return {success:true,notLinked:true};
+        id=linked.id;kind='users';
+        if(input.action!=='archive') fail('Operazione non valida.');
+      }
       if(kind==='users') {
         const u=(d.users || []).find(u=>u.id===id); if(!u) fail('Utente non trovato.');
         if(u.role==='admin') fail('Gli account amministratori si gestiscono separatamente.');
@@ -37,6 +43,7 @@ export class MarketplaceAdmin {
         } else if(input.action==='suspend'||input.action==='restore') {
           u.isSuspended=input.action==='suspend'; if(input.action==='restore') delete u.archivedAt;
         } else if(input.action==='archive') {
+          if((d.p2pBankPayments || []).some(p=>p.userId===id&&p.status==='reported') || (d.p2pGooglePayments || []).some(p=>p.userId===id&&(p.status==='pending'||p.reviewRequired))) fail('Verifica prima i pagamenti BYS ancora in attesa.');
           if((d.p2pSubscriptions || []).some(s=>s.userId===id&&Date.parse(s.currentPeriodEnd)>Date.now())) fail('L’utente ha ancora un periodo BYS pagato. Puoi sospendere l’account per moderazione, conservando il periodo.');
           if((d.groups || []).some(g=>g.ownerId===id&&!['CLOSED','DRAFT'].includes(g.status))) fail('Chiudi prima i gruppi gestiti dall’utente.');
           if((d.p2pManualRequests || []).some(r=>r.userId===id&&(['accepted','reported'].includes(r.status)||(r.status==='confirmed'&&Date.parse(r.periodEnd)>Date.now())))) fail('Gestisci prima le partecipazioni e i periodi pagati.');

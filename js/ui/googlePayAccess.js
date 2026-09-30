@@ -13,13 +13,26 @@ export async function mountGooglePayAccess(target, api, reload) {
   try {
     const config = await api('/api/p2p/google-pay/config');
     if (!config.enabled || !target.isConnected) { target.remove(); return; }
-    target.innerHTML = '<h3>Google Pay · attivazione automatica</h3><p>Pagamento singolo, senza rinnovo automatico. I giorni residui si conservano se rinnovi in anticipo. Alla scadenza le funzioni riservate e l’assistenza inclusa si sospendono fino a un nuovo pagamento.</p><p>Restano disponibili il conto, il rinnovo e il supporto per problemi di pagamento. Le quote ai capigruppo sono separate.</p><div data-google-button></div><p role="status" data-google-status></p><a href="#notifiche">Attiva i promemoria e le notifiche push</a>';
-    const automatic = document.createElement('p');
-    automatic.textContent = 'Accesso attivato automaticamente dopo la conferma del pagamento, senza approvazione dell’amministratore.';
-    target.querySelector('[data-google-button]').before(automatic);
-    const select = document.createElement('select'); select.setAttribute('aria-label','Piano accesso BYS con Google Pay');
-    for (const plan of config.plans) { const option = document.createElement('option'); option.value=plan.code; option.textContent=`${plan.label} · ${accessMoney(plan.amountCents)} / ${plan.period}`; select.append(option); }
-    select.className='form-control'; target.querySelector('[data-google-button]').before(select);
+    target.classList.add('bys-pay-card');
+    target.innerHTML = '<div class="bys-pay-heading"><span class="bys-pay-badge">ATTIVAZIONE AUTOMATICA</span><h3>Il tuo prossimo gruppo inizia qui.</h3><p>Scegli quanto restare con BYS. Un solo accesso per partecipare e creare gruppi.</p></div><div class="bys-pay-options" role="group" aria-label="Scegli la durata"></div><div class="bys-pay-checkout"><div><span>Totale da pagare</span><strong data-plan-total></strong><small data-plan-duration></small></div><div class="bys-pay-action"><div data-google-button></div><p>Accesso attivo dopo la conferma del pagamento.</p></div></div><p role="status" aria-live="polite" data-google-status></p><p class="bys-pay-note">Pagamento singolo, senza rinnovo automatico. Se rinnovi in anticipo conservi i giorni residui. Le quote dei gruppi sono separate.</p><a class="bys-pay-reminders" href="#notifiche">Attiva i promemoria di rinnovo →</a><details class="bys-pay-details"><summary>Cosa succede alla scadenza?</summary><p>Le funzioni riservate e l’assistenza inclusa si sospendono fino al rinnovo. Il conto, il rinnovo e il supporto sui pagamenti restano disponibili.</p></details>';
+    const select = document.createElement('select'); select.setAttribute('aria-label','Piano accesso BYS con Google Pay'); select.hidden=true;
+    for (const plan of config.plans) { const option = document.createElement('option'); option.value=plan.code; option.textContent=plan.label; select.append(option); }
+    target.append(select);
+    const options = target.querySelector('.bys-pay-options');
+    const renderChoice = () => {
+      const plan=config.plans.find(p=>p.code===select.value);
+      target.querySelector('[data-plan-total]').textContent=accessMoney(plan.amountCents);
+      target.querySelector('[data-plan-duration]').textContent=`Accesso per ${plan.period}`;
+      for(const button of options.children) button.setAttribute('aria-pressed',String(button.dataset.plan===plan.code));
+    };
+    for(const plan of config.plans) {
+      const button=document.createElement('button'); button.type='button';button.dataset.plan=plan.code;
+      const label=document.createElement('span');label.textContent=plan.label;
+      const price=document.createElement('strong');price.textContent=accessMoney(plan.amountCents);
+      const duration=document.createElement('small');duration.textContent=plan.period;
+      button.append(label,price,duration);button.onclick=()=>{if(select.disabled)return;select.value=plan.code;renderChoice();};options.append(button);
+    }
+    renderChoice();
     let chosen = config.plans[0];
     const status = target.querySelector('[data-google-status]');
     if (config.environment === 'TEST') status.textContent = 'Ambiente di prova: nessun pagamento reale.';
@@ -47,7 +60,7 @@ export async function mountGooglePayAccess(target, api, reload) {
     const base = { apiVersion: 2, apiVersionMinor: 0, allowedPaymentMethods: settings.allowedPaymentMethods };
     const ready = await client.isReadyToPay(base);
     if (!ready.result || settings.isEligible === false) { status.textContent = 'Google Pay non è disponibile su questo dispositivo o conto. Puoi utilizzare il bonifico.'; return; }
-    target.querySelector('[data-google-button]').append(client.createButton({ allowedPaymentMethods: settings.allowedPaymentMethods, onClick: () => {
+    target.querySelector('[data-google-button]').append(client.createButton({ buttonType: 'pay', buttonColor: 'black', buttonLocale: 'it', buttonSizeMode: 'fill', buttonRadius: 16, onClick: () => {
       if (busy) return; busy = true; select.disabled=true; chosen=config.plans.find(p=>p.code===select.value);
       client.loadPaymentData({ ...base, merchantInfo: settings.merchantInfo, callbackIntents: ['PAYMENT_AUTHORIZATION'],
         transactionInfo: { currencyCode: 'EUR', countryCode: 'IT', totalPriceStatus: 'FINAL', totalPrice: (chosen.amountCents/100).toFixed(2), totalPriceLabel: `Accesso BYS · ${chosen.period}` }

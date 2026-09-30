@@ -6,3 +6,12 @@ test('admin snapshot excludes credentials and private messages, resolves leader 
 test('suspension is explicit, revokes sessions and records actor/reason',async()=>{const {repo,service}=fixture();await service.change('users','u',{action:'suspend',reason:'Moderation review'},'bys-admin');assert.equal(repo.data.users[1].isSuspended,true);assert.equal(repo.data.sessions.length,0);assert.equal(repo.data.marketplaceAdminAudit[0].actor,'bys:bys-admin');await assert.rejects(service.change('users','a',{action:'suspend',reason:'Moderation review'},'bys-admin'));});
 test('archive is reversible and preserves history; pending money and paid periods are protected',async()=>{const {repo,service}=fixture();repo.data.p2pManualRequests.push({id:'r',groupId:'g',userId:'u',status:'reported'});await assert.rejects(service.change('groups','g',{action:'archive',reason:'Close group'},'a'));await assert.rejects(service.change('requests','r',{action:'cancel',reason:'Cancel request'},'a'));repo.data.p2pManualRequests[0].status='confirmed';repo.data.p2pManualRequests[0].periodEnd='2035-01-01';await assert.rejects(service.change('requests','r',{action:'cancel',reason:'Cancel request'},'a'));await service.change('groups','g',{action:'archive',reason:'Close group'},'a');assert.equal(repo.data.p2pManualRequests.length,1);await service.change('groups','g',{action:'restore',reason:'Restore group'},'a');assert.equal(repo.data.groups[0].status,'DRAFT');});
 test('failed persistence rolls back all admin changes',async()=>{const {repo,service}=fixture();repo.save=async()=>{throw new Error('disk failed')};await assert.rejects(service.change('users','u',{action:'edit',name:'New name',email:'u@example.com',reason:'Correct name'},'a'));assert.equal(repo.data.users[1].fullName,'User');assert.equal(repo.data.marketplaceAdminAudit,undefined);});
+
+test('BYS deletion resolves linked identity, protects active groups and revokes sessions',async()=>{
+ const {repo,service}=fixture();repo.data.users[1].bysUserId='bys-u';
+ await assert.rejects(service.change('bys-users','bys-u',{action:'archive',reason:'Delete account'},'admin'));
+ repo.data.groups[0].status='CLOSED';
+ await service.change('bys-users','bys-u',{action:'archive',reason:'Delete account'},'admin');
+ assert.equal(repo.data.users[1].isSuspended,true);assert.ok(repo.data.users[1].archivedAt);assert.equal(repo.data.sessions.length,0);
+ assert.equal((await service.change('bys-users','not-linked',{action:'archive',reason:'Delete account'},'admin')).notLinked,true);
+});
