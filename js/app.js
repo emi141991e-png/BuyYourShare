@@ -4403,7 +4403,7 @@ function setupInactivityWatchdog() {
         const u = authService.getCurrentUser();
         await db.syncAllFromServer(u);
         const routePath = (currentRoute || '#home').split('?')[0];
-        if (routePath !== '#crea' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
+        if (routePath !== '#crea' && routePath !== '#p2p-abbonamento' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
           renderApp();
         }
       }
@@ -4417,7 +4417,7 @@ function setupInactivityWatchdog() {
       const u = authService.getCurrentUser();
       await db.syncAllFromServer(u);
       const routePath = (currentRoute || '#home').split('?')[0];
-      if (routePath !== '#crea' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
+      if (routePath !== '#crea' && routePath !== '#p2p-abbonamento' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
         renderApp();
       }
     }
@@ -4467,7 +4467,7 @@ async function init() {
         const activeEl = document.activeElement;
         const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
         const routePath = (currentRoute || '#home').split('?')[0];
-        if (!isTyping && routePath !== '#crea' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
+        if (!isTyping && routePath !== '#crea' && routePath !== '#p2p-abbonamento' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
           renderApp();
         }
       }
