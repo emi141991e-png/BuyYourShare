@@ -30,6 +30,11 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     }).join('') || `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">${managing ? '+' : '↗'}</span><h3>${managing ? 'Le richieste arriveranno qui' : 'Trova il tuo prossimo gruppo'}</h3><p>${managing ? 'Crea un gruppo e condividilo su WhatsApp. Potrai accettare i membri e verificare le quote da questa pagina.' : 'Non hai ancora richieste di partecipazione. Esplora il marketplace e scegli un gruppo.'}</p>${link(managing ? '#crea' : '#cerca', managing ? 'Crea un gruppo' : 'Esplora i gruppi')}</div>`}
     ${selected ? '<section class="private-chat"><h3>La vostra conversazione</h3><div id="privateMessages" aria-live="polite" role="log" aria-label="Messaggi della chat privata"></div><form id="privateForm"><label>Messaggio privato<textarea name="content" required maxlength="2000" style="width:100%"></textarea></label><button class="btn btn-primary">Invia messaggio</button></form></section>' : ''}`);
   const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna stato delle richieste'; refresh.type = 'button';
+  container.querySelectorAll('.participation-card').forEach((card,i)=>{
+    const r=list[i],url=r.ownerId===user.id?r.memberAvatar:r.ownerAvatar;
+    if(url){const img=document.createElement('img');img.src=url;img.alt='Foto profilo';img.width=44;img.height=44;img.style.cssText='border-radius:50%;object-fit:cover;margin:12px 0';card.querySelector('h3').after(img);}
+    if(r.ownerId!==user.id&&r.periodEnd){const a=document.createElement('a');a.href='#gruppo-'+r.groupId;a.className='btn btn-secondary';a.textContent='★ Valuta il capogruppo';card.append(a);}
+  });
   container.querySelector('#manualRefresh').append(refresh); refresh.addEventListener('click', reload);
   groups.filter(g => managing && g.ownerId === user.id).forEach((g, i) => bind(`editInstructions${i}`, async () => {
     const result = await api(`/api/access/${encodeURIComponent(g.id)}`);

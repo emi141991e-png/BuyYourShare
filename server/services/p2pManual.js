@@ -23,6 +23,7 @@ export function paymentDestination(body) {
 export class P2pManual {
   constructor(subscriptions, now = () => Date.now()) { this.subscriptions = subscriptions; this.repo = subscriptions.repo; this.now = now; }
   records() { return this.repo.data.p2pManualRequests ||= []; }
+  avatar(id) {const u=(this.repo.data.users||[]).find(u=>u.id===id);return u?.bysUserId?`https://buyyourshare.it/api/profile-photo/${encodeURIComponent(u.bysUserId)}`:null;}
   exclusive(fn) { return this.subscriptions.exclusive(async () => {
     // Restore only collections owned by this workflow when an atomic save fails.
     const fields = ['p2pManualRequests', 'p2pPrivateMessages', 'p2pManualConfirmations', 'notifications', 'memberships'];
@@ -53,6 +54,7 @@ export class P2pManual {
     return this.records().filter(r => this.repo.data.groups.some(g => g.id === r.groupId && (r.userId === userId || g.ownerId === userId))).map(r => ({ ...r,
       groupName: this.group(r.groupId).customServiceName, groupStatus: this.group(r.groupId).status, ownerId: this.group(r.groupId).ownerId,
       memberName: (this.repo.data.users || []).find(u => u.id === r.userId)?.fullName || 'Membro',
+      memberAvatar: this.avatar(r.userId), ownerAvatar: this.avatar(this.group(r.groupId).ownerId),
       ownerName: (this.repo.data.users || []).find(u => u.id === this.group(r.groupId).ownerId)?.fullName || 'Capogruppo',
       unreadMessages: (this.repo.data.p2pPrivateMessages || []).filter(m => m.requestId === r.id).slice(r.chatReadCount?.[userId] || 0).filter(m => m.senderId && m.senderId !== userId).length,
       paymentDestination: ['accepted', 'reported', 'confirmed'].includes(r.status) ? r.destination : undefined, destination: undefined }));
