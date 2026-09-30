@@ -97,7 +97,7 @@ export async function renderP2pAccess(container, route, user) {
         g.slotsInfo.slots.forEach(slot => bind(`join${slot.slotNumber}`, async () => {
           if (!user) { window.location.hash = '#login'; return; }
           const { subscription } = await api('/api/p2p/subscription');
-          if (!subscription.accessAllowed) { window.location.hash = '#p2p-abbonamento'; return; }
+          if (!subscription.accessAllowed) { window.location.hash = '#p2p-abbonamento?group=' + encodeURIComponent(g.id); return; }
           await api(`/api/manual/groups/${encodeURIComponent(g.id)}/request`, { slotNumber: slot.slotNumber }); window.location.hash = '#miei-abbonamenti';
         }));
       }
@@ -116,6 +116,20 @@ export async function renderP2pAccess(container, route, user) {
     const state = await api('/api/p2p/subscription');
     if (generation !== turn) return;
     const s = state.subscription;
+    const returnGroup = route === '#p2p-abbonamento' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('group') : null;
+    if (returnGroup && /^grp-[a-zA-Z0-9-]+$/.test(returnGroup)) {
+      const groupRoute = '#gruppo-' + returnGroup;
+      if (s.accessAllowed) { window.location.hash = groupRoute; return; }
+      shell(`<section class="billing-card"><span class="billing-eyebrow">1. ACCESSO BYS · 2. RICHIESTA DEL POSTO · 3. CHAT PRIVATA</span><h2>Attiva BYS per partecipare al gruppo</h2><p>Questo pagamento attiva il tuo accesso al marketplace. Dopo la conferma tornerai al gruppo per richiedere il posto.</p><p>La quota del gruppo è separata: dopo l’accettazione concorderai il bonifico direttamente con il capogruppo nella chat privata. Il pagamento BYS non prenota il posto.</p>${link(groupRoute, 'Torna al gruppo')}<button id="joinRefresh" type="button" class="btn btn-secondary">Ho pagato · verifica accesso</button></section><section id="joinGoogle" class="billing-card"></section>`, true);
+      const finish = async () => {
+        const result = await api('/api/p2p/subscription');
+        if (result.subscription.accessAllowed) window.location.hash = groupRoute;
+        else container.querySelector('#p2pMessage').textContent = 'Pagamento ancora in verifica. Non pagare di nuovo: riprova la verifica tra qualche istante.';
+      };
+      bind('joinRefresh', finish);
+      void mountGooglePayAccess(container.querySelector('#joinGoogle'), api, finish);
+      return;
+    }
     if (route === '#p2p-abbonamento' || !s.accessAllowed || !state.available) {
       shell(`<div class="billing-grid"><article class="billing-card">
         <div class="billing-top"><span class="billing-eyebrow">ABBONAMENTO BYS</span><span class="billing-status ${s.accessAllowed ? 'is-active' : ''}">${esc(statuses[s.status] || s.status)}</span></div>
