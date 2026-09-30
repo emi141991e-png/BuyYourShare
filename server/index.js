@@ -186,6 +186,16 @@ app.use('/js', express.static(path.join(ROOT_DIR, 'js'), staticOptions));
 for (const asset of ['push-sw.js', 'manifest.webmanifest', 'push-icon-192.png', 'push-icon-512.png']) {
   app.get(`/${asset}`, (req, res) => res.sendFile(path.join(ROOT_DIR, asset)));
 }
+app.get('/gruppi/:id', async (req, res, next) => {
+  try {
+    const { groupSharePage } = await import('./services/groupSharePage.js');
+    const group = await dataRepository.findGroupById(req.params.id);
+    const origin = process.env.BASE_URL || 'https://marketplace.buyyourshare.it';
+    const html = groupSharePage(group, origin);
+    if (!html) return res.status(404).type('html').send('<!doctype html><html lang="it"><meta name="robots" content="noindex"><title>Gruppo non disponibile</title><h1>Gruppo non disponibile</h1><a href="/">Esplora il marketplace</a></html>');
+    res.type('html').send(html);
+  } catch (error) { next(error); }
+});
 app.get('/', (req, res) => res.sendFile(path.join(ROOT_DIR, 'index.html')));
 
 app.use((req, res, next) => {

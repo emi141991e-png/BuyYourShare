@@ -33,6 +33,16 @@ before(async () => {
   });
 });
 after(() => { child?.kill(); });
+test('group share URL serves crawler metadata without authentication and missing groups return 404', async () => {
+  const response = await fetch(base + '/gruppi/group');
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.ok(html.includes('property="og:title" content="Test Group'));
+  assert.ok(html.includes('property="og:image"'));
+  assert.ok(!html.includes('private@example.test'));
+  assert.ok(!html.includes('private access'));
+  assert.equal((await fetch(base + '/gruppi/missing')).status, 404);
+});
 async function request(url, user = 'member', body) {
   const r = await fetch(base + url, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(user ? { Authorization: `Bearer test-${user}` } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   return { status: r.status, body: await r.json() };
