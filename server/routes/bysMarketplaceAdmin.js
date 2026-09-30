@@ -15,7 +15,7 @@ export function bysMarketplaceAdmin(subscriptions) {
       return {id:r.id,status:r.status,group:g?brief(g):null};
     }).filter(r=>r.group);
     const v=subscriptions.view(u.id);
-    res.json({linked:true,groups,participations,subscription:{active:v.accessAllowed,until:v.currentPeriodEnd}});
+    res.json({linked:true,groups,participations,subscription:{active:v.accessAllowed,until:v.currentPeriodEnd,plan:v.accessPlanCode,amountCents:v.priceCents,paymentMethod:v.paymentMethod,automaticRenewal:v.paymentMethod==='PAYPAL'&&!v.cancelAtPeriodEnd&&!!v.nextBillingDate}});
   });
   router.get('/',(req,res)=>res.json(marketplaceSnapshot(subscriptions.repo.data)));
   router.post('/:kind/:id',async(req,res)=>{try {res.json(await service.change(req.params.kind,req.params.id,req.body,req.bysAdminId));}catch(e){res.status(e.status||503).json({error:e.message});}});
