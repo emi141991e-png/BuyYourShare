@@ -33,7 +33,7 @@ export class P2pBank {
     if (existing) return existing;
     const p = { id: randomUUID(), userId, code: bankCode(userId), amountCents: 99, status: 'reported', reportedAt: new Date(this.s.now()).toISOString() };
     this.records().push(p);
-    for (const u of this.repo.data.users || []) if (u.role === 'admin') this.notify(u.id, `bank-report:${p.id}:${u.id}`, `Bonifico BYS da verificare: ${p.code}.`);
+    for (const u of this.repo.data.users || []) if (u.role === 'admin') this.notify(u.id, `bank-report:${p.id}:${u.id}`, `Bonifico BYS da verificare: ${p.code}.`, { actionUrl: 'https://buyyourshare.it/admin/marketplace-payments' });
     return p;
   }); }
   confirmFromBys(id, bysAdminId, reference) {

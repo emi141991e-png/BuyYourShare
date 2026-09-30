@@ -20,6 +20,12 @@ test('sharing keeps sandbox origins and safely encodes service names and identif
 });
 
 import { notificationTarget } from '../js/ui/notificationCenter.js';
+test('admin bank reminders open BYS bank administration including existing reminders', () => {
+ const target = 'https://buyyourshare.it/admin/marketplace-payments';
+ assert.equal(notificationTarget({id:'bank-report:123:admin',actionUrl:'#p2p-abbonamento'}), target);
+ assert.equal(notificationTarget({actionUrl:target}), target);
+ assert.equal(notificationTarget({actionUrl:target+'?redirect=https://evil.example'}), null);
+});
 test('notification links only navigate to internal marketplace destinations', () => {
  assert.equal(notificationTarget({ requestId: 'request-1' }), '#privata-request-1');
  assert.equal(notificationTarget({ actionUrl: '#miei-gruppi' }), '#miei-gruppi');

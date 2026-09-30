@@ -1,6 +1,8 @@
 import { renderPushSettings } from './pushSettings.js';
 
 export function notificationTarget(n) {
+  const bankAdminUrl = 'https://buyyourshare.it/admin/marketplace-payments';
+  if (n.actionUrl === bankAdminUrl || (typeof n.id === 'string' && n.id.startsWith('bank-report:'))) return bankAdminUrl;
   if (typeof n.requestId === 'string' && /^[\w-]+$/.test(n.requestId)) return `#privata-${n.requestId}`;
   const target = n.actionUrl;
   return typeof target === 'string' && /^#(?:miei-gruppi|miei-abbonamenti|p2p-abbonamento|notifiche|(?:gruppo|chat|privata)-[\w-]+)$/.test(target) ? target : null;
