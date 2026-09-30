@@ -271,25 +271,10 @@ function updateHeader(currentUser) {
       </button>
     ` : ''}
 
-    <details class="account-menu"><summary>Account</summary><div class="account-menu-panel">
-    <!-- Payment and Payout Settings Button -->
-    <a href="#p2p-abbonamento" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;">Abbonamento P2P</a>
-
-    <!-- Delete Account Button (Tutti gli account registrati) -->
-    ${currentUser.role !== 'admin' ? `
-      <button id="btnDeleteAccountHeader" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; font-weight:700;" title="Elimina definitivamente il tuo account">
-        🗑️ Elimina Account
-      </button>
-    ` : ''}
-
-    <!-- Logout Button -->
-    <button id="btnLogoutHeader" class="btn btn-secondary btn-sm" style="font-size:11.5px; padding:4px 8px; color:#dc2626; border-color:#fca5a5;" title="Disconnetti account">
-      🚪 Esci
-    </button>
-    </div></details>
+    <a class="btn btn-secondary btn-sm" href="https://buyyourshare.it/account">La mia area BYS ↗</a>
   `;
 
-  if (accountOpen) headerActions.querySelector('.account-menu').open = true;
+  if (accountOpen && headerActions.querySelector('.account-menu')) headerActions.querySelector('.account-menu').open = true;
 
   // Bind Payment Modal
   const btnPayment = document.getElementById('btnOpenPaymentSettingsHeader');
