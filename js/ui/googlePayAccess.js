@@ -16,6 +16,7 @@ function script(src, namespace) {
   return scripts.get(src);
 }
 export async function mountGooglePayAccess(target, api, reload) {
+  let stage = 'CONFIGURAZIONE';
   try {
     const config = await api('/api/p2p/google-pay/config');
     if (!config.enabled || !target.isConnected) { target.remove(); return; }
@@ -42,7 +43,13 @@ export async function mountGooglePayAccess(target, api, reload) {
     let chosen = config.plans[0];
     const status = target.querySelector('[data-google-status]');
     if (config.environment === 'TEST') status.textContent = 'Ambiente di prova: nessun pagamento reale.';
-    await Promise.all([script('https://pay.google.com/gp/p/js/pay.js'), script(`https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=EUR&components=googlepay`, 'bysGooglePay')]);
+    stage = 'GOOGLE_SCRIPT';
+    target.querySelector('[data-google-button]').textContent = 'Connessione a Google Pay…';
+    await script('https://pay.google.com/gp/p/js/pay.js');
+    stage = 'PAYPAL_SCRIPT';
+    target.querySelector('[data-google-button]').textContent = 'Connessione al gestore del pagamento…';
+    await script(`https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=EUR&components=googlepay`, 'bysGooglePay');
+    stage = 'PAYPAL_CONFIG';
     const paypal = window.bysGooglePay.Googlepay();
     const settings = await bounded(paypal.config(), 'Configurazione Google Pay non disponibile.');
     let orderId, busy = false; select.disabled=false;
@@ -64,11 +71,13 @@ export async function mountGooglePayAccess(target, api, reload) {
       }
     } });
     const base = { apiVersion: 2, apiVersionMinor: 0, allowedPaymentMethods: settings.allowedPaymentMethods };
+    stage = 'GOOGLE_READY';
     const ready = await bounded(client.isReadyToPay(base), 'Google Pay non risponde. Riprova.');
     if (!target.isConnected) return;
     const buttonHost = target.querySelector('[data-google-button]');
     buttonHost.replaceChildren(); buttonHost.setAttribute('aria-busy','false');
     if (!ready.result || settings.isEligible === false) { status.textContent = 'Google Pay non è disponibile su questo dispositivo o conto. Puoi utilizzare il bonifico.'; return; }
+    stage = 'GOOGLE_BUTTON';
     buttonHost.append(client.createButton({ buttonType: 'checkout', buttonColor: 'black', buttonLocale: 'it', buttonSizeMode: 'fill', buttonRadius: 16, onClick: () => {
       if (busy) return; busy = true; select.disabled=true; chosen=config.plans.find(p=>p.code===select.value);
       client.loadPaymentData({ ...base, merchantInfo: settings.merchantInfo, callbackIntents: ['PAYMENT_AUTHORIZATION'],
@@ -78,7 +87,7 @@ export async function mountGooglePayAccess(target, api, reload) {
    } catch {
     if (!target.isConnected) return;
     const status=target.querySelector('[data-google-status]');
-    if (status) status.textContent='Google Pay non si è caricato. Riprova oppure apri questa pagina nel browser del dispositivo. Il bonifico resta disponibile.';
+    if (status) status.textContent='Non è stato possibile collegarsi al servizio di pagamento. Riprova. Se il problema continua, comunica a BYS questo codice: ' + stage;
     else target.textContent='Google Pay non si è caricato. Riprova.';
     const host=target.querySelector('[data-google-button]') || target;
     host.replaceChildren(); host.setAttribute('aria-busy','false');
