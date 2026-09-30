@@ -3,7 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { P2pError, accessAllowed } from '../services/p2pSubscription.js';
 
 export function p2pError(res, error) {
-  const code = error instanceof P2pError ? error.message : 'P2P_PROVIDER_UNAVAILABLE';
+  const code = error instanceof P2pError || error.message === 'INVALID_ACCESS_PLAN' ? error.message : 'P2P_PROVIDER_UNAVAILABLE';
   return res.status(error.status || 503).json({ error: code,
     message: 'Operazione non completata. Controlla lo stato abbonamento; non avviare un secondo pagamento.' });
 }
@@ -19,9 +19,9 @@ export function createP2pRoutes(service, quota) {
     next();
   });
   router.get('/bank', handle(async (req, res) => res.json(req.app.locals.p2pBank.view(req.user.id))));
-  router.post('/bank/report', handle(async (req, res) => res.json(await req.app.locals.p2pBank.report(req.user.id))));
+  router.post('/bank/report', handle(async (req, res) => res.json(await req.app.locals.p2pBank.report(req.user.id, req.body.planCode))));
   router.get('/google-pay/config', handle(async (req, res) => res.json(req.app.locals.p2pGooglePay.config())));
-  router.post('/google-pay/orders', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.create(req.user.id))));
+  router.post('/google-pay/orders', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.create(req.user.id, req.body.planCode))));
   router.post('/google-pay/orders/:id/capture', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.capture(req.user.id, req.params.id))));
   router.get('/subscription', handle(async (req, res) => {
     let available = true, unavailableReason = null;

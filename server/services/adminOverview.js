@@ -8,7 +8,7 @@ export function adminOverview(data, now = Date.now()) {
     return { userId: s.userId, name: user?.fullName || 'Utente', email: user?.email || '',
       status: view.status, accessAllowed: view.accessAllowed, role: view.role,
       providerSubscriptionId: s.providerSubscriptionId || null, currentPeriodEnd: view.currentPeriodEnd,
-      paymentMethod: view.paymentMethod, paypalReviewRequired: !!s.paypalReviewRequired, cancelAtPeriodEnd: view.cancelAtPeriodEnd, lastPaymentAt: s.lastPaymentAt || null };
+      paymentMethod: view.paymentMethod, accessPlanCode: view.accessPlanCode, amountCents: view.priceCents, paypalReviewRequired: !!s.paypalReviewRequired, cancelAtPeriodEnd: view.cancelAtPeriodEnd, lastPaymentAt: s.lastPaymentAt || null };
   });
   const requests = (data.p2pManualRequests || []).map(r => ({ id: r.id, groupId: r.groupId,
     groupName: (data.groups || []).find(g => g.id === r.groupId)?.customServiceName || 'Gruppo archiviato',

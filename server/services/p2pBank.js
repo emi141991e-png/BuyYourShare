@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { P2pError } from './p2pSubscription.js';
 import { addOneMonth } from '../engine/DateEngine.js';
+import { ACCESS_PLANS, accessPlan, accessPeriodEnd } from '../../js/config/accessPlans.js';
 
 export const bankDetails = { iban: 'LT933250037466060894', accountHolder: 'Caruso Emilio', amountCents: 99, currency: 'EUR' };
 export const bankCode = id => 'BYS-' + createHash('sha256').update(String(id)).digest('hex').slice(0, 16).toUpperCase();
@@ -14,7 +15,7 @@ export class P2pBank {
     if (s?.providerSubscriptionId && !['CANCELLED', 'EXPIRED'].includes(s.providerStatus)) await this.s.reconcile(s);
     if (this.blocked(userId)) throw new P2pError('BANK_PAYPAL_OPEN');
   }
-  view(userId) { return { ...bankDetails, code: bankCode(userId), reference: `Abbonamento BYS - ${bankCode(userId)}`, blocked: this.blocked(userId), payments: this.records().filter(p => p.userId === userId).map(({ bankReference, confirmedBy, ...p }) => p) }; }
+  view(userId) { return { ...bankDetails, plans: ACCESS_PLANS, code: bankCode(userId), reference: `Abbonamento BYS - ${bankCode(userId)}`, blocked: this.blocked(userId), payments: this.records().filter(p => p.userId === userId).map(({ bankReference, confirmedBy, ...p }) => p) }; }
   transaction(fn) { return this.s.exclusive(async () => {
     const fields = ['p2pBankPayments', 'p2pSubscriptions', 'notifications'];
     const snapshot = Object.fromEntries(fields.map(k => [k, structuredClone(this.repo.data[k])]));
@@ -25,13 +26,14 @@ export class P2pBank {
     const list = this.repo.data.notifications ||= [];
     if (!list.some(n => n.id === id)) list.push({ id, userId, title: 'Abbonamento BYS', message, actionUrl: '#p2p-abbonamento', isRead: false, createdAt: new Date(this.s.now()).toISOString(), ...extra });
   }
-  report(userId) { return this.transaction(async () => {
+  report(userId, planCode = 'MONTHLY') { return this.transaction(async () => {
+    const plan = accessPlan(planCode);
     this.s.ready();
     if ((this.repo.data.p2pGooglePayments || []).some(p => p.userId === userId && p.status === 'pending')) throw new P2pError('PAYPAL_PAYMENT_REVIEW_REQUIRED');
     await this.verifyChoice(userId);
     const existing = this.records().find(p => p.userId === userId && p.status === 'reported');
-    if (existing) return existing;
-    const p = { id: randomUUID(), userId, code: bankCode(userId), amountCents: 99, status: 'reported', reportedAt: new Date(this.s.now()).toISOString() };
+    if (existing) { if ((existing.planCode || 'MONTHLY') !== plan.code) throw new P2pError('ACCESS_PLAN_PAYMENT_PENDING'); return existing; }
+    const p = { id: randomUUID(), userId, code: bankCode(userId), planCode: plan.code, amountCents: plan.amountCents, status: 'reported', reportedAt: new Date(this.s.now()).toISOString() };
     this.records().push(p);
     for (const u of this.repo.data.users || []) if (u.role === 'admin') this.notify(u.id, `bank-report:${p.id}:${u.id}`, `Bonifico BYS da verificare: ${p.code}.`, { actionUrl: 'https://buyyourshare.it/admin/marketplace-payments' });
     return p;
@@ -46,14 +48,14 @@ export class P2pBank {
     const p = this.records().find(p => p.id === id);
     if (!p) throw new P2pError('NOT_FOUND', 404);
     if (p.status === 'confirmed') return p;
-    const ref = String(reference || '').trim().toUpperCase();
+    const ref = String(reference || `BYS-CONFIRM-${p.id}`).trim().toUpperCase();
     if (ref.length < 6 || ref.length > 120) throw new P2pError('BANK_REFERENCE_REQUIRED', 400);
     if (this.records().some(r => r.bankReference === ref)) throw new P2pError('BANK_REFERENCE_DUPLICATE');
     await this.verifyChoice(p.userId);
     let s = this.s.find(p.userId);
     const now = this.s.now();
     const start = Math.max(now, Date.parse(s?.currentPeriodEnd) || 0);
-    const end = addOneMonth(new Date(start)).toISOString();
+    const end = p.planCode ? accessPeriodEnd(start, p.planCode) : addOneMonth(new Date(start)).toISOString();
     if (!s) { s = { userId: p.userId, role: this.s.roleFor(p.userId) }; (this.repo.data.p2pSubscriptions ||= []).push(s); }
     // An unapproved PayPal request remains available for support and reconciliation.
     // Only terminal identities are retired; never cancel a provider request here.
@@ -61,7 +63,7 @@ export class P2pBank {
       s.retiredIds = [...(s.retiredIds || []), s.providerSubscriptionId];
       s.providerSubscriptionId = null; s.providerStatus = null; s.customId = null;
     }
-    Object.assign(s, { status: 'active', paymentMethod: 'BANK', currentPeriodStart: new Date(start).toISOString(), currentPeriodEnd: end, nextBillingDate: null, cancelAtPeriodEnd: false, approvalUrl: null });
+    Object.assign(s, { status: 'active', paymentMethod: 'BANK', accessPlanCode: p.planCode || 'MONTHLY', accessAmountCents: p.amountCents, lastPaymentAt: new Date(now).toISOString(), currentPeriodStart: new Date(start).toISOString(), currentPeriodEnd: end, nextBillingDate: null, cancelAtPeriodEnd: false, approvalUrl: null });
     Object.assign(p, { status: 'confirmed', confirmedBy: adminId, confirmedAt: new Date(now).toISOString(), bankReference: ref, periodStart: s.currentPeriodStart, periodEnd: end });
     this.notify(p.userId, `bank-confirm:${p.id}`, 'Bonifico ricevuto: il tuo accesso BYS è stato attivato o rinnovato. Consulta la scadenza nella pagina Accesso BYS.');
     return p;
@@ -73,8 +75,8 @@ export class P2pBank {
       if (remaining > 3 * 86400000) continue;
       const phase = remaining > 0 ? 'before' : 'due';
       const message = s.paymentMethod === 'GOOGLE_PAY'
-        ? (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Rinnova con un nuovo pagamento di 0,99 €: non ci sono addebiti automatici.' : 'Accesso BYS scaduto: funzioni riservate e assistenza inclusa sono sospese fino al rinnovo. Puoi ancora accedere al conto e chiedere supporto sui pagamenti.')
-        : (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Verifica il bonifico periodico da 0,99 € e segnala il pagamento.' : 'Il tuo accesso BYS è scaduto. Segnala il bonifico per rinnovarlo dopo la verifica dell’incasso.');
+        ? (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Scegli il piano e rinnova: non ci sono addebiti automatici.' : 'Accesso BYS scaduto: funzioni riservate e assistenza inclusa sono sospese fino al rinnovo. Puoi ancora accedere al conto e chiedere supporto sui pagamenti.')
+        : (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Verifica il bonifico per il piano scelto e segnala il pagamento.' : 'Il tuo accesso BYS è scaduto. Segnala il bonifico per rinnovarlo dopo la verifica dell’incasso.');
       this.notify(s.userId, `bank-renew:${s.userId}:${s.currentPeriodEnd}:${phase}`, message, { bankPeriodEnd: s.currentPeriodEnd });
     }
   }); }

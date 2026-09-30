@@ -9,7 +9,7 @@ export function accessAllowed(s, now = Date.now()) {
 }
 export function publicSubscription(s, now = Date.now()) {
   const active = accessAllowed(s, now);
-  return { role: s?.role || 'MEMBER', priceCents: PRICES[s?.role || 'MEMBER'], currency: 'EUR',
+  return { role: s?.role || 'MEMBER', priceCents: s?.accessAmountCents ?? PRICES[s?.role || 'MEMBER'], accessPlanCode: s?.accessPlanCode || 'MONTHLY', currency: 'EUR',
     status: s?.status === 'active' && !active ? (s.cancelAtPeriodEnd ? 'canceled' : 'past_due') : s?.status || 'inactive',
     accessAllowed: active, includedSupportAllowed: active, currentPeriodStart: s?.currentPeriodStart || null, currentPeriodEnd: s?.currentPeriodEnd || null,
     nextBillingDate: s?.cancelAtPeriodEnd ? null : s?.nextBillingDate || null,

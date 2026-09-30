@@ -1,3 +1,4 @@
+import { accessPlan } from '../config/accessPlans.js';
 import { renderBankAccess } from './bankAccess.js';
 import { mountGooglePayAccess } from './googlePayAccess.js';
 import { groupShareLink } from './groupShare.js';
@@ -12,6 +13,8 @@ const date = value => value ? new Date(value).toLocaleDateString('it-IT') : '—
 const direct = 'Le quote dei gruppi si pagano manualmente tramite bonifico o PayPal, direttamente al capogruppo. BYS non incassa, custodisce né distribuisce tali somme e non offre un deposito a garanzia. L’abbonamento BYS paga esclusivamente l’accesso al P2P.';
 const statuses = { inactive: 'Da attivare', pending: 'Pagamento o approvazione in attesa', active: 'Attivo', past_due: 'Pagamento da regolarizzare', suspended: 'Sospeso', canceled: 'Cancellato' };
 const messages = {
+  ACCESS_PLAN_PAYMENT_PENDING: 'Esiste già un pagamento in corso per un altro piano. Completa o fai verificare quello prima di cambiare durata.',
+  INVALID_ACCESS_PLAN: 'Scegli un piano disponibile.',
   BANK_PAYPAL_OPEN: 'Risulta un pagamento automatico da verificare. Contatta BYS prima di inviare un secondo pagamento.',
   BANK_PAYMENT_IN_PROGRESS: 'Stai usando il bonifico: completa la verifica con amministratore prima di passare a PayPal.',
   PAYMENT_DESTINATION_REQUIRED: 'Il capogruppo deve indicare almeno un IBAN con intestatario oppure una email PayPal.',
@@ -80,7 +83,7 @@ export async function renderP2pAccess(container, route, user) {
     try {
       if (!route.startsWith('#gruppo-')) {
         const { groups } = await api('/api/groups');
-        shell(`<section class="market-hero"><div><span class="hero-kicker">PIÙ CONNESSIONI. MENO COMPLICAZIONI.</span><h2>Trova il tuo gruppo.<br>Condividi le possibilità.</h2><p>Esplora gli abbonamenti disponibili, conosci il capogruppo e organizza tutto in un unico spazio.</p><a href="#crea" class="hero-cta">+ Crea un gruppo</a><a href="#miei-abbonamenti" class="hero-secondary">Le mie partecipazioni →</a></div><aside class="access-preview"><span>UN ACCESSO, DUE POSSIBILITÀ</span><strong>0,99 €<small>/ mese</small></strong><p>Partecipa ai gruppi e crea i tuoi.<br>Bonifico mensile, anche periodico dalla tua banca.</p><a href="#p2p-abbonamento">Scopri il tuo accesso →</a><small>Le quote ai capigruppo sono separate.</small></aside></section>
+        shell(`<section class="market-hero"><div><span class="hero-kicker">PIÙ CONNESSIONI. MENO COMPLICAZIONI.</span><h2>Trova il tuo gruppo.<br>Condividi le possibilità.</h2><p>Esplora gli abbonamenti disponibili, conosci il capogruppo e organizza tutto in un unico spazio.</p><a href="#crea" class="hero-cta">+ Crea un gruppo</a><a href="#miei-abbonamenti" class="hero-secondary">Le mie partecipazioni →</a></div><aside class="access-preview"><span>UN ACCESSO, DUE POSSIBILITÀ</span><strong>0,99 €<small>/ mese</small></strong><p>Partecipa ai gruppi e crea i tuoi.<br>Mensile 0,99 € · Trimestrale 2,69 € · Annuale 9,90 €. Google Pay o bonifico.</p><a href="#p2p-abbonamento">Scopri il tuo accesso →</a><small>Le quote ai capigruppo sono separate.</small></aside></section>
         <div class="quick-actions"><a href="#notifiche"><span class="quick-icon">◉</span><div><strong>Notifiche e promemoria</strong><span>Richieste, messaggi e scadenze</span></div><b>↗</b></a><a href="#miei-abbonamenti"><span class="quick-icon">↗</span><div><strong>Le tue partecipazioni</strong><span>Quote, rinnovi e chat private</span></div><b>↗</b></a><a href="#miei-gruppi"><span class="quick-icon">＋</span><div><strong>Gestisci i tuoi gruppi</strong><span>Accogli membri e conferma le quote</span></div><b>↗</b></a></div>
         <section><div class="section-heading"><div><span class="eyebrow">ESPLORA IL MARKETPLACE</span><h2>Un posto per te</h2><p>${groups.length} gruppi pubblici · consultazione gratuita</p></div>${groups.length ? '<label class="group-search">Cerca un servizio<input id="groupSearch" type="search" placeholder="Nome del servizio…"></label>' : ''}</div><div class="group-grid">${groups.map(g => `<article class="group-card" data-group-name="${esc((g.customServiceName+' '+g.planName).toLowerCase())}"><div class="group-card-top"><span class="service-monogram">${esc((g.customServiceName || 'B').slice(0,1).toUpperCase())}</span><span class="availability">${g.status === 'FULL' ? 'Completo' : 'Scopri i posti'}</span></div><h3>${esc(g.customServiceName)}</h3><p>${esc(g.planName)}</p><div class="group-price">${money(g.baseMemberShareCents)}<span>/ mese al capogruppo</span></div>${link(`#gruppo-${g.id}`, 'Vedi il gruppo →')}</article>`).join('')}</div><div class="empty-state" id="groupEmpty" ${groups.length ? 'hidden' : ''}><span class="empty-symbol" aria-hidden="true">＋</span><h3>Le condivisioni iniziano da qui</h3><p>Non ci sono ancora gruppi da mostrare. Crea il tuo e invita chi vuoi tramite WhatsApp.</p>${link('#crea','Crea il primo gruppo')}</div></section>`);
         container.querySelector('#groupSearch')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); let visible = 0; container.querySelectorAll('[data-group-name]').forEach(el => { el.hidden = !el.dataset.groupName.includes(q); if (!el.hidden) visible++; }); const empty = container.querySelector('#groupEmpty'); empty.hidden = visible > 0; if (!visible) { empty.querySelector('h3').textContent = 'Nessun gruppo trovato'; empty.querySelector('p').textContent = 'Prova un altro nome oppure crea un nuovo gruppo.'; } });
@@ -100,7 +103,7 @@ export async function renderP2pAccess(container, route, user) {
   }
   if (!user) {
     shell(`<h2>Un abbonamento per accedere al P2P</h2><p>Membro: <strong>0,99 €/mese</strong>. Capogruppo: <strong>0,99 €/mese</strong>.</p>
-      <p>Google Pay, quando disponibile, attiva automaticamente 30 giorni dopo la conferma del pagamento. Con bonifico serve la verifica dell’incasso. Puoi impostare il bonifico periodico nella tua banca. Le quote dei gruppi sono separate.</p>${link('#login', 'Accedi')}${link('#register', 'Registrati')}`); return;
+      <p>Google Pay attiva automaticamente il periodo scelto dopo la conferma del pagamento: 30 giorni, 3 mesi o 12 mesi. Con bonifico serve la verifica dell’incasso. Puoi impostare il bonifico periodico nella tua banca. Le quote dei gruppi sono separate.</p>${link('#login', 'Accedi')}${link('#register', 'Registrati')}`); return;
   }
   try {
     if (route === '#miei-gruppi' || route === '#miei-abbonamenti' || route.startsWith('#privata-')) {
@@ -113,12 +116,12 @@ export async function renderP2pAccess(container, route, user) {
     if (route === '#p2p-abbonamento' || !s.accessAllowed || !state.available) {
       shell(`<div class="billing-grid"><article class="billing-card">
         <div class="billing-top"><span class="billing-eyebrow">ABBONAMENTO BYS</span><span class="billing-status ${s.accessAllowed ? 'is-active' : ''}">${esc(statuses[s.status] || s.status)}</span></div>
-        <h2>Un unico piano.<br>Il tuo modo di condividere.</h2>
+        <h2>Scegli la durata.<br>Condividi a modo tuo.</h2>
         <p class="billing-intro">${route === '#crea' ? 'Per creare il tuo gruppo, attiva l’accesso BYS. Sarai il capogruppo dei gruppi che crei.' : 'Partecipa ai gruppi e crea i tuoi con un unico abbonamento.'}</p>
         <div class="billing-price">${money(s.priceCents)}<span>/ mese</span></div>
         <p class="billing-caption">${!state.paypalAvailable || s.paymentMethod === 'BANK' ? 'Pagamento con bonifico · Conferma dell’incasso a cura di BYS' : 'PayPal: rinnovo automatico mensile. In alternativa scegli il bonifico qui sotto.'}</p>
         <dl class="billing-details"><div><dt>Il piano include</dt><dd>Membro e capogruppo</dd></div><div><dt>${s.cancelAtPeriodEnd ? 'Accesso fino al' : 'Prossimo rinnovo'}</dt><dd>${s.cancelAtPeriodEnd ? date(s.currentPeriodEnd) : s.nextBillingDate ? date(s.nextBillingDate) : 'Dopo l’attivazione'}</dd></div></dl>
-        ${!s.accessAllowed ? `<p class="billing-notice">${state.paypalAvailable ? 'Scegli il metodo di pagamento per attivare le funzioni P2P.' : 'Trovi qui sotto i dati del bonifico e la tua causale personale.'}</p>` : '<p class="billing-notice is-active">Il tuo accesso P2P è attivo.</p>'}
+        ${!s.accessAllowed ? `<p class="billing-notice">${state.paypalAvailable ? 'Scegli il metodo di pagamento per attivare le funzioni P2P.' : 'Scegli qui sotto durata e metodo: Google Pay oppure bonifico.'}</p>` : '<p class="billing-notice is-active">Il tuo accesso P2P è attivo.</p>'}
         ${s.cancelAtPeriodEnd ? '<p class="billing-notice">Rinnovo disattivato: conservi il periodo già pagato.</p>' : ''}
         ${state.paypalAvailable && s.pendingRole ? '<p class="billing-notice">Cambio ruolo in attesa di conferma PayPal.</p>' : ''}
         ${!state.available ? `<p class="billing-notice">${esc(messages[state.unavailableReason] || 'Attivazione temporaneamente non disponibile.')}</p>` : ''}
@@ -132,12 +135,13 @@ export async function renderP2pAccess(container, route, user) {
         ${s.paymentMethod === 'PAYPAL' && s.providerStatus && !['APPROVAL_PENDING', 'CANCELLED', 'EXPIRED'].includes(s.providerStatus) && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? '<div class="billing-manage"><button id="p2pCancel" type="button">Disattiva rinnovo automatico</button></div>' : ''}
         </article><aside class="billing-aside"><span class="billing-eyebrow">SEMPLICE, TRASPARENTE</span><h3>Un accesso,<br>due possibilità.</h3><div><span class="billing-step">01</span><h4>Partecipa a un gruppo</h4><p>Scegli il gruppo e gestisci le tue partecipazioni in un unico spazio.</p></div><div><span class="billing-step">02</span><h4>Crea il tuo gruppo</h4><p>Diventa capogruppo senza un secondo abbonamento o costi aggiuntivi di accesso.</p></div><div class="billing-separate"><h4>Le quote restano separate</h4><p>Le quote dei membri vanno direttamente al capogruppo tramite bonifico o PayPal. BYS incassa solo l’abbonamento di accesso.</p></div></aside></div>`, true);
       if (['BANK', 'GOOGLE_PAY'].includes(s.paymentMethod)) {
+        container.querySelector('.billing-price span').textContent = '/ ' + accessPlan(s.accessPlanCode).period;
         const details = container.querySelector('.billing-details');
         details.innerHTML = `<div><dt>Il piano include</dt><dd>Membro e capogruppo</dd></div><div><dt>Accesso fino al</dt><dd>${date(s.currentPeriodEnd)}</dd></div>`;
         const notice = container.querySelector('.billing-notice');
         if (notice) notice.textContent = s.accessAllowed ? 'Il tuo accesso BYS è attivo.' : 'Accesso e assistenza inclusa sospesi: rinnova per riattivarli. Il supporto per problemi di pagamento resta disponibile.';
         if (s.paymentMethod === 'GOOGLE_PAY') {
-          container.querySelector('.billing-price span').textContent = '/ 30 giorni';
+          container.querySelector('.billing-price span').textContent = '/ ' + accessPlan(s.accessPlanCode).period;
           container.querySelector('.billing-caption').textContent = 'Google Pay · Pagamento singolo, senza rinnovo automatico';
         }
       }

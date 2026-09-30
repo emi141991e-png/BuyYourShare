@@ -1,3 +1,4 @@
+import { accessMoney } from '../config/accessPlans.js';
 const scripts = new Map();
 function script(src, namespace) {
   if (!scripts.has(src)) scripts.set(src, new Promise((resolve, reject) => {
@@ -12,20 +13,24 @@ export async function mountGooglePayAccess(target, api, reload) {
   try {
     const config = await api('/api/p2p/google-pay/config');
     if (!config.enabled || !target.isConnected) { target.remove(); return; }
-    target.innerHTML = '<h3>Google Pay · 0,99 € per 30 giorni</h3><p>Pagamento singolo, senza rinnovo automatico. I giorni residui si conservano se rinnovi in anticipo. Alla scadenza le funzioni riservate e l’assistenza inclusa si sospendono fino a un nuovo pagamento.</p><p>Restano disponibili il conto, il rinnovo e il supporto per problemi di pagamento. Le quote ai capigruppo sono separate.</p><div data-google-button></div><p role="status" data-google-status></p><a href="#notifiche">Attiva i promemoria e le notifiche push</a>';
+    target.innerHTML = '<h3>Google Pay · attivazione automatica</h3><p>Pagamento singolo, senza rinnovo automatico. I giorni residui si conservano se rinnovi in anticipo. Alla scadenza le funzioni riservate e l’assistenza inclusa si sospendono fino a un nuovo pagamento.</p><p>Restano disponibili il conto, il rinnovo e il supporto per problemi di pagamento. Le quote ai capigruppo sono separate.</p><div data-google-button></div><p role="status" data-google-status></p><a href="#notifiche">Attiva i promemoria e le notifiche push</a>';
     const automatic = document.createElement('p');
     automatic.textContent = 'Accesso attivato automaticamente dopo la conferma del pagamento, senza approvazione dell’amministratore.';
     target.querySelector('[data-google-button]').before(automatic);
+    const select = document.createElement('select'); select.setAttribute('aria-label','Piano accesso BYS con Google Pay');
+    for (const plan of config.plans) { const option = document.createElement('option'); option.value=plan.code; option.textContent=`${plan.label} · ${accessMoney(plan.amountCents)} / ${plan.period}`; select.append(option); }
+    select.className='form-control'; target.querySelector('[data-google-button]').before(select);
+    let chosen = config.plans[0];
     const status = target.querySelector('[data-google-status]');
     if (config.environment === 'TEST') status.textContent = 'Ambiente di prova: nessun pagamento reale.';
     await Promise.all([script('https://pay.google.com/gp/p/js/pay.js'), script(`https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.clientId)}&currency=EUR&components=googlepay`, 'bysGooglePay')]);
     const paypal = window.bysGooglePay.Googlepay();
     const settings = await paypal.config();
-    let orderId, busy = false;
+    let orderId, busy = false; select.disabled=false;
     const client = new google.payments.api.PaymentsClient({ environment: config.environment, paymentDataCallbacks: {
       onPaymentAuthorized: async data => {
         try {
-          ({ orderId } = await api('/api/p2p/google-pay/orders', {}));
+          ({ orderId } = await api('/api/p2p/google-pay/orders', {planCode:chosen.code}));
           const result = await paypal.confirmOrder({ orderId, paymentMethodData: data.paymentMethodData });
           if (result.status === 'PAYER_ACTION_REQUIRED') await paypal.initiatePayerAction({ orderId });
           else if (!['APPROVED', 'COMPLETED'].includes(result.status)) throw new Error('Autorizzazione non completata.');
@@ -43,10 +48,10 @@ export async function mountGooglePayAccess(target, api, reload) {
     const ready = await client.isReadyToPay(base);
     if (!ready.result || settings.isEligible === false) { status.textContent = 'Google Pay non è disponibile su questo dispositivo o conto. Puoi utilizzare il bonifico.'; return; }
     target.querySelector('[data-google-button]').append(client.createButton({ allowedPaymentMethods: settings.allowedPaymentMethods, onClick: () => {
-      if (busy) return; busy = true;
+      if (busy) return; busy = true; select.disabled=true; chosen=config.plans.find(p=>p.code===select.value);
       client.loadPaymentData({ ...base, merchantInfo: settings.merchantInfo, callbackIntents: ['PAYMENT_AUTHORIZATION'],
-        transactionInfo: { currencyCode: 'EUR', countryCode: 'IT', totalPriceStatus: 'FINAL', totalPrice: '0.99', totalPriceLabel: 'Accesso BYS · 30 giorni' }
-      }).catch(() => { status.textContent = 'Procedura interrotta. Se hai autorizzato il pagamento, attendi la verifica senza ripagarlo.'; }).finally(() => { busy = false; });
+        transactionInfo: { currencyCode: 'EUR', countryCode: 'IT', totalPriceStatus: 'FINAL', totalPrice: (chosen.amountCents/100).toFixed(2), totalPriceLabel: `Accesso BYS · ${chosen.period}` }
+      }).catch(() => { status.textContent = 'Procedura interrotta. Se hai autorizzato il pagamento, attendi la verifica senza ripagarlo.'; }).finally(() => { busy = false; select.disabled=false; });
     } }));
   } catch { if (target.isConnected) target.textContent = 'Google Pay temporaneamente non disponibile. Il bonifico resta disponibile.'; }
 }

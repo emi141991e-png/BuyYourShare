@@ -1,21 +1,17 @@
+import { accessMoney } from '../config/accessPlans.js';
 export async function renderBankAccess(target, api, esc, reload) {
   try {
-    const b = await api('/api/p2p/bank');
-    if (!target.isConnected) return;
-    const pending = b.payments.some(p => p.status === 'reported');
-    target.innerHTML = `<h3>Accedi con bonifico · 0,99 €/mese</h3><p>Il tuo codice personale: <strong>${esc(b.code)}</strong></p><p>Conservalo o ritrovalo qui quando vuoi. Non è una password.</p>${b.blocked ? '<p>Risulta un pagamento automatico da verificare. Contatta BYS prima di inviare un secondo pagamento.</p>' : `<dl><dt>Intestatario</dt><dd>${esc(b.accountHolder)}</dd><dt>IBAN</dt><dd style="overflow-wrap:anywhere">${esc(b.iban)}</dd><dt>Causale</dt><dd>${esc(b.reference)}</dd></dl><button class="btn btn-secondary" data-copy>Copia dati del bonifico</button><p>Per rinnovare comodamente, imposta nella tua banca un bonifico periodico mensile da 0,99 € con questa causale. BYS non addebita il conto: l’accesso viene rinnovato dopo la verifica dell’incasso da parte dell’amministratore.</p><p>${pending ? 'Bonifico segnalato: in attesa di verifica. Non inviarlo nuovamente.' : 'Hai già inviato il bonifico? Segnalalo per consentire la verifica.'}</p>${pending ? '' : '<button class="btn btn-primary" data-report>Ho effettuato il bonifico</button>'}`}<p><a href="#notifiche">Attiva le notifiche push e consulta i promemoria →</a></p><p role="status" data-status></p>`;
-    const status = target.querySelector('[data-status]');
-    target.querySelector('[data-copy]')?.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(`${b.accountHolder}\n${b.iban}\n0,99 EUR\n${b.reference}`); status.textContent = 'Dati copiati.'; }
-      catch { status.textContent = 'Seleziona e copia i dati mostrati sopra.'; }
-    });
-    target.querySelector('[data-report]')?.addEventListener('click', async e => {
-      if (!window.confirm('Confermi di aver inviato 0,99 € al conto BYS con la tua causale personale?')) return;
-      e.target.disabled = true;
-      try { await api('/api/p2p/bank/report', {}); await reload(); }
-      catch (err) { status.textContent = err.message; e.target.disabled = false; }
-    });
-  } catch (e) { target.textContent = e.message; }
+    const b = await api('/api/p2p/bank'); if (!target.isConnected) return;
+    const pending = b.payments.find(p=>p.status==='reported');
+    target.innerHTML = `<h3>Bonifico · verifica dell’incasso a cura di BYS</h3><label>Scegli la durata<select data-plan ${pending?'disabled':''}>${b.plans.map(p=>`<option value="${p.code}" ${pending && (pending.planCode||'MONTHLY')===p.code?'selected':''}>${p.label} · ${accessMoney(p.amountCents)} / ${p.period}</option>`).join('')}</select></label><p>Codice personale: <strong>${esc(b.code)}</strong></p><p>Conservalo: identifica il tuo pagamento, non è una password.</p>${b.blocked?'<p>Pagamento automatico da verificare. Contatta BYS prima di pagare di nuovo.</p>':`<dl><dt>Intestatario</dt><dd>${esc(b.accountHolder)}</dd><dt>IBAN</dt><dd style="overflow-wrap:anywhere">${esc(b.iban)}</dd><dt>Importo</dt><dd data-amount></dd><dt>Causale</dt><dd data-reference></dd></dl><button type="button" class="btn btn-secondary" data-copy>Copia dati del bonifico</button><p>Puoi impostare un bonifico periodico nella tua banca per l’importo e la durata scelti. L’accesso si attiva dopo la verifica dell’accredito.</p>${pending?'<p>Bonifico già segnalato: attendi la verifica, senza inviarlo nuovamente.</p>':'<button class="btn btn-primary" data-report>Ho effettuato il bonifico</button>'}`}<p><a href="#notifiche">Attiva notifiche e promemoria</a></p><p role="status" data-status></p>`;
+    const select=target.querySelector('[data-plan]'), status=target.querySelector('[data-status]');
+    const plan=()=>b.plans.find(p=>p.code===select.value);
+    const reference=()=>`${b.reference} - ${plan().label}`;
+    const update=()=>{if(target.querySelector('[data-amount]')){target.querySelector('[data-amount]').textContent=accessMoney(plan().amountCents);target.querySelector('[data-reference]').textContent=reference();}};
+    select.onchange=update; update();
+    target.querySelector('[data-copy]')?.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(`${b.accountHolder}\n${b.iban}\n${accessMoney(plan().amountCents)}\n${reference()}`);status.textContent='Dati copiati.';}catch{status.textContent='Puoi copiare i dati mostrati sopra.';}});
+    target.querySelector('[data-report]')?.addEventListener('click',async e=>{if(!window.confirm(`Hai inviato ${accessMoney(plan().amountCents)} per il piano ${plan().label} al conto BYS?`))return;e.target.disabled=true;select.disabled=true;try{await api('/api/p2p/bank/report',{planCode:plan().code});await reload();}catch(err){status.textContent=err.message;e.target.disabled=false;select.disabled=false;}});
+  } catch(e){target.textContent=e.message;}
 }
 
 export async function renderAdminBank(target, token, esc) {
