@@ -22,6 +22,19 @@ test('email transport is disabled in tests and fails honestly without configurat
     assert.equal(emailService.getTransporter(), null);
     assert.equal((await emailService.sendMail({ to: 'test@example.test', subject: 'test', text: 'test' })).status, 'FAILED');
     assert.equal(networkCalls, 0);
+    process.env.EMAIL_PROVIDER = 'resend';
+    process.env.GMAIL_APP_PASSWORD = 'test-only-not-a-secret';
+    process.env.RESEND_API_KEY = 'test-only-not-a-key';
+    process.env.EMAIL_FROM = 'BuyYourShare <noreply@example.test>';
+    assert.equal(emailService.getTransporter(), null);
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, 'https://api.resend.com/emails');
+      assert.equal(JSON.parse(options.body).from, process.env.EMAIL_FROM);
+      networkCalls++;
+      return { ok:true, json:async()=>({id:'mock-only'}) };
+    };
+    assert.equal((await emailService.sendMail({to:'test@example.test',subject:'test',text:'test'})).status,'DELIVERED_RESEND');
+    assert.equal(networkCalls,1);
   } finally {
     globalThis.fetch = originalFetch;
     rmSync(dir, { recursive: true, force: true });

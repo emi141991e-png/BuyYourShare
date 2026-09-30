@@ -10,6 +10,7 @@ class EmailService {
    * Restituisce il transporter nodemailer configurato (da env o da systemConfig)
    */
   getTransporter() {
+    if (process.env.EMAIL_PROVIDER === 'resend') return null;
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
     
     // 1. Gmail Dedicated App Password (Invio Universale per Libero, Outlook, Yahoo, Gmail, ecc.)
@@ -99,7 +100,7 @@ class EmailService {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              from: 'BuyYourShare <onboarding@resend.dev>',
+              from: fromAddress,
               to: [to],
               subject: subject,
               html: html,
@@ -119,7 +120,7 @@ class EmailService {
 
     // 3. Invio tramite Brevo REST API (se configurato)
     const brevoKey = process.env.BREVO_API_KEY || emailConfig.brevoApiKey;
-    if (brevoKey && !emailRecord.status.startsWith('DELIVERED_')) {
+    if (process.env.EMAIL_PROVIDER !== 'resend' && brevoKey && !emailRecord.status.startsWith('DELIVERED_')) {
       try {
         const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
