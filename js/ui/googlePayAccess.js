@@ -60,7 +60,7 @@ export async function mountGooglePayAccess(target, api, reload) {
     const base = { apiVersion: 2, apiVersionMinor: 0, allowedPaymentMethods: settings.allowedPaymentMethods };
     const ready = await client.isReadyToPay(base);
     if (!ready.result || settings.isEligible === false) { status.textContent = 'Google Pay non è disponibile su questo dispositivo o conto. Puoi utilizzare il bonifico.'; return; }
-    target.querySelector('[data-google-button]').append(client.createButton({ buttonType: 'pay', buttonColor: 'black', buttonLocale: 'it', buttonSizeMode: 'fill', buttonRadius: 16, onClick: () => {
+    target.querySelector('[data-google-button]').append(client.createButton({ buttonType: 'checkout', buttonColor: 'black', buttonLocale: 'it', buttonSizeMode: 'fill', buttonRadius: 16, onClick: () => {
       if (busy) return; busy = true; select.disabled=true; chosen=config.plans.find(p=>p.code===select.value);
       client.loadPaymentData({ ...base, merchantInfo: settings.merchantInfo, callbackIntents: ['PAYMENT_AUTHORIZATION'],
         transactionInfo: { currencyCode: 'EUR', countryCode: 'IT', totalPriceStatus: 'FINAL', totalPrice: (chosen.amountCents/100).toFixed(2), totalPriceLabel: `Accesso BYS · ${chosen.period}` }
