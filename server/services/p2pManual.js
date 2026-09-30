@@ -129,6 +129,8 @@ export class P2pManual {
     const count = messages.findIndex(m => m.id === lastMessageId) + 1;
     if (!count || (r.chatReadCount?.[userId] || 0) >= count) return;
     (r.chatReadCount ||= {})[userId] = count;
+    const readIds=new Set(messages.slice(0,count).map(m=>m.id));
+    for(const n of this.repo.data.notifications||[])if(n.userId===userId&&n.requestId===id&&n.id.startsWith('chat:')&&readIds.has(n.messageId))n.isRead=true;
     await this.repo.save();
   }); }
   send(userId, id, content, clientMessageId) { return this.exclusive(async () => {
@@ -138,7 +140,9 @@ export class P2pManual {
     if (clientMessageId && (this.repo.data.p2pPrivateMessages || []).some(m => m.requestId === id && m.senderId === userId && m.clientMessageId === clientMessageId)) return;
     this.message(r, content.trim(), userId);
     if (clientMessageId) this.repo.data.p2pPrivateMessages.at(-1).clientMessageId = clientMessageId;
-    this.notify(userId === r.userId ? this.group(r.groupId).ownerId : r.userId, `chat:${randomUUID()}`, 'Hai ricevuto un messaggio nella chat privata del gruppo.', r.id);
+    const notificationId=`chat:${randomUUID()}`;
+    this.notify(userId === r.userId ? this.group(r.groupId).ownerId : r.userId, notificationId, 'Hai ricevuto un messaggio nella chat privata del gruppo.', r.id);
+    this.repo.data.notifications.find(n=>n.id===notificationId).messageId=this.repo.data.p2pPrivateMessages.at(-1).id;
     await this.repo.save();
   }); }
   reminders() { return this.exclusive(async () => {

@@ -12,6 +12,6 @@ export function pushRoutes(service) {
     res.json(await service.subscribe(req.user.id, req.body.subscription, req.body.label));
   }));
   router.post('/:id/remove', handle(async (req, res) => { await service.remove(req.user.id, req.params.id); res.json({ success: true }); }));
-  router.post('/:id/test', handle(async (req, res) => { res.status(202).json(await service.test(req.user.id, req.params.id)); }));
+  router.post('/:id/test', handle(async (req, res) => { res.status(202).json(await service.test(req.user.id, req.params.id)); service.kick(); }));
   return router;
 }

@@ -29,10 +29,10 @@ export async function renderPushSettings(target, user, api, esc) {
     if (!target.isConnected) return;
     const device = localDevice();
     const enabled = device?.userId === user.id && config.devices.some(d => d.id === device.id) && Notification.permission === 'granted';
-    target.innerHTML = `<h3>Promemoria push sul dispositivo</h3><p>Ricevi un avviso anche quando il sito non è aperto. Puoi disattivarlo in qualsiasi momento. Il dispositivo deve essere connesso e consentire le notifiche.</p>
+    target.innerHTML = `<h3>Chat e notifiche sul dispositivo</h3><p>Ricevi messaggi della chat, richieste e promemoria anche quando il sito non è aperto. Puoi disattivarlo in qualsiasi momento. Il dispositivo deve essere connesso e consentire le notifiche.</p>
       <p>Stato: <strong>${enabled ? 'Attivate su questo browser' : Notification.permission === 'denied' ? 'Bloccate nelle impostazioni del browser' : 'Non attivate su questo browser'}</strong></p>
       <p>Su iPhone/iPad: aggiungi il marketplace alla schermata Home e aprilo da lì prima di attivarle.</p>
-      ${!enabled && Notification.permission !== 'denied' ? '<button type="button" class="btn btn-primary" id="enablePush">Attiva promemoria push</button>' : ''}
+      ${!enabled && Notification.permission !== 'denied' ? '<button type="button" class="btn btn-primary" id="enablePush">Attiva notifiche push</button>' : ''}
       ${enabled ? '<button type="button" class="btn btn-primary" id="testPush">Invia notifica di prova</button>' : ''}
       <div>${config.devices.map((d, i) => `<p>${esc(d.label)} · ${esc(new Date(d.createdAt).toLocaleDateString('it-IT'))} <button class="btn btn-secondary" type="button" id="removePush${i}">Disattiva dispositivo</button></p>`).join('')}</div>
       <p id="pushFeedback" role="status" aria-live="polite"></p>`;
@@ -79,4 +79,3 @@ export async function renderPushSettings(target, user, api, esc) {
     })));
   } catch (e) { target.innerHTML = `<p role="status">${esc(text[e.message] || 'Le impostazioni push non sono disponibili. Riprova più tardi.')}</p>`; }
 }
-

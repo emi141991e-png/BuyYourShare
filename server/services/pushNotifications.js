@@ -48,13 +48,13 @@ export class PushNotifications {
       lastTestStatus: this.jobs().filter(j => j.deviceId === d.id && j.test).sort((a, b) => b.createdAt - a.createdAt)[0]?.status || null
     })) };
   }
-  subscribe(userId, input, label) { return this.exclusive(async () => {
+  subscribe(userId, input, label, source = 'marketplace') { return this.exclusive(async () => {
     this.keys();
     const subscription = validatePushSubscription(input), existing = this.devices().find(d => d.subscription.endpoint === subscription.endpoint);
     if (existing && existing.userId !== userId) throw new P2pError('PUSH_DEVICE_OTHER_ACCOUNT', 409);
-    if (existing) { existing.subscription = subscription; await this.repo.save(); return { id: existing.id }; }
+    if (existing) { existing.subscription = subscription; existing.source = source; await this.repo.save(); return { id: existing.id }; }
     if (this.devices().filter(d => d.userId === userId).length >= 10) throw new P2pError('PUSH_DEVICE_LIMIT', 409);
-    const d = { id: randomUUID(), userId, subscription, label: String(label || 'Dispositivo').slice(0, 80), createdAt: new Date(this.now()).toISOString() };
+    const d = { id: randomUUID(), userId, subscription, source, label: String(label || 'Dispositivo').slice(0, 80), createdAt: new Date(this.now()).toISOString() };
     this.devices().push(d); await this.repo.save(); return { id: d.id };
   }); }
   remove(userId, id) { return this.exclusive(async () => {
@@ -73,6 +73,14 @@ export class PushNotifications {
     this.jobs().push(job); await this.repo.save(); return { queued: true };
   }); }
   relevant(notification) {
+    if (!notification) return false;
+    if (/^(chat|request|accept|report|confirm|cancel|reservation-expired|reservation-expired-owner):/.test(notification.id)) {
+      if (notification.isRead) return false;
+      const r=(this.repo.data.p2pManualRequests||[]).find(r=>r.id===notification.requestId);
+      const g=r&&(this.repo.data.groups||[]).find(g=>g.id===r.groupId&&!g.archivedAt);
+      const user=(this.repo.data.users||[]).find(u=>u.id===notification.userId&&!u.archivedAt);
+      return !!(user&&g&&[r.userId,g.ownerId].includes(notification.userId));
+    }
     if (notification?.id.startsWith('bank-renew:')) {
       const s = this.subscriptions.find(notification.userId);
       if (!['BANK', 'GOOGLE_PAY', 'APPLE_PAY'].includes(s?.paymentMethod) || s.currentPeriodEnd !== notification.bankPeriodEnd) return false;
@@ -89,7 +97,7 @@ export class PushNotifications {
     this.running = true;
     try {
       const selected = await this.exclusive(async () => {
-        const notifications = (this.repo.data.notifications || []).filter(n => (n.id.startsWith('renew:') || n.id.startsWith('bank-renew:')) && this.relevant(n) && this.now() - Date.parse(n.createdAt) <= DAY);
+        const notifications = (this.repo.data.notifications || []).filter(n => this.relevant(n) && this.now() - Date.parse(n.createdAt) <= DAY);
         let changed = false;
         for (const n of notifications) for (const d of this.devices().filter(d => d.userId === n.userId && Date.parse(d.createdAt) <= Date.parse(n.createdAt))) {
           const id = `${n.id}:${d.id}`;
@@ -111,10 +119,13 @@ export class PushNotifications {
         }
         const tag = createHash('sha256').update(job.id).digest('hex').slice(0, 32);
         // Generic lock-screen content: never disclose names, IBAN, amounts or messages.
-        const payload = JSON.stringify({ title: 'BuyYourShare', body: job.test ? 'Le notifiche push sono pronte su questo dispositivo.' : 'Hai un promemoria di pagamento. Apri il marketplace per i dettagli.', tag, url: '/#notifiche' });
+        const chat=n?.id.startsWith('chat:');
+        const next=n?.requestId&&/^[\w-]+$/.test(n.requestId)?`#privata-${n.requestId}`:'#notifiche';
+        const url=device.source==='bys'?`/api/auth/p2p?next=${encodeURIComponent(next)}`:`/${next}`;
+        const payload = JSON.stringify({ title: 'BuyYourShare', body: job.test ? 'Le notifiche push sono pronte su questo dispositivo.' : chat ? 'Hai un nuovo messaggio. Tocca per aprire la chat privata.' : 'Hai un aggiornamento sui tuoi gruppi o un promemoria. Tocca per i dettagli.', tag, url });
         let status = 'sent', errorCode = null;
         try {
-          await this.send(device.subscription, payload, { TTL: 3600, timeout: 10000, urgency: 'normal', topic: tag,
+          await this.send(device.subscription, payload, { TTL: 3600, timeout: 10000, urgency: chat ? 'high' : 'normal', topic: tag,
             vapidDetails: { subject: 'mailto:info@buyyourshare.com', ...this.keys() } });
         } catch (e) { errorCode = Number(e.statusCode) || 0; status = 'pending'; }
         await this.exclusive(async () => {
@@ -126,6 +137,12 @@ export class PushNotifications {
           await this.repo.save();
         });
       }
-    } finally { this.running = false; }
+    } finally { this.running = false; if(this.rerun){this.rerun=false;this.kick();} }
+  }
+  kick() {
+    if(this.running){this.rerun=true;return;}
+    if(this.scheduled)return;
+    this.scheduled=true;
+    setImmediate(()=>{this.scheduled=false;void this.flush().catch(()=>{});});
   }
 }

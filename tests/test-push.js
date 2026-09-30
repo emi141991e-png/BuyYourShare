@@ -51,7 +51,7 @@ test('renewal delivered once per device across worker restart and contains no pe
   const restarted = new PushNotifications(serial, { now: push.now, keys: () => keys, send: async () => { throw new Error('must not send twice'); } });
   await restarted.flush(); assert.equal(calls.length, 1);
   const payload = JSON.parse(calls[0][1]);
-  assert.equal(payload.url, '/#notifiche'); assert.equal(payload.body.includes('member'), false);
+  assert.equal(payload.url, '/#privata-request'); assert.equal(payload.body.includes('member'), false);
   assert.equal(calls[0][2].TTL, 3600); assert.equal(calls[0][2].timeout, 10000);
 });
 test('temporary failures retry with backoff; expired subscriptions are removed', async () => {
@@ -92,3 +92,16 @@ test('updated email library supports existing sendMail API without sending real 
   const result = await transport.sendMail({ from: 'test@example.test', to: 'member@example.test', subject: 'Test', text: 'Local test', html: '<p>Local test</p>' });
   assert.match(result.message, /Local test/);
 });
+
+test('private chat is pushed only to the recipient, once, without message text, with a direct chat link',async()=>{
+ const f=setup();f.repo.data.groups=[{id:'group',ownerId:'leader'}];f.repo.data.users.push({id:'leader'},{id:'outsider'});
+ f.repo.data.p2pManualRequests=[{id:'request',groupId:'group',userId:'member',status:'accepted'}];
+ await f.push.subscribe('member',subscription('member'),'BYS','bys');await f.push.subscribe('leader',subscription('leader'));
+ const n={id:'chat:1',requestId:'request',userId:'member',isRead:false,message:'Private text not for lockscreen',createdAt:'2026-09-20T12:00:00Z'};
+ f.repo.data.notifications.push(n,{...n,id:'chat:evil',userId:'outsider'});
+ await f.push.flush();await f.push.flush();assert.equal(f.calls.length,1);
+ const payload=JSON.parse(f.calls[0][1]);assert.equal(payload.url,'/api/auth/p2p?next=%23privata-request');assert.match(payload.body,/messaggio/);assert.doesNotMatch(payload.body,/Private text/);assert.equal(f.calls[0][2].urgency,'high');
+ f.repo.data.notifications.push({...n,id:'chat:2',isRead:true});await f.push.flush();assert.equal(f.calls.length,1);
+});
+
+

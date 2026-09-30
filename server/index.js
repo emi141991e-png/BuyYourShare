@@ -8,6 +8,7 @@ import { P2pBank } from './services/p2pBank.js';
 import { P2pGooglePay } from './services/p2pGooglePay.js';
 import { PushNotifications } from './services/pushNotifications.js';
 import { pushRoutes } from './routes/push.js';
+import { bysPushRoutes } from './routes/bysPush.js';
 import Stripe from 'stripe';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -140,8 +141,9 @@ app.use('/api/auth', (req, res, next) => {
   next();
 }, authRouter);
 app.use('/api/p2p', createP2pRoutes(p2pSubscriptions, p2pQuota));
-app.use('/api/manual', manualRoutes(manual));
+app.use('/api/manual', (req,res,next)=>{if(req.method==='POST')res.on('finish',()=>{if(res.statusCode<400)pushNotifications.kick();});next();}, manualRoutes(manual));
 app.use('/api/push', pushRoutes(pushNotifications));
+app.use('/api/bys-push', bysPushRoutes(pushNotifications));
 app.use('/api/groups', (req, res, next) => req.method === 'GET' && req.path.replace(/\/+$/, '') !== '/my' ? next() : p2pGate(req, res, next), groupsRouter);
 app.use('/api/memberships', p2pGate, membershipsRouter);
 app.use('/api/access', p2pGate, accessRouter);
