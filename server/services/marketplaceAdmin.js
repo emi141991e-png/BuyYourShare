@@ -54,7 +54,7 @@ export class MarketplaceAdmin {
         after={name:u.fullName,email:u.email,suspended:!!u.isSuspended,archived:!!u.archivedAt};
       } else if(kind==='groups') {
         const g=(d.groups || []).find(g=>g.id===id);if(!g) fail('Gruppo non trovato.');
-        if ((input.action==='archive'||(input.action==='edit'&&['CLOSED','DRAFT'].includes(input.status))) && (d.p2pManualRequests || []).some(r=>r.groupId===id&&['accepted','reported'].includes(r.status))) fail('Prima della chiusura risolvi le prenotazioni e i pagamenti dichiarati con i partecipanti.');
+        if ((input.action==='edit'&&['CLOSED','DRAFT'].includes(input.status)) && (d.p2pManualRequests || []).some(r=>r.groupId===id&&['accepted','reported'].includes(r.status))) fail('Prima della chiusura risolvi le prenotazioni e i pagamenti dichiarati con i partecipanti.');
         before={name:g.customServiceName,plan:g.planName,status:g.status,archived:!!g.archivedAt};
         if(input.action==='edit') {
           g.customServiceName=text(input.name);g.planName=text(input.plan);g.rulesAndRequirements=text(input.rules,2000);
