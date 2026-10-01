@@ -89,3 +89,17 @@ test('failed reminder persistence retries without losing the reminder', async ()
   time('2026-02-28T12:00:00Z'); await s.reminders(); await s.reminders();
   assert.equal(repo.data.notifications.filter(n => n.id.startsWith('renew:')).length,2);
 });
+
+ test('receipt photos stay private, deduplicate retries and roll back failed saves',async()=>{
+ const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path');
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'bys-receipt-'));const old=process.env.DATA_DIR;process.env.DATA_DIR=dir;
+ try{const {service:s,repo}=setup();const r=await s.request('m','g',2);const attachment={data:'data:image/jpeg;base64,'+Buffer.from([255,216,255,224,255,217]).toString('base64')};
+ await assert.rejects(s.send('stranger',r.id,'','file-1',attachment));
+ await assert.rejects(s.send('m',r.id,'','bad',{data:'data:image/svg+xml;base64,PHN2Zz4='}));
+ await s.send('m',r.id,'','file-1',attachment);await s.send('m',r.id,'','file-1',attachment);
+ const msg=s.chat('o',r.id).at(-1);assert.ok(msg.attachment);assert.equal((await s.attachment('o',r.id,msg.id)).data,attachment.data);
+ await assert.rejects(s.attachment('stranger',r.id,msg.id));await assert.rejects(s.attachment('m','wrong',msg.id));
+ assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
+ repo.save=async()=>{throw new Error('disk failure')};await assert.rejects(s.send('m',r.id,'','file-2',attachment));assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
+ }finally{if(old===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=old;await fs.rm(dir,{recursive:true,force:true});}
+ });

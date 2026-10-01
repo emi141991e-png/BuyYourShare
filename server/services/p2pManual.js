@@ -1,3 +1,4 @@
+import {saveAttachment,removeAttachment,readAttachment} from './chatAttachments.js';
 import { randomUUID } from 'node:crypto';
 import { P2pError, accessAllowed } from './p2pSubscription.js';
 import { addOneMonth } from '../engine/DateEngine.js';
@@ -133,17 +134,23 @@ export class P2pManual {
     for(const n of this.repo.data.notifications||[])if(n.userId===userId&&n.requestId===id&&n.id.startsWith('chat:')&&readIds.has(n.messageId))n.isRead=true;
     await this.repo.save();
   }); }
-  send(userId, id, content, clientMessageId) { return this.exclusive(async () => {
+  async attachment(userId,id,messageId){this.authorized(id,userId);const m=(this.repo.data.p2pPrivateMessages||[]).find(m=>m.requestId===id&&m.id===messageId);if(!m?.attachment)throw new P2pError('Allegato non trovato.',404);return {data:await readAttachment(m.attachment.id)};}
+  send(userId, id, content, clientMessageId, attachment) { return this.exclusive(async () => {
     const r = this.authorized(id, userId);
-    if (typeof content !== 'string' || !content.trim() || content.length > 2000) throw new P2pError('INVALID_MESSAGE', 400);
+    if (typeof content !== 'string' || (!content.trim() && !attachment) || content.length > 2000) throw new P2pError('INVALID_MESSAGE', 400);
     if (clientMessageId && (typeof clientMessageId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(clientMessageId))) throw new P2pError('INVALID_MESSAGE', 400);
     if (clientMessageId && (this.repo.data.p2pPrivateMessages || []).some(m => m.requestId === id && m.senderId === userId && m.clientMessageId === clientMessageId)) return;
+    if(attachment&&(this.repo.data.p2pPrivateMessages||[]).filter(m=>m.senderId===userId&&m.attachment&&Date.parse(m.createdAt)>this.now()-86400000).length>=50)throw new P2pError('Hai raggiunto il limite di 50 foto al giorno. Riprova domani.',429);
+    const stored=attachment?await saveAttachment(attachment):null;
+    try {
     this.message(r, content.trim(), userId);
+    if(stored)this.repo.data.p2pPrivateMessages.at(-1).attachment=stored;
     if (clientMessageId) this.repo.data.p2pPrivateMessages.at(-1).clientMessageId = clientMessageId;
     const notificationId=`chat:${randomUUID()}`;
     this.notify(userId === r.userId ? this.group(r.groupId).ownerId : r.userId, notificationId, 'Hai ricevuto un messaggio nella chat privata del gruppo.', r.id);
     this.repo.data.notifications.find(n=>n.id===notificationId).messageId=this.repo.data.p2pPrivateMessages.at(-1).id;
     await this.repo.save();
+    } catch(error){if(stored)await removeAttachment(stored.id);throw error;}
   }); }
   reminders() { return this.exclusive(async () => {
     let changed = false;
