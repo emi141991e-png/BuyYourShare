@@ -1,3 +1,4 @@
+import {issueForm,participationProgress,communityInbox} from './communityFeatures.js';
 import { groupShareLink } from './groupShare.js';
 let chatTimer;
 export function requestsForView(requests, route, userId) {
@@ -23,7 +24,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       ${r.status === 'accepted' ? `<p>Posto riservato fino al ${esc(new Date(r.reservedUntil).toLocaleString('it-IT'))}. Non inviare denaro dopo la scadenza.</p>` : ''}
       ${d ? `<div style="background:#eff6ff;padding:16px;border-radius:12px"><strong>Paga direttamente al capogruppo</strong>${d.iban ? `<p>IBAN: ${esc(d.iban)}<br>Intestatario: ${esc(d.accountHolder)}</p>` : ''}${d.paypalEmail ? `<p>Email PayPal: ${esc(d.paypalEmail)}</p>` : ''}<p>Concordate la causale e le modalità in chat. Non è un pagamento a BYS.</p></div>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">${owner && r.status === 'pending' && !['CLOSED','DRAFT'].includes(r.groupStatus) ? button(`accept${i}`, 'Accetta e riserva 48 ore') : ''}
-      ${!owner && (r.status === 'accepted' || (r.status === 'confirmed' && Date.parse(r.periodEnd) - Date.now() <= 3 * 86400000)) ? button(`report${i}`, 'Ho pagato al capogruppo') : ''}
+      ${!owner && !r.leaveAtPeriodEnd && (r.status === 'accepted' || (r.status === 'confirmed' && Date.parse(r.periodEnd) - Date.now() <= 3 * 86400000)) ? button(`report${i}`, 'Ho pagato al capogruppo') : ''}
       ${owner && r.status === 'reported' ? button(`confirm${i}`, 'Confermo: quota accreditata') : ''}
       ${['pending','accepted'].includes(r.status) || (r.status === 'confirmed' && Date.parse(r.periodEnd) <= Date.now()) ? button(`cancel${i}`, 'Annulla partecipazione') : ''}
       ${selected ? "" : link(`#privata-${r.id}`, r.unreadMessages ? 'Chat · ' + r.unreadMessages + ' non letti' : 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${groupShareLink({ id: r.groupId, customServiceName: r.groupName })}${r.periodEnd && Date.parse(r.periodEnd) > Date.now() ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
@@ -31,7 +32,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     ${selected ? '<section class="private-chat"><h3>La vostra conversazione</h3><div id="privateMessages" aria-live="polite" role="log" aria-label="Messaggi della chat privata"></div><form id="privateForm"><label>Messaggio privato<textarea name="content" maxlength="2000" style="width:100%"></textarea></label><label class="btn btn-secondary" style="display:block">Allega foto<input id="receiptPhoto" type="file" accept="image/jpeg,image/png,image/webp" style="display:block;max-width:100%;margin-top:8px"></label><div id="receiptPreview"></div><p>Foto privata della ricevuta. Oscura i dati non necessari. L’accredito va comunque verificato dal capogruppo.</p><button class="btn btn-primary">Invia</button></form></section>' : ''}`);
   const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna stato delle richieste'; refresh.type = 'button';
   container.querySelectorAll('.participation-card').forEach((card,i)=>{
-    const r=list[i],url=r.ownerId===user.id?r.memberAvatar:r.ownerAvatar;
+    const r=list[i];participationProgress(card,r,{user,api,reload,esc});issueForm(card,{groupId:r.groupId,requestId:r.id,user,api,esc});const url=r.ownerId===user.id?r.memberAvatar:r.ownerAvatar;
     if(url){const img=document.createElement('img');img.src=url;img.alt='Foto profilo';img.width=44;img.height=44;img.style.cssText='border-radius:50%;object-fit:cover;margin:12px 0';card.querySelector('h3').after(img);}
     if(r.ownerId!==user.id&&r.periodEnd){const a=document.createElement('a');a.href='#gruppo-'+r.groupId;a.className='btn btn-secondary';a.textContent='★ Valuta il capogruppo';card.append(a);}
   });
@@ -57,6 +58,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     const result = await api(`/api/access/${encodeURIComponent(r.groupId)}`);
     container.querySelector(`#accessText${i}`).textContent = [result.instructions?.instructions, result.instructions?.accessUrl].filter(Boolean).join('\n');
   }));
+  if(!selected)await communityInbox(container,{api,esc});
   if (selected) {
     const { messages } = await api(`/api/manual/${encodeURIComponent(selected.id)}/messages`);
     const feed = container.querySelector('#privateMessages');

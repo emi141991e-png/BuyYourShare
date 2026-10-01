@@ -103,3 +103,17 @@ test('failed reminder persistence retries without losing the reminder', async ()
  repo.save=async()=>{throw new Error('disk failure')};await assert.rejects(s.send('m',r.id,'','file-2',attachment));assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
  }finally{if(old===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=old;await fs.rm(dir,{recursive:true,force:true});}
  });
+
+test('scheduled exit preserves paid time, frees only at expiry, sends availability once',async()=>{
+ const {service:s,repo,time}=setup();const r=await s.request('m','g',2);await s.action('o',r.id,'accept');await s.action('m',r.id,'report');await s.action('o',r.id,'confirm');
+ await assert.rejects(s.action('o',r.id,'schedule-exit'));await s.action('m',r.id,'schedule-exit');await s.reminders();assert.equal(r.status,'confirmed');await assert.rejects(s.action('m',r.id,'report'));
+ repo.data.groups[0].customServiceName='Example';repo.data.groups[0].totalSlots=2;
+ await s.community.watch('other',{service:'Example'});await s.reminders();assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('availability:')).length,0);
+ time(r.periodEnd);await s.reminders();assert.equal(r.status,'canceled');assert.equal(repo.data.memberships[0].status,'CANCELED');assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('availability:')).length,1);await s.reminders();assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('availability:')).length,1);
+});
+test('requirements are owner controlled, acknowledged and snapshotted; issues private and deduplicated',async()=>{
+ const {service:s,repo}=setup();const q={country:'Italia',accessMethod:'Invito',eligibility:'Requisiti del fornitore'};
+ await assert.rejects(s.community.updateRequirements('m','g',q));await s.community.updateRequirements('o','g',q);await assert.rejects(s.request('m','g',2));const r=await s.request('m','g',2,true);assert.deepEqual(r.requirementsAccepted,q);
+ const x=await s.community.issue('m',{groupId:'g',requestId:r.id,description:'Non ho ricevuto accesso'});assert.equal((await s.community.issue('m',{groupId:'g',description:'Altra descrizione valida'})).id,x.id);assert.equal(s.community.list('other').issues.length,0);await assert.rejects(s.community.issue('other',{groupId:'g',requestId:r.id,description:'Accesso non consentito'}));
+ repo.save=async()=>{throw new Error('disk')};await assert.rejects(s.community.watch('m',{service:'Example'}));assert.equal((repo.data.groupWatches||[]).length,0);
+});

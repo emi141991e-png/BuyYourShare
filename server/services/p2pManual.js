@@ -1,3 +1,4 @@
+import {CommunityFeatures} from './communityFeatures.js';
 import {saveAttachment,removeAttachment,readAttachment} from './chatAttachments.js';
 import { randomUUID } from 'node:crypto';
 import { P2pError, accessAllowed } from './p2pSubscription.js';
@@ -22,12 +23,12 @@ export function paymentDestination(body) {
 
 // One process, same serialization queue as platform billing. No provider writes.
 export class P2pManual {
-  constructor(subscriptions, now = () => Date.now()) { this.subscriptions = subscriptions; this.repo = subscriptions.repo; this.now = now; }
+  constructor(subscriptions, now = () => Date.now()) { this.subscriptions = subscriptions; this.repo = subscriptions.repo; this.now = now; this.community=new CommunityFeatures(this); }
   records() { return this.repo.data.p2pManualRequests ||= []; }
   avatar(id) {const u=(this.repo.data.users||[]).find(u=>u.id===id);return u?.bysUserId?`https://buyyourshare.it/api/profile-photo/${encodeURIComponent(u.bysUserId)}`:null;}
   exclusive(fn) { return this.subscriptions.exclusive(async () => {
     // Restore only collections owned by this workflow when an atomic save fails.
-    const fields = ['p2pManualRequests', 'p2pPrivateMessages', 'p2pManualConfirmations', 'notifications', 'memberships'];
+    const fields = ['p2pManualRequests', 'p2pPrivateMessages', 'p2pManualConfirmations', 'notifications', 'memberships','groupIssues','groupWatches'];
     const snapshot = Object.fromEntries(fields.map(key => [key, structuredClone(this.repo.data[key])]));
     const occupancy = this.repo.data.groups.map(g => [g.id, g.occupiedMemberSlots]);
     try { return await fn(); } catch (e) {
@@ -71,15 +72,16 @@ export class P2pManual {
     if (this.records().some(r => r.id !== exceptId && r.groupId === g.id && r.slotNumber === slot && ['accepted', 'reported', 'confirmed'].includes(r.status))) throw new P2pError('SLOT_RESERVED');
     if ((this.repo.data.p2pQuotaPayments || []).some(p => p.groupId === g.id && p.slotNumber === slot && !['failed', 'canceled', 'refunded', 'reversed'].includes(p.status) && (p.status !== 'completed' || Date.parse(p.periodEnd) > this.now()))) throw new P2pError('SLOT_RESERVED');
   }
-  request(userId, groupId, slot) { return this.exclusive(async () => {
+  request(userId, groupId, slot, acknowledged) { return this.exclusive(async () => {
     this.subscriptions.ready?.(); this.active(userId); const g = this.group(groupId);
+    if(g.requirements&&acknowledged!==true)throw new P2pError('Leggi e conferma i requisiti prima di richiedere un posto.',400);
     if (g.ownerId === userId) throw new P2pError('OWN_GROUP');
     if (!g.manualPaymentDestination) throw new P2pError('PAYMENT_DESTINATION_REQUIRED');
     const previous = this.records().find(r => r.groupId === groupId && r.userId === userId && !['canceled', 'rejected'].includes(r.status));
     if (previous) { await this.repo.save(); return previous; }
     this.slotFree(g, Number(slot));
     const r = { id: randomUUID(), userId, groupId, slotNumber: Number(slot), status: 'pending', amountCents: allocateMoneySplit(g.realSubscriptionCostCents, g.totalSlots)[Number(slot) - 1], createdAt: new Date(this.now()).toISOString() };
-    this.records().push(r); this.message(r, 'Richiesta inviata. Attendi l’accettazione prima di pagare.');
+    r.requirementsAccepted=g.requirements?structuredClone(g.requirements):null;this.records().push(r); this.message(r, 'Richiesta inviata. Attendi l’accettazione prima di pagare.');
     this.notify(g.ownerId, `request:${r.id}`, 'Nuova richiesta di partecipazione: apri la chat privata.', r.id);
     await this.repo.save(); return r;
   }); }
@@ -90,7 +92,13 @@ export class P2pManual {
       this.active(userId); this.active(r.userId); this.slotFree(g, r.slotNumber, r.id);
       r.destination = structuredClone(g.manualPaymentDestination); r.status = 'accepted';
       r.reservedUntil = new Date(this.now() + 48 * 3600000).toISOString();
+    } else if (action === 'schedule-exit' || action === 'keep-place') {
+      if(owner||r.status!=='confirmed'||Date.parse(r.periodEnd)<=this.now())throw new P2pError('Operazione disponibile durante il periodo pagato.',400);
+      r.leaveAtPeriodEnd=action==='schedule-exit';const m=(this.repo.data.memberships||[]).find(m=>m.id===r.membershipId);if(m)m.status=r.leaveAtPeriodEnd?'CANCELLATION_SCHEDULED':'ACTIVE';
+    } else if(action==='access-received'){
+      if(owner||r.status!=='confirmed')throw new P2pError('Conferma disponibile dopo l’accredito.',400);r.accessReceivedAt=new Date(this.now()).toISOString();
     } else if (action === 'report') {
+      if(r.leaveAtPeriodEnd)throw new P2pError('Hai programmato l’uscita. Annullala prima di rinnovare.',400);
       if (owner || !['accepted', 'confirmed', 'reported'].includes(r.status)) throw new P2pError('INVALID_TRANSITION');
       if (r.status === 'reported') { await this.repo.save(); return r; }
       if (r.status === 'accepted' && Date.parse(r.reservedUntil) <= this.now()) throw new P2pError('RESERVATION_EXPIRED');
@@ -118,7 +126,7 @@ export class P2pManual {
       r.status = 'canceled';
       const m = (this.repo.data.memberships || []).find(m => m.id === r.membershipId); if (m) m.status = 'CANCELED';
     } else throw new P2pError('INVALID_ACTION', 400);
-    const labels = { accept: 'Richiesta accettata. Posto riservato per 48 ore: puoi pagare direttamente al capogruppo.', report: 'Il membro dichiara di aver pagato. Il capogruppo deve verificare l’accredito.', confirm: 'Il capogruppo ha confermato l’accredito della quota.', cancel: 'Partecipazione annullata.' };
+    const labels = { 'schedule-exit':'Il membro lascerà il gruppo alla scadenza del periodo pagato.', 'keep-place':'Il membro ha annullato l’uscita programmata.', 'access-received':'Il membro conferma di aver ricevuto l’accesso al servizio.', accept: 'Richiesta accettata. Posto riservato per 48 ore: puoi pagare direttamente al capogruppo.', report: 'Il membro dichiara di aver pagato. Il capogruppo deve verificare l’accredito.', confirm: 'Il capogruppo ha confermato l’accredito della quota.', cancel: 'Partecipazione annullata.' };
     g.occupiedMemberSlots = (this.repo.data.memberships || []).filter(m => m.groupId === g.id && m.role === 'MEMBER' && ['ACTIVE', 'CANCELLATION_SCHEDULED'].includes(m.status) && (m.paymentProvider === 'MANUAL' || Date.parse(m.currentPeriodEnd) > this.now())).length;
     this.message(r, labels[action]); this.notify(owner ? r.userId : g.ownerId, `${action}:${id}:${r.periodEnd || r.reportedAt || ''}`, labels[action], id);
     await this.repo.save(); return r;
@@ -155,7 +163,10 @@ export class P2pManual {
   reminders() { return this.exclusive(async () => {
     let changed = false;
     for (const r of this.records()) {
-      if (r.status === 'accepted' && Date.parse(r.reservedUntil) <= this.now()) {
+      if(r.leaveAtPeriodEnd&&r.status==='confirmed'){
+        if(Date.parse(r.periodEnd)<=this.now()){r.status='canceled';r.leftAt=new Date(this.now()).toISOString();const m=(this.repo.data.memberships||[]).find(m=>m.id===r.membershipId);if(m)m.status='CANCELED';const g=this.group(r.groupId);g.occupiedMemberSlots=(this.repo.data.memberships||[]).filter(m=>m.groupId===g.id&&m.role==='MEMBER'&&['ACTIVE','CANCELLATION_SCHEDULED'].includes(m.status)).length;this.message(r,'Uscita completata alla scadenza. Il posto è nuovamente disponibile.');for(const userId of [r.userId,g.ownerId])this.notify(userId,'exit:'+r.id+':'+userId,'Uscita dal gruppo completata alla scadenza.',r.id);changed=true;}continue;
+      }
+      if (r.status === 'accepted'  && Date.parse(r.reservedUntil) <= this.now()) {
         r.status = 'canceled';
         const text = 'Prenotazione scaduta senza dichiarazione di pagamento. Richiedi nuovamente il posto prima di pagare.';
         this.message(r, text);
@@ -172,6 +183,7 @@ export class P2pManual {
       this.notify(r.userId, key, text, r.id); this.message(r, text); changed = true;
       if (phase === 'due') this.notify(this.group(r.groupId).ownerId, `leader-${key}`, 'Una quota è scaduta. Contatta il membro in chat e verifica l’accredito prima di confermare il rinnovo.', r.id);
     }
+    if(this.community.checkWatches())changed=true;
     if (changed) await this.repo.save();
   }); }
 }

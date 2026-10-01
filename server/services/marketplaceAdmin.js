@@ -7,7 +7,7 @@ export function marketplaceSnapshot(data) {
   const overview = adminOverview(data);
   const users = (data.users || []).map(u => ({ id:u.id, name:u.fullName || '', email:u.email || '', role:u.role, linkedToBys:!!u.bysUserId, bysUserId:u.bysUserId || null, suspended:!!u.isSuspended, archived:!!u.archivedAt, groups:(data.groups || []).filter(g=>g.ownerId===u.id).length }));
   const groups = (data.groups || []).map(g => ({ id:g.id, name:g.customServiceName, plan:g.planName || '', rules:g.rulesAndRequirements || '', status:g.status, ownerId:g.ownerId, owner:users.find(u=>u.id===g.ownerId)?.name || 'Capogruppo', totalSlots:g.totalSlots, amountCents:g.baseMemberShareCents, archived:!!g.archivedAt, paymentDestination:g.manualPaymentDestination || {}, participants:(data.p2pManualRequests || []).filter(r=>r.groupId===g.id && ['accepted','reported','confirmed'].includes(r.status)).length }));
-  return { ...overview, users, groups, requests:overview.requests.map(r=>({...r,leader:groups.find(g=>g.id===r.groupId)?.owner || 'Capogruppo'})), audit:(data.marketplaceAdminAudit || []).slice(-300).reverse(), pendingBank:(data.p2pBankPayments || []).filter(p=>p.status==='reported').length };
+  return { ...overview, users, groups, issues:(data.groupIssues||[]).map(x=>({...x,groupName:groups.find(g=>g.id===x.groupId)?.name||'Gruppo',name:users.find(u=>u.id===x.userId)?.name||'Utente'})), requests:overview.requests.map(r=>({...r,leader:groups.find(g=>g.id===r.groupId)?.owner || 'Capogruppo'})), audit:(data.marketplaceAdminAudit || []).slice(-300).reverse(), pendingBank:(data.p2pBankPayments || []).filter(p=>p.status==='reported').length };
 }
 
 export class MarketplaceAdmin {
@@ -15,7 +15,7 @@ export class MarketplaceAdmin {
   change(kind,id,input,actor) { return this.s.exclusive(async()=>{
     const reason=String(input.reason || '').trim();
     if (reason.length<5 || reason.length>500) throw new P2pError('Indica una motivazione da 5 a 500 caratteri.',400);
-    const fields=['users','groups','memberships','p2pManualRequests','marketplaceAdminAudit','notifications','sessions'];
+    const fields=['users','groups','memberships','p2pManualRequests','marketplaceAdminAudit','notifications','sessions','groupIssues'];
     const snapshot=Object.fromEntries(fields.map(k=>[k,structuredClone(this.repo.data[k])]));
     const d=this.repo.data, now=new Date().toISOString();
     const fail=(text)=>{throw new P2pError(text,409);};
@@ -28,7 +28,9 @@ export class MarketplaceAdmin {
         id=linked.id;kind='users';
         if(input.action!=='archive') fail('Operazione non valida.');
       }
-      if(kind==='users') {
+      if(kind==='issues'){
+        const issue=(d.groupIssues||[]).find(x=>x.id===id);if(!issue)fail('Segnalazione non trovata.');if(!['reviewing','resolved'].includes(input.action))fail('Stato non valido.');before={status:issue.status};issue.status=input.action;issue.reply=text(input.reply,2000);issue.updatedAt=now;after={status:issue.status};(d.notifications||=[]).push({id:'issue:'+randomUUID(),userId:issue.userId,title:'Risposta alla segnalazione',message:'BYS ha aggiornato la tua segnalazione. Apri le partecipazioni per leggere la risposta.',actionUrl:'#miei-abbonamenti',createdAt:now,isRead:false});
+      } else if(kind==='users') {
         const u=(d.users || []).find(u=>u.id===id); if(!u) fail('Utente non trovato.');
         if(u.role==='admin') fail('Gli account amministratori si gestiscono separatamente.');
         before={name:u.fullName,email:u.email,suspended:!!u.isSuspended,archived:!!u.archivedAt};

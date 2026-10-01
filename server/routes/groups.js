@@ -1,3 +1,4 @@
+import {requirements} from '../services/communityFeatures.js';
 import { paymentDestination } from '../services/p2pManual.js';
 import {ratingSummary} from '../services/leaderRatings.js';
 /**
@@ -46,6 +47,7 @@ function sanitizeGroupForPublic(group, ownerUser) {
     memberTotalCents: group.baseMemberShareCents,
     groupType: group.groupType || 'public',
     status: computedStatus,
+    requirements: group.requirements || null,
     rulesAndRequirements: group.rulesAndRequirements || '',
     description: group.description || '',
     createdAt: group.createdAt,
@@ -65,7 +67,7 @@ groupsRouter.get('/', async (req, res) => {
   try {
     const { serviceId, search } = req.query;
     const rawGroups = await dataRepository.getGroups({ serviceId, search });
-    const memberships = await dataRepository.getMemberships({ status: 'ACTIVE' });
+    const memberships = await dataRepository.getMemberships();
     const users = dataRepository.data.users;
 
     // Filtro rigoroso: visualizza SOLO gruppi in stato PUBLISHED o FULL
@@ -219,6 +221,7 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       isPublished: true,
       publishedAt: new Date().toISOString(),
       ownerSpotifyAddress: (ownerSpotifyAddress || '').trim(),
+      requirements: requirements(req.body),
       rulesAndRequirements: (rulesAndRequirements || 'Rispetta le regole della community e del provider.').trim(),
       description: (description || `Gruppo condivisione ${customServiceName}`).trim(),
       paymentMethod: 'MANUAL_DIRECT',

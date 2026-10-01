@@ -7,6 +7,13 @@ test('suspension is explicit, revokes sessions and records actor/reason',async()
 test('archive is reversible and preserves history; pending money and paid periods are protected',async()=>{const {repo,service}=fixture();repo.data.p2pManualRequests.push({id:'r',groupId:'g',userId:'u',status:'reported'});await service.change('groups','g',{action:'archive',reason:'Close group'},'a');assert.equal(repo.data.groups[0].status,'CLOSED');assert.equal(repo.data.groups[0].isPublished,false);assert.equal(repo.data.p2pManualRequests[0].status,'reported');assert.equal(marketplaceSnapshot(repo.data).groups[0].archived,true);await assert.rejects(service.change('requests','r',{action:'cancel',reason:'Cancel request'},'a'));repo.data.p2pManualRequests[0].status='confirmed';repo.data.p2pManualRequests[0].periodEnd='2035-01-01';await assert.rejects(service.change('requests','r',{action:'cancel',reason:'Cancel request'},'a'));await service.change('groups','g',{action:'archive',reason:'Close group'},'a');assert.equal(repo.data.p2pManualRequests.length,1);await service.change('groups','g',{action:'restore',reason:'Restore group'},'a');assert.equal(repo.data.groups[0].status,'DRAFT');});
 test('failed persistence rolls back all admin changes',async()=>{const {repo,service}=fixture();repo.save=async()=>{throw new Error('disk failed')};await assert.rejects(service.change('users','u',{action:'edit',name:'New name',email:'u@example.com',reason:'Correct name'},'a'));assert.equal(repo.data.users[1].fullName,'User');assert.equal(repo.data.marketplaceAdminAudit,undefined);});
 
+test('issue reply reaches only the reporter and failed save rolls back status and notification',async()=>{
+ const {repo,service}=fixture();repo.data.groupIssues=[{id:'i',userId:'u',groupId:'g',status:'open',description:'Missing access'}];
+ await service.change('issues','i',{action:'reviewing',reply:'We are reviewing your report',reason:'Review report'},'a');
+ assert.equal(repo.data.groupIssues[0].status,'reviewing');assert.equal(repo.data.notifications.length,1);assert.equal(repo.data.notifications[0].userId,'u');assert.equal(marketplaceSnapshot(repo.data).issues[0].groupName,'Group');
+ repo.save=async()=>{throw new Error('disk')};await assert.rejects(service.change('issues','i',{action:'resolved',reply:'Resolved report',reason:'Close report'},'a'));assert.equal(repo.data.groupIssues[0].status,'reviewing');assert.equal(repo.data.notifications.length,1);
+});
+
 test('BYS deletion resolves linked identity, protects active groups and revokes sessions',async()=>{
  const {repo,service}=fixture();repo.data.users[1].bysUserId='bys-u';
  await assert.rejects(service.change('bys-users','bys-u',{action:'archive',reason:'Delete account'},'admin'));

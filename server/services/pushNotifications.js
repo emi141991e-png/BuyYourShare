@@ -74,7 +74,9 @@ export class PushNotifications {
   }); }
   relevant(notification) {
     if (!notification) return false;
-    if (/^(chat|request|accept|report|confirm|cancel|reservation-expired|reservation-expired-owner):/.test(notification.id)) {
+    if(/^(availability|issue):/.test(notification.id))return !notification.isRead;
+
+    if (/^(chat|request|accept|report|confirm|cancel|schedule-exit|keep-place|access-received|exit|reservation-expired|reservation-expired-owner):/.test(notification.id)) {
       if (notification.isRead) return false;
       const r=(this.repo.data.p2pManualRequests||[]).find(r=>r.id===notification.requestId);
       const g=r&&(this.repo.data.groups||[]).find(g=>g.id===r.groupId&&!g.archivedAt);
