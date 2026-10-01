@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import {backupRouter} from './routes/backup.js';
 import { P2pBank } from './services/p2pBank.js';
 import { P2pGooglePay } from './services/p2pGooglePay.js';
 import { PushNotifications } from './services/pushNotifications.js';
@@ -154,6 +155,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/bys-admin/bank-payments', bysBankAdminRouter);
 app.use('/api/bys-admin/marketplace', bysMarketplaceAdmin(p2pSubscriptions));
+app.use('/api/internal-backup',backupRouter(p2pSubscriptions));
 
 // Endpoint Health Check
 app.get('/api/health', (req, res) => {
