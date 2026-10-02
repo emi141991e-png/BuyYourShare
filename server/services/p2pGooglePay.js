@@ -12,7 +12,8 @@ export class P2pGooglePay {
     // Read the existing order only: never authorize or capture another payment.
     const order = await this.s.provider.request(`/v2/checkout/orders/${p.orderId}`);
     const result = await this.settle(p, order);
-    p.providerStatus = order.status;
+    const states = (order.purchase_units || []).flatMap(u => (u.payments?.captures || []).map(c => [c.status, c.status_details?.reason].filter(Boolean).join(': ')));
+    p.providerStatus = [order.status, ...states].join(' / ');
     p.checkedAt = new Date(this.s.now()).toISOString();
     await this.repo.save();
     return { ...result, providerStatus: p.providerStatus };
