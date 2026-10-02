@@ -4,6 +4,30 @@ import { P2pSubscriptions } from '../server/services/p2pSubscription.js';
 import { P2pBank } from '../server/services/p2pBank.js';
 import { P2pGooglePay } from '../server/services/p2pGooglePay.js';
 import { walletErrorCode } from '../js/ui/walletError.js';
+import { accessRemainingDays } from '../js/config/accessPlans.js';
+
+test('monthly then annual preserves every residual day, including after a delay and repeated verification', async () => {
+  for (const wallet of ['GOOGLE_PAY','APPLE_PAY']) for (const delay of [0,10]) {
+    const f=fixture(wallet);let sequence=0;
+    const request=f.s.provider.request;
+    f.s.provider.request=async (...args)=>{
+      const result=await request(...args);
+      if(args[0]==='/v2/checkout/orders') {sequence++; f.order().id=`ORDER${sequence}`; result.id=f.order().id;}
+      if(args[0].endsWith('/capture')) {f.order().purchase_units[0].payments.captures[0].id=`CAP${sequence}`;}
+      return result;
+    };
+    const monthly=await f.g.create('u','MONTHLY',wallet);
+    await f.g.capture('u',monthly.orderId,wallet);
+    const originalEnd=f.s.view('u').currentPeriodEnd;
+    f.advance(delay);
+    const yearly=await f.g.create('u','YEARLY',wallet);
+    await f.g.capture('u',yearly.orderId,wallet);
+    await f.g.capture('u',yearly.orderId,wallet);
+    assert.equal(f.s.view('u').currentPeriodEnd,'2027-03-02T12:00:00.000Z');
+    assert.equal(f.g.records()[1].periodStart,originalEnd);
+    assert.equal(accessRemainingDays(f.s.view('u').currentPeriodEnd,Date.parse('2026-01-31T12:00:00Z')+delay*86400000),395-delay);
+  }
+});
 
 test('wallet diagnostics retain machine codes without leaking payment fields', () => {
   assert.equal(walletErrorCode({code:'ACCESS_PLAN_PAYMENT_PENDING'},'ORDER'), 'ORDER:ACCESS_PLAN_PAYMENT_PENDING');

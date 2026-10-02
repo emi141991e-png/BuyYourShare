@@ -16,3 +16,7 @@ export function accessPeriodEnd(start, code) {
   date.setUTCDate(Math.min(day, last)); return date.toISOString();
 }
 export const accessMoney = cents => (cents / 100).toLocaleString('it-IT', {style:'currency',currency:'EUR'});
+export function accessRemainingDays(until, now = Date.now()) {
+  const end = Date.parse(until);
+  return Number.isFinite(end) ? Math.max(0, Math.ceil((end - now) / 86400000)) : 0;
+}

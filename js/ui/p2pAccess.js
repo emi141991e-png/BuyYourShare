@@ -1,5 +1,5 @@
 import {issueForm,watchButton,requirementsBox} from './communityFeatures.js';
-import { accessPlan } from '../config/accessPlans.js';
+import { accessPlan, accessRemainingDays } from '../config/accessPlans.js';
 import {leaderProfile,mountLeaderRating} from './leaderRating.js';
 import { renderBankAccess } from './bankAccess.js';
 import { mountGooglePayAccess } from './googlePayAccess.js';
@@ -178,6 +178,10 @@ export async function renderP2pAccess(container, route, user) {
           container.querySelector('.billing-price span').textContent = '/ ' + accessPlan(s.accessPlanCode).period;
           container.querySelector('.billing-caption').textContent = `${s.paymentMethod === 'APPLE_PAY' ? 'Apple Pay' : 'Google Pay'} · Pagamento singolo, senza rinnovo automatico`;
         }
+      }
+      if (s.accessAllowed) {
+        container.querySelector('.billing-price').innerHTML = `${accessRemainingDays(s.currentPeriodEnd)}<span> giorni residui totali</span>`;
+        container.querySelector('.billing-caption').textContent = `Ultimo acquisto: ${accessPlan(s.accessPlanCode).label} · ${money(s.priceCents)}. Il totale include i giorni precedenti ancora disponibili.`;
       }
       const bankTarget = document.createElement('section'); bankTarget.className = 'billing-card';
       container.querySelector('.billing-grid').after(bankTarget);
