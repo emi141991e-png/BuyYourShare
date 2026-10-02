@@ -1,3 +1,4 @@
+import { showAccessConfirmation } from './accessConfirmation.js';
 import { walletErrorCode } from './walletError.js';
 import { mountApplePayAccess } from './applePayAccess.js';
 import { accessMoney } from '../config/accessPlans.js';
@@ -61,7 +62,7 @@ export async function mountGooglePayAccess(target, api, reload) {
         let paymentStage = 'CREAZIONE_ORDINE';
         try {
           const created = await api('/api/p2p/google-pay/orders', {planCode:chosen.code});
-          if (created.alreadyPaid) { status.textContent='Pagamento precedente recuperato. Accesso attivo.'; setTimeout(reload,500); return { transactionState: 'SUCCESS' }; }
+          if (created.alreadyPaid) { status.textContent='Pagamento precedente recuperato. Accesso attivo.'; setTimeout(() => showAccessConfirmation(created.subscription,reload),500); return { transactionState: 'SUCCESS' }; }
           orderId=created.orderId;
           paymentStage = 'AUTORIZZAZIONE_GOOGLE_PAY';
           const result = await paypal.confirmOrder({ orderId, paymentMethodData: data.paymentMethodData });
@@ -71,7 +72,7 @@ export async function mountGooglePayAccess(target, api, reload) {
           const captured = await api(`/api/p2p/google-pay/orders/${encodeURIComponent(orderId)}/capture`, {});
           if (captured.failed) throw Object.assign(new Error('Il gestore ha rifiutato il pagamento.'), {code:'PAYMENT_DECLINED'});
           if (captured.pending) status.textContent = 'Pagamento in verifica. Non ripagarlo: aggiorna lo stato tra qualche minuto.';
-          else { status.textContent = 'Pagamento confermato. Accesso aggiornato.'; setTimeout(reload, 500); }
+          else { status.textContent = 'Pagamento confermato. Accesso aggiornato.'; setTimeout(() => showAccessConfirmation(captured.subscription,reload),500); }
           return { transactionState: 'SUCCESS' };
         } catch (e) {
           status.textContent = 'Pagamento non confermato. ' + e.message + ' Codice: ' + walletErrorCode(e, paymentStage);

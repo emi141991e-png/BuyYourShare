@@ -150,7 +150,7 @@ export async function renderP2pAccess(container, route, user) {
     if (route === '#p2p-abbonamento' || !s.accessAllowed || !state.available) {
       shell(`<div class="billing-grid"><article class="billing-card">
         <div class="billing-top"><span class="billing-eyebrow">ABBONAMENTO BYS</span><span class="billing-status ${s.accessAllowed ? 'is-active' : ''}">${esc(statuses[s.status] || s.status)}</span></div>
-        <h2>Scegli la durata.<br>Condividi a modo tuo.</h2>
+        <h2>${s.accessAllowed ? 'Abbonamento BYS<br><span class="bys-active-heading">ATTIVO</span>' : 'Scegli la durata.<br>Condividi a modo tuo.'}</h2>
         <p class="billing-intro">${route === '#crea' ? 'Per creare il tuo gruppo, attiva l’accesso BYS. Sarai il capogruppo dei gruppi che crei.' : 'Partecipa ai gruppi e crea i tuoi con un unico abbonamento.'}</p>
         <div class="billing-price">${money(s.priceCents)}<span>/ mese</span></div>
         <p class="billing-caption">${!state.paypalAvailable || s.paymentMethod === 'BANK' ? 'Pagamento con bonifico · Conferma dell’incasso a cura di BYS' : 'PayPal: rinnovo automatico mensile. In alternativa scegli il bonifico qui sotto.'}</p>

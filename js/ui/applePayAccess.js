@@ -1,3 +1,4 @@
+import { showAccessConfirmation } from './accessConfirmation.js';
 import { walletErrorCode } from './walletError.js';
 const loads = new Map();
 function load(src, namespace) {
@@ -35,7 +36,7 @@ export async function mountApplePayAccess(host, api, reload, selection) {
           let paymentStage='CREAZIONE_ORDINE';
           try {
             const created=await api('/api/p2p/apple-pay/orders',{planCode:plan.code});
-            if(created.alreadyPaid){session.completePayment(ApplePaySession.STATUS_SUCCESS);status.textContent='Pagamento precedente recuperato. Accesso attivo.';setTimeout(reload,500);return;}
+            if(created.alreadyPaid){session.completePayment(ApplePaySession.STATUS_SUCCESS);status.textContent='Pagamento precedente recuperato. Accesso attivo.';setTimeout(() => showAccessConfirmation(created.subscription,reload),500);return;}
             const {orderId}=created;
             paymentStage='AUTORIZZAZIONE_APPLE_PAY';
             await paypal.confirmOrder({orderId,token:event.payment.token,billingContact:event.payment.billingContact});
@@ -44,7 +45,7 @@ export async function mountApplePayAccess(host, api, reload, selection) {
             if(result.failed) throw Object.assign(new Error('Pagamento rifiutato'),{code:'PAYMENT_DECLINED'});
             session.completePayment(ApplePaySession.STATUS_SUCCESS);
             if(result.pending) status.textContent='Pagamento in verifica. Non ripagarlo: aggiorna lo stato tra qualche minuto.';
-            else {status.textContent='Pagamento confermato. Accesso BYS attivato.';setTimeout(reload,500);}
+            else {status.textContent='Pagamento confermato. Accesso BYS attivato.';setTimeout(() => showAccessConfirmation(result.subscription,reload),500);}
           }catch(e){session.completePayment(ApplePaySession.STATUS_FAILURE);status.textContent='Pagamento non confermato. Non effettuare un secondo pagamento. Codice: '+walletErrorCode(e,paymentStage);}
           finally{release();}
         };session.begin();
