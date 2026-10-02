@@ -241,3 +241,51 @@ test('one unavailable order cannot starve recovery of another completed payment'
   assert.equal(f.s.view('u').accessAllowed, true);
   assert.ok(f.g.records()[0].checkedAt);
 });
+
+
+test('unapproved wallet switch reuses one order for every plan and recovers the actual paid wallet once', async () => {
+  for (const plan of ['MONTHLY','QUARTERLY','YEARLY']) for (const paidWallet of ['apple_pay','google_pay']) {
+    const f=fixture('APPLE_PAY');
+    const first=await f.g.create('u',plan,'APPLE_PAY');
+    f.order().status='CREATED'; delete f.order().payment_source;
+    const retry=await f.g.create('u',plan,'GOOGLE_PAY');
+    assert.equal(retry.orderId,first.orderId);
+    assert.equal(f.calls.filter(c=>c.path==='/v2/checkout/orders').length,1);
+    assert.equal(f.g.records().length,1);
+    assert.equal(f.s.view('u').accessAllowed,false);
+    f.order().status='APPROVED';f.order().payment_source={[paidWallet]:{}};
+    await f.g.capture('u',first.orderId,'GOOGLE_PAY');
+    const end=f.s.view('u').currentPeriodEnd;
+    await f.g.recheck(f.g.records()[0].id);
+    assert.equal(f.s.view('u').currentPeriodEnd,end);
+    assert.equal(f.s.view('u').accessAllowed,true);
+    assert.equal(f.s.find('u').paymentMethod,paidWallet==='apple_pay'?'APPLE_PAY':'GOOGLE_PAY');
+    assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,1);
+  }
+});
+
+test('wallet switch never overrides approval, a payment source, authorizations, captures or an uncertain provider', async () => {
+  for (const variant of ['approved','source','authorization','capture','unavailable']) {
+    const f=fixture('APPLE_PAY');await f.g.create('u','MONTHLY','APPLE_PAY');
+    f.order().status='CREATED';delete f.order().payment_source;
+    if(variant==='approved') f.order().status='APPROVED';
+    if(variant==='source') f.order().payment_source={apple_pay:{}};
+    if(variant==='authorization') f.order().purchase_units[0].payments={authorizations:[{status:'CREATED'}]};
+    if(variant==='capture') f.order().purchase_units[0].payments={captures:[{status:'PENDING'}]};
+    if(variant==='unavailable') f.s.provider.request=async()=>{throw new Error('network');};
+    await assert.rejects(f.g.create('u','MONTHLY','GOOGLE_PAY'));
+    assert.equal(f.g.records()[0].paymentMethod,'APPLE_PAY');
+    assert.equal(f.g.records().length,1);
+    assert.equal(f.s.view('u').accessAllowed,false);
+  }
+});
+
+test('wallet switch persistence failure preserves the old method and order', async () => {
+  const f=fixture('APPLE_PAY');await f.g.create('u','MONTHLY','APPLE_PAY');
+  f.order().status='CREATED';delete f.order().payment_source;
+  f.repo.save=async()=>{throw new Error('disk');};
+  await assert.rejects(f.g.create('u','MONTHLY','GOOGLE_PAY'),/disk/);
+  assert.equal(f.g.records()[0].paymentMethod,'APPLE_PAY');
+  assert.equal(f.g.records()[0].allowedWallets,undefined);
+  assert.equal(f.g.records().length,1);
+});

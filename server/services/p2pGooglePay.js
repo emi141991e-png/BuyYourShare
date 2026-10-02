@@ -48,6 +48,19 @@ export class P2pGooglePay {
       catch (e) { for (const k of fields) this.repo.data[k] = snapshot[k]; throw e; }
       if (p.status === 'confirmed') return { alreadyPaid: true, subscription: outcome.subscription };
       if (p.status === 'failed') p = null;
+      // A wallet button can leave an unapproved order behind. Reuse that same
+      // provider order (never create a second chargeable order) for another wallet.
+      if (p && (p.paymentMethod || 'GOOGLE_PAY') !== method &&
+          (p.planCode || 'MONTHLY') === plan.code && existing.status === 'CREATED' &&
+          !Object.keys(existing.payment_source || {}).length &&
+          !existing.purchase_units.some(u => (u.payments?.captures || []).length || (u.payments?.authorizations || []).length)) {
+        const previousMethod = p.paymentMethod || 'GOOGLE_PAY';
+        const previousAllowed = p.allowedWallets;
+        p.allowedWallets = [...new Set([...(p.allowedWallets || []), previousMethod, method])];
+        p.paymentMethod = method;
+        try { await this.repo.save(); }
+        catch (e) { p.paymentMethod = previousMethod; p.allowedWallets = previousAllowed; throw e; }
+      }
     }
     if (p && (p.paymentMethod || 'GOOGLE_PAY') !== method) throw new P2pError('WALLET_PAYMENT_IN_PROGRESS');
     if (p && (p.planCode || 'MONTHLY') !== plan.code) throw new P2pError('ACCESS_PLAN_PAYMENT_PENDING');
@@ -69,7 +82,11 @@ export class P2pGooglePay {
     return { orderId: p.orderId };
   }); }
   async settle(p, order) {
-    const method = p.paymentMethod || 'GOOGLE_PAY';
+    let method = p.paymentMethod || 'GOOGLE_PAY';
+    // A previously open browser may complete the original wallet on the SAME
+    // order. Reconcile the verified source, without losing or duplicating access.
+    const actualWallet = order.payment_source?.apple_pay ? 'APPLE_PAY' : order.payment_source?.google_pay ? 'GOOGLE_PAY' : null;
+    if (actualWallet && p.allowedWallets?.includes(actualWallet)) method = actualWallet;
     const amount = ((p.amountCents ?? 99) / 100).toFixed(2);
     const plan = accessPlan(p.planCode || 'MONTHLY');
     const units = order.purchase_units || [];
@@ -122,7 +139,7 @@ export class P2pGooglePay {
     if (!s) { s = { userId: p.userId, role: this.s.roleFor(p.userId) }; (this.repo.data.p2pSubscriptions ||= []).push(s); }
     Object.assign(s, { status: 'active', paymentMethod: method, currentPeriodStart: new Date(start).toISOString(),
       currentPeriodEnd: accessPeriodEnd(start, plan.code), accessPlanCode: plan.code, accessAmountCents: p.amountCents ?? 99, lastPaymentAt: capture.create_time, nextBillingDate: null, cancelAtPeriodEnd: false, approvalUrl: null });
-    Object.assign(p, { status: 'confirmed', captureId: capture.id, paidAt: capture.create_time, periodStart: s.currentPeriodStart, periodEnd: s.currentPeriodEnd });
+    Object.assign(p, { status: 'confirmed', paymentMethod: method, captureId: capture.id, paidAt: capture.create_time, periodStart: s.currentPeriodStart, periodEnd: s.currentPeriodEnd });
     this.bank.notify(p.userId, `google-paid:${p.id}`, `Pagamento ricevuto: accesso BYS ${plan.label}, per ${plan.period}. Il rinnovo richiederà un nuovo pagamento.`, { actionUrl: '#p2p-abbonamento' });
     const buyer = (this.repo.data.users || []).find(u => u.id === p.userId);
     for (const admin of this.repo.data.users || []) if (admin.role === 'admin') this.bank.notify(admin.id, `google-paid-admin:${p.id}:${admin.id}`, `${buyer?.fullName || 'Utente'} (${buyer?.email || p.userId}) ha acquistato accesso BYS ${plan.label}: ${accessMoney(p.amountCents ?? 99)}. Attivato automaticamente.`, { actionUrl: 'https://buyyourshare.it/admin/marketplace-payments' });
