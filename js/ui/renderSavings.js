@@ -81,7 +81,7 @@ export function renderSavingsSection(subscriptions = []) {
 
           <p class="savings-card-desc">${escapeHtml(offer.description)}</p>
 
-          <a href="${escapeHtml(offer.ctaUrl || DEFAULT_BYS_URL)}" target="_blank" rel="noopener noreferrer" class="btn-bys-cta">
+          <a href="${escapeHtml(offer.ctaUrl || DEFAULT_BYS_URL)}"  rel="noopener noreferrer" class="btn-bys-cta">
             ${escapeHtml(offer.ctaText || 'Scopri l\'offerta')}
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
@@ -116,7 +116,7 @@ export function renderSavingsSection(subscriptions = []) {
           </div>
         </div>
         <p style="font-size: 12px; color: var(--text-secondary); margin: 8px 0 12px 0;">${escapeHtml(offer.description)}</p>
-        <a href="${escapeHtml(offer.ctaUrl || DEFAULT_BYS_URL)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="width: 100%; font-size: 12px;">
+        <a href="${escapeHtml(offer.ctaUrl || DEFAULT_BYS_URL)}"  rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="width: 100%; font-size: 12px;">
           ${escapeHtml(offer.ctaText || 'Vedi Dettagli')}
         </a>
       </div>

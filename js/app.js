@@ -228,7 +228,7 @@ function updateHeader(currentUser) {
   if (!headerActions) return;
 
   if (!isAuth || !currentUser) {
-    headerActions.innerHTML = '';
+    headerActions.innerHTML = '<a class="btn btn-secondary btn-sm" href="https://buyyourshare.it/">← Torna a BYS</a>';
     return;
   }
 
@@ -271,7 +271,7 @@ function updateHeader(currentUser) {
       </button>
     ` : ''}
 
-    <a class="btn btn-secondary btn-sm" href="https://buyyourshare.it/account">La mia area BYS ↗</a>
+    <a class="btn btn-secondary btn-sm" href="https://buyyourshare.it/">← Torna a BYS</a>
   `;
 
   if (accountOpen && headerActions.querySelector('.account-menu')) headerActions.querySelector('.account-menu').open = true;
