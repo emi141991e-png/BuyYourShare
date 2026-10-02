@@ -186,6 +186,7 @@ const staticOptions = {
 
 // Publish only browser assets. Never expose server/, package files or the database.
 app.get('/.well-known/apple-developer-merchantid-domain-association', (req,res) => res.type('application/octet-stream').sendFile(path.join(ROOT_DIR, 'public/.well-known/apple-developer-merchantid-domain-association'), {dotfiles:'allow'}));
+app.get('/images/bys-passioni.webp', (req, res) => res.sendFile(path.join(ROOT_DIR, 'public/images/bys-passioni.webp')));
 app.use('/css', express.static(path.join(ROOT_DIR, 'css'), staticOptions));
 app.use('/js', express.static(path.join(ROOT_DIR, 'js'), staticOptions));
 for (const asset of ['push-sw.js', 'manifest.webmanifest', 'push-icon-192.png', 'push-icon-512.png']) {
