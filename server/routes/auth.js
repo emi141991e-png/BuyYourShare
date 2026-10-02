@@ -39,7 +39,7 @@ authRouter.use((req, res, next) => {
 });
 
 function renderSsoCompletion(session, user, next) {
-  const destination = /^#(?:home|miei-gruppi|miei-abbonamenti|p2p-abbonamento|notifiche|privata-[a-zA-Z0-9-]+|gruppo-[a-zA-Z0-9-]+)$/.test(next || '') ? next : '#home';
+  const destination = /^#(?:home|messaggi|miei-gruppi|miei-abbonamenti|p2p-abbonamento|notifiche|privata-[a-zA-Z0-9-]+|gruppo-[a-zA-Z0-9-]+)$/.test(next || '') ? next : '#home';
   const safeState = JSON.stringify({
     token: session.token,
     user: sanitizeUser(user)
