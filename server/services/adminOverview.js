@@ -10,7 +10,7 @@ export function adminOverview(data, now = Date.now()) {
       providerSubscriptionId: s.providerSubscriptionId || null, currentPeriodEnd: view.currentPeriodEnd,
       paymentMethod: view.paymentMethod, accessPlanCode: view.accessPlanCode, amountCents: view.priceCents, paypalReviewRequired: !!s.paypalReviewRequired, cancelAtPeriodEnd: view.cancelAtPeriodEnd, lastPaymentAt: s.lastPaymentAt || null };
   });
-  const requests = (data.p2pManualRequests || []).map(r => ({ id: r.id, groupId: r.groupId,
+  const requests = (data.p2pManualRequests || []).map(r => ({ id: r.id, groupId: r.groupId, userId: r.userId, ownerId: r.ownerId,
     groupName: (data.groups || []).find(g => g.id === r.groupId)?.customServiceName || 'Gruppo archiviato',
     member: users.find(u => u.id === r.userId)?.fullName || 'Membro',
     leader: users.find(u => u.id === r.ownerId)?.fullName || 'Capogruppo',
