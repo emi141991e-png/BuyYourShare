@@ -56,9 +56,10 @@ export async function mountGooglePayAccess(target, api, reload) {
     stage = 'PAYPAL_CONFIG';
     const paypal = window.bysGooglePay.Googlepay();
     const settings = await bounded(paypal.config(), 'Configurazione Google Pay non disponibile.');
-    let orderId, busy = false; select.disabled=false;
+    let orderId, busy = false, authorizationStarted = false;
     const client = new google.payments.api.PaymentsClient({ environment: config.environment, paymentDataCallbacks: {
       onPaymentAuthorized: async data => {
+        authorizationStarted = true;
         let paymentStage = 'CREAZIONE_ORDINE';
         try {
           const created = await api('/api/p2p/google-pay/orders', {planCode:chosen.code});
@@ -89,10 +90,10 @@ export async function mountGooglePayAccess(target, api, reload) {
     if (!ready.result || settings.isEligible === false) { status.textContent = 'Google Pay non è disponibile su questo dispositivo o conto. Puoi utilizzare il bonifico.'; return; }
     stage = 'GOOGLE_BUTTON';
     buttonHost.append(client.createButton({ buttonType: 'checkout', buttonColor: 'black', buttonLocale: 'it', buttonSizeMode: 'fill', buttonRadius: 16, onClick: () => {
-      if (busy || select.disabled) return; busy = true; select.disabled=true; chosen=config.plans.find(p=>p.code===select.value);
+      if (busy || select.disabled) return; busy = true; authorizationStarted=false; select.disabled=true; chosen=config.plans.find(p=>p.code===select.value);
       client.loadPaymentData({ ...base, merchantInfo: settings.merchantInfo, callbackIntents: ['PAYMENT_AUTHORIZATION'],
         transactionInfo: { currencyCode: 'EUR', countryCode: 'IT', totalPriceStatus: 'FINAL', totalPrice: (chosen.amountCents/100).toFixed(2), totalPriceLabel: `Accesso BYS · ${chosen.period}` }
-      }).catch(() => { status.textContent = 'Procedura interrotta. Se hai autorizzato il pagamento, attendi la verifica senza ripagarlo.'; }).finally(() => { busy = false; select.disabled=false; });
+      }).catch(e => { if (!authorizationStarted) status.textContent = e?.statusCode === 'CANCELED' ? 'Pagamento annullato prima dell’autorizzazione.' : 'Impossibile aprire Google Pay. Codice: ' + walletErrorCode({code:e?.statusCode || e?.code},'APERTURA_GOOGLE_PAY'); }).finally(() => { busy = false; select.disabled=false; });
     } }));
    } catch {
     if (!target.isConnected) return;

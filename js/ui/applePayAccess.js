@@ -28,8 +28,9 @@ export async function mountApplePayAccess(host, api, reload, selection) {
       const release=()=>selection.lock(false);
       try {
         // Begin directly in the click gesture; network calls belong to session events.
-        session=new ApplePaySession(4,{countryCode:settings.countryCode,currencyCode:'EUR',merchantCapabilities:settings.merchantCapabilities,supportedNetworks:settings.supportedNetworks,total:{label:'BuyYourShare',type:'final',amount:(plan.amountCents/100).toFixed(2)}});
-        session.onvalidatemerchant=async event=>{try{const result=await paypal.validateMerchant({validationUrl:event.validationURL,displayName:'BuyYourShare'});session.completeMerchantValidation(result.merchantSession);}catch{session.abort();release();status.textContent='Apple Pay non disponibile. Riprova più tardi.';}};
+        session=new ApplePaySession(4,{countryCode:settings.countryCode,currencyCode:'EUR',merchantCapabilities:settings.merchantCapabilities,supportedNetworks:settings.supportedNetworks,requiredBillingContactFields:['postalAddress'],total:{label:'BuyYourShare',type:'final',amount:(plan.amountCents/100).toFixed(2)}});
+        session.onpaymentmethodselected=()=>session.completePaymentMethodSelection({newTotal:{label:'BuyYourShare',type:'final',amount:(plan.amountCents/100).toFixed(2)},newLineItems:[]});
+        session.onvalidatemerchant=async event=>{try{const result=await paypal.validateMerchant({validationUrl:event.validationURL,displayName:'BuyYourShare'});session.completeMerchantValidation(result.merchantSession);}catch(e){session.abort();release();status.textContent='Apple Pay non ha validato il pagamento. Codice: '+walletErrorCode(e,'VALIDAZIONE_APPLE_PAY');}};
         session.oncancel=()=>{release();status.textContent=authorized?'Se hai autorizzato il pagamento, attendi la verifica prima di riprovare.':'Pagamento annullato.';};
         session.onpaymentauthorized=async event=>{
           authorized=true;
@@ -49,7 +50,7 @@ export async function mountApplePayAccess(host, api, reload, selection) {
           }catch(e){session.completePayment(ApplePaySession.STATUS_FAILURE);status.textContent='Pagamento non confermato. Non effettuare un secondo pagamento. Codice: '+walletErrorCode(e,paymentStage);}
           finally{release();}
         };session.begin();
-      }catch{release();status.textContent='Impossibile aprire Apple Pay su questo dispositivo.';}
+      }catch(e){release();status.textContent='Impossibile aprire Apple Pay. Codice: '+walletErrorCode(e,'APERTURA_APPLE_PAY');}
     };
-  }catch{if(host.isConnected)host.textContent='Apple Pay temporaneamente non disponibile.';}
+  }catch(e){if(host.isConnected)host.textContent='Apple Pay temporaneamente non disponibile. Codice: '+walletErrorCode(e,'CONFIGURAZIONE_APPLE_PAY');}
 }
