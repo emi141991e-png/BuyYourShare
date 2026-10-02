@@ -70,3 +70,7 @@
 .bys-active-heading{color:#047857;font-size:clamp(36px,6vw,52px);font-weight:850}
 
 .bys-active-total{font-size:26px;color:#047857}.bys-active-summary small{line-height:1.5;color:#46645b}
+
+.bys-pay-reminders{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;box-sizing:border-box;padding:18px 22px;margin:20px 0;border:1px solid #4338ca;border-radius:18px;background:#4338ca;color:#fff!important;text-decoration:none!important;box-shadow:0 8px 20px #4338ca24;font-size:17px;font-weight:750;line-height:1.4}
+.bys-pay-reminders>span:nth-child(2){flex:1}.bys-pay-reminders small{display:block;margin-top:4px;color:#fff;font-size:13px;font-weight:400}.bys-pay-reminders:hover{background:#3730a3}.bys-pay-reminders:focus-visible,.bys-enable-push:focus-visible{outline:3px solid #0ea5e9;outline-offset:4px}
+.bys-enable-push{width:100%;min-height:56px!important;font-size:17px!important;white-space:normal;box-shadow:0 8px 20px #4338ca24}.push-panel{border:2px solid #c7d2fe!important;background:#f5f7ff!important}
