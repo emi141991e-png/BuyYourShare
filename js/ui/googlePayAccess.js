@@ -60,13 +60,16 @@ export async function mountGooglePayAccess(target, api, reload) {
       onPaymentAuthorized: async data => {
         let paymentStage = 'CREAZIONE_ORDINE';
         try {
-          ({ orderId } = await api('/api/p2p/google-pay/orders', {planCode:chosen.code}));
+          const created = await api('/api/p2p/google-pay/orders', {planCode:chosen.code});
+          if (created.alreadyPaid) { status.textContent='Pagamento precedente recuperato. Accesso attivo.'; setTimeout(reload,500); return { transactionState: 'SUCCESS' }; }
+          orderId=created.orderId;
           paymentStage = 'AUTORIZZAZIONE_GOOGLE_PAY';
           const result = await paypal.confirmOrder({ orderId, paymentMethodData: data.paymentMethodData });
           if (result.status === 'PAYER_ACTION_REQUIRED') await paypal.initiatePayerAction({ orderId });
           else if (!['APPROVED', 'COMPLETED'].includes(result.status)) throw new Error('Autorizzazione non completata.');
           paymentStage = 'CONFERMA_INCASSO';
           const captured = await api(`/api/p2p/google-pay/orders/${encodeURIComponent(orderId)}/capture`, {});
+          if (captured.failed) throw Object.assign(new Error('Il gestore ha rifiutato il pagamento.'), {code:'PAYMENT_DECLINED'});
           if (captured.pending) status.textContent = 'Pagamento in verifica. Non ripagarlo: aggiorna lo stato tra qualche minuto.';
           else { status.textContent = 'Pagamento confermato. Accesso aggiornato.'; setTimeout(reload, 500); }
           return { transactionState: 'SUCCESS' };

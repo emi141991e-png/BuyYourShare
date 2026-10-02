@@ -44,6 +44,28 @@ function fixture(wallet = 'GOOGLE_PAY') {
   return { repo, s, bank, g, calls, advance: days => { now += days * 86400000; }, order: () => order, fail: () => { failCreate = true; } };
 }
 
+test('a verified declined capture no longer blocks another plan; uncertain payments still block', async () => {
+  const f=fixture(); await f.g.create('u');
+  await f.s.provider.request('/v2/checkout/orders/ORDER1/capture','POST');
+  f.order().purchase_units[0].payments.captures[0].status='DECLINED';
+  await f.g.create('u','QUARTERLY');
+  assert.equal(f.g.records()[0].status,'failed');
+  assert.equal(f.g.records()[1].amountCents,269);
+  assert.equal(f.s.view('u').accessAllowed,false);
+  assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,1);
+  const g=fixture();await g.g.create('u');
+  await assert.rejects(g.g.create('u','YEARLY'),/ACCESS_PLAN_PAYMENT_PENDING/);
+  assert.equal(g.g.records().length,1);
+});
+
+test('already completed payment is recovered before a new plan is created', async () => {
+  const f=fixture();await f.g.create('u','QUARTERLY');
+  await f.s.provider.request('/v2/checkout/orders/ORDER1/capture','POST');
+  const result=await f.g.create('u','YEARLY');
+  assert.equal(result.alreadyPaid,true); assert.equal(f.g.records().length,1);
+  assert.equal(f.s.view('u').accessPlanCode,'QUARTERLY');
+});
+
 test('Apple Pay verifies wallet, price and ownership; recovery activates once and reminders/refunds work', async()=>{
   for(const plan of ['MONTHLY','QUARTERLY','YEARLY']) {
     const f=fixture('APPLE_PAY');f.repo.data.users=[{id:'admin',role:'admin'}];

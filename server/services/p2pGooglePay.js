@@ -39,6 +39,16 @@ export class P2pGooglePay {
     const plan = accessPlan(planCode);
     await this.choice(userId, method);
     let p = this.records().find(r => r.userId === userId && r.status === 'pending');
+    if (p?.orderId) {
+      const existing = await this.s.provider.request(`/v2/checkout/orders/${p.orderId}`);
+      const fields = ['p2pGooglePayments', 'p2pSubscriptions', 'notifications'];
+      const snapshot = Object.fromEntries(fields.map(k => [k, structuredClone(this.repo.data[k])]));
+      let outcome;
+      try { outcome = await this.settle(p, existing); }
+      catch (e) { for (const k of fields) this.repo.data[k] = snapshot[k]; throw e; }
+      if (p.status === 'confirmed') return { alreadyPaid: true, subscription: outcome.subscription };
+      if (p.status === 'failed') p = null;
+    }
     if (p && (p.paymentMethod || 'GOOGLE_PAY') !== method) throw new P2pError('WALLET_PAYMENT_IN_PROGRESS');
     if (p && (p.planCode || 'MONTHLY') !== plan.code) throw new P2pError('ACCESS_PLAN_PAYMENT_PENDING');
     if (!p) {
@@ -67,6 +77,13 @@ export class P2pGooglePay {
     if (order.id !== p.orderId || units.length !== 1 || unit.custom_id !== p.id ||
         unit.amount?.currency_code !== 'EUR' || unit.amount.value !== amount) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
     const captures = unit.payments?.captures || [];
+    if (p.status === 'pending' && order.status === 'COMPLETED' && captures.length === 1 &&
+        captures[0].status === 'DECLINED' && captures[0].amount?.currency_code === 'EUR' && captures[0].amount.value === amount) {
+      p.status = 'failed'; p.providerStatus = 'COMPLETED / DECLINED';
+      p.failedAt = new Date(this.s.now()).toISOString();
+      await this.repo.save();
+      return { failed: true, reason: 'PAYMENT_DECLINED' };
+    }
     if (p.status === 'refunded') return { subscription: this.s.view(p.userId) };
     if (p.status === 'confirmed') {
       const capture = captures.find(c => c.id === p.captureId);

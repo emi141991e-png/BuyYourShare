@@ -34,11 +34,14 @@ export async function mountApplePayAccess(host, api, reload, selection) {
           authorized=true;
           let paymentStage='CREAZIONE_ORDINE';
           try {
-            const {orderId}=await api('/api/p2p/apple-pay/orders',{planCode:plan.code});
+            const created=await api('/api/p2p/apple-pay/orders',{planCode:plan.code});
+            if(created.alreadyPaid){session.completePayment(ApplePaySession.STATUS_SUCCESS);status.textContent='Pagamento precedente recuperato. Accesso attivo.';setTimeout(reload,500);return;}
+            const {orderId}=created;
             paymentStage='AUTORIZZAZIONE_APPLE_PAY';
             await paypal.confirmOrder({orderId,token:event.payment.token,billingContact:event.payment.billingContact});
             paymentStage='CONFERMA_INCASSO';
             const result=await api(`/api/p2p/apple-pay/orders/${encodeURIComponent(orderId)}/capture`,{});
+            if(result.failed) throw Object.assign(new Error('Pagamento rifiutato'),{code:'PAYMENT_DECLINED'});
             session.completePayment(ApplePaySession.STATUS_SUCCESS);
             if(result.pending) status.textContent='Pagamento in verifica. Non ripagarlo: aggiorna lo stato tra qualche minuto.';
             else {status.textContent='Pagamento confermato. Accesso BYS attivato.';setTimeout(reload,500);}
