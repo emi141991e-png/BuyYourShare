@@ -20,6 +20,7 @@ const messages = {
   RATING_PARTICIPATION_REQUIRED: 'Puoi valutare il capogruppo solo dopo una quota confermata nel suo gruppo.',
   RATING_INVALID: 'Scegli da una a cinque stelle.',
   ACCESS_PLAN_PAYMENT_PENDING: 'Esiste già un pagamento in corso per un altro piano. Completa o fai verificare quello prima di cambiare durata.',
+  WALLET_PAYMENT_IN_PROGRESS: 'Hai un tentativo aperto con un altro metodo. Contatta BYS per verificarlo prima di cambiare metodo.',
   INVALID_ACCESS_PLAN: 'Scegli un piano disponibile.',
   BANK_PAYPAL_OPEN: 'Risulta un pagamento automatico da verificare. Contatta BYS prima di inviare un secondo pagamento.',
   BANK_PAYMENT_IN_PROGRESS: 'Stai usando il bonifico: completa la verifica con amministratore prima di passare a PayPal.',
@@ -52,7 +53,7 @@ async function api(path, body) {
     headers: { Authorization: `Bearer ${authService.getToken()}`, 'Content-Type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const result = await response.json();
-  if (!response.ok) throw new Error(messages[result.error] || result.message || result.error || 'Operazione non completata. Riprova.');
+  if (!response.ok) throw Object.assign(new Error(messages[result.error] || result.message || result.error || 'Operazione non completata. Riprova.'), { code: result.error });
   return result;
 }
 const button = (id, text) => `<button class="btn btn-primary" id="${id}" type="button">${text}</button>`;

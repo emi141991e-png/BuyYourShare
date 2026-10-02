@@ -27,3 +27,7 @@ bysBankAdminRouter.post('/:id/confirm', async (req, res) => {
   try { res.json(await req.app.locals.p2pBank.confirmFromBys(req.params.id, req.bysAdminId, req.body.reference)); }
   catch (e) { res.status(e.status || 503).json({ error: e.message }); }
 });
+bysBankAdminRouter.post('/:id/recheck', async (req, res) => {
+  try { res.json(await req.app.locals.p2pGooglePay.recheck(req.params.id)); }
+  catch (e) { res.status(e.status || 503).json({ error: e.message }); }
+});

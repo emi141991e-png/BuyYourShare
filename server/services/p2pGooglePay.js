@@ -6,6 +6,17 @@ const DAY = 86400000;
 export class P2pGooglePay {
   constructor(subscriptions, bank, env = process.env) { this.s = subscriptions; this.bank = bank; this.repo = subscriptions.repo; this.env = env; }
   records() { return this.repo.data.p2pGooglePayments ||= []; }
+  recheck(id) { return this.transaction(async () => {
+    const p = this.records().find(r => r.id === id);
+    if (!p?.orderId) throw new P2pError('NOT_FOUND', 404);
+    // Read the existing order only: never authorize or capture another payment.
+    const order = await this.s.provider.request(`/v2/checkout/orders/${p.orderId}`);
+    const result = await this.settle(p, order);
+    p.providerStatus = order.status;
+    p.checkedAt = new Date(this.s.now()).toISOString();
+    await this.repo.save();
+    return { ...result, providerStatus: p.providerStatus };
+  }); }
   config(method = 'GOOGLE_PAY') {
     const p = this.s.provider.settings();
     const enabled = this.env[`P2P_${method}_ENABLED`] === 'true' && !!p.clientId && !!p.secret &&

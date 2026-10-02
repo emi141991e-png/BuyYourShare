@@ -1,3 +1,4 @@
+import { walletErrorCode } from './walletError.js';
 import { mountApplePayAccess } from './applePayAccess.js';
 import { accessMoney } from '../config/accessPlans.js';
 const scripts = new Map();
@@ -57,18 +58,21 @@ export async function mountGooglePayAccess(target, api, reload) {
     let orderId, busy = false; select.disabled=false;
     const client = new google.payments.api.PaymentsClient({ environment: config.environment, paymentDataCallbacks: {
       onPaymentAuthorized: async data => {
+        let paymentStage = 'CREAZIONE_ORDINE';
         try {
           ({ orderId } = await api('/api/p2p/google-pay/orders', {planCode:chosen.code}));
+          paymentStage = 'AUTORIZZAZIONE_GOOGLE_PAY';
           const result = await paypal.confirmOrder({ orderId, paymentMethodData: data.paymentMethodData });
           if (result.status === 'PAYER_ACTION_REQUIRED') await paypal.initiatePayerAction({ orderId });
           else if (!['APPROVED', 'COMPLETED'].includes(result.status)) throw new Error('Autorizzazione non completata.');
+          paymentStage = 'CONFERMA_INCASSO';
           const captured = await api(`/api/p2p/google-pay/orders/${encodeURIComponent(orderId)}/capture`, {});
           if (captured.pending) status.textContent = 'Pagamento in verifica. Non ripagarlo: aggiorna lo stato tra qualche minuto.';
           else { status.textContent = 'Pagamento confermato. Accesso aggiornato.'; setTimeout(reload, 500); }
           return { transactionState: 'SUCCESS' };
         } catch (e) {
-          status.textContent = 'Pagamento non confermato. Attendi la verifica prima di riprovare. ' + e.message;
-          return { transactionState: 'ERROR', error: { intent: 'PAYMENT_AUTHORIZATION', reason: 'OTHER_ERROR', message: 'Pagamento da verificare. Non effettuare un secondo pagamento.' } };
+          status.textContent = 'Pagamento non confermato. ' + e.message + ' Codice: ' + walletErrorCode(e, paymentStage);
+          return { transactionState: 'ERROR', error: { intent: 'PAYMENT_AUTHORIZATION', reason: 'OTHER_ERROR', message: 'Pagamento non completato. Non ripagare. Codice: ' + walletErrorCode(e, paymentStage) } };
         }
       }
     } });

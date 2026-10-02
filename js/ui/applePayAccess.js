@@ -1,3 +1,4 @@
+import { walletErrorCode } from './walletError.js';
 const loads = new Map();
 function load(src, namespace) {
   if (!loads.has(src)) loads.set(src, new Promise((resolve,reject) => {
@@ -31,14 +32,17 @@ export async function mountApplePayAccess(host, api, reload, selection) {
         session.oncancel=()=>{release();status.textContent=authorized?'Se hai autorizzato il pagamento, attendi la verifica prima di riprovare.':'Pagamento annullato.';};
         session.onpaymentauthorized=async event=>{
           authorized=true;
+          let paymentStage='CREAZIONE_ORDINE';
           try {
             const {orderId}=await api('/api/p2p/apple-pay/orders',{planCode:plan.code});
+            paymentStage='AUTORIZZAZIONE_APPLE_PAY';
             await paypal.confirmOrder({orderId,token:event.payment.token,billingContact:event.payment.billingContact});
+            paymentStage='CONFERMA_INCASSO';
             const result=await api(`/api/p2p/apple-pay/orders/${encodeURIComponent(orderId)}/capture`,{});
             session.completePayment(ApplePaySession.STATUS_SUCCESS);
             if(result.pending) status.textContent='Pagamento in verifica. Non ripagarlo: aggiorna lo stato tra qualche minuto.';
             else {status.textContent='Pagamento confermato. Accesso BYS attivato.';setTimeout(reload,500);}
-          }catch{session.completePayment(ApplePaySession.STATUS_FAILURE);status.textContent='Pagamento non confermato. Verifica lo stato prima di effettuare un nuovo pagamento.';}
+          }catch(e){session.completePayment(ApplePaySession.STATUS_FAILURE);status.textContent='Pagamento non confermato. Non effettuare un secondo pagamento. Codice: '+walletErrorCode(e,paymentStage);}
           finally{release();}
         };session.begin();
       }catch{release();status.textContent='Impossibile aprire Apple Pay su questo dispositivo.';}

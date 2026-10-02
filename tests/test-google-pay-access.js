@@ -3,6 +3,28 @@ import assert from 'node:assert/strict';
 import { P2pSubscriptions } from '../server/services/p2pSubscription.js';
 import { P2pBank } from '../server/services/p2pBank.js';
 import { P2pGooglePay } from '../server/services/p2pGooglePay.js';
+import { walletErrorCode } from '../js/ui/walletError.js';
+
+test('wallet diagnostics retain machine codes without leaking payment fields', () => {
+  assert.equal(walletErrorCode({code:'ACCESS_PLAN_PAYMENT_PENDING'},'ORDER'), 'ORDER:ACCESS_PLAN_PAYMENT_PENDING');
+  assert.equal(walletErrorCode({details:[{issue:'INSTRUMENT_DECLINED'}],token:'secret'},'WALLET'), 'WALLET:INSTRUMENT_DECLINED');
+  assert.equal(walletErrorCode({code:'private@example.com',message:'secret'},'ORDER'), 'ORDER:NON_COMPLETATO');
+});
+
+test('admin recheck never charges; completed quarterly and yearly orders recover only once', async () => {
+  for (const wallet of ['GOOGLE_PAY','APPLE_PAY']) for (const plan of ['MONTHLY','QUARTERLY','YEARLY']) {
+    const f=fixture(wallet); await f.g.create('u',plan,wallet);
+    const id=f.g.records()[0].id;
+    assert.equal((await f.g.recheck(id)).pending,true);
+    assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,0);
+    await f.s.provider.request('/v2/checkout/orders/ORDER1/capture','POST');
+    await f.g.recheck(id); const end=f.s.view('u').currentPeriodEnd;
+    await f.g.recheck(id);
+    assert.equal(f.s.view('u').currentPeriodEnd,end);
+    assert.equal(f.s.view('u').accessPlanCode,plan);
+    assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,1);
+  }
+});
 function fixture(wallet = 'GOOGLE_PAY') {
   let now = Date.parse('2026-01-31T12:00:00Z'), order, failCreate = false;
   const calls = [];
