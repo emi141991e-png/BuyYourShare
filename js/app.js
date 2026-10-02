@@ -368,7 +368,16 @@ function updateBottomNav() {
     return;
   }
 
-  bottomNav.innerHTML = `${[['#home','⌂','Esplora'],['#miei-abbonamenti','♧','I miei gruppi'],['#messaggi','✉','Messaggi'],['https://buyyourshare.it/account','○','La mia area']].map(([href,icon,label])=>`<a href="${href}" class="nav-item ${currentRoute===href||(href==='#miei-abbonamenti'&&currentRoute==='#miei-gruppi')||(href==='#messaggi'&&currentRoute.startsWith('#privata-'))?'active':''}"><span aria-hidden="true" style="font-size:24px">${icon}</span><span>${label}</span></a>`).join('')}`;
+  const items = [
+    ['#home','M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9','Esplora'],
+    ['#miei-abbonamenti','M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0','I miei gruppi'],
+    ['#messaggi','M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5','Messaggi'],
+    ['https://buyyourshare.it/account','M20 21v-2a7 7 0 0 0-14 0v2M17 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0','La mia area']
+  ];
+  bottomNav.innerHTML = items.map(([href,path,label])=>{
+    const active=currentRoute===href||(href==='#home'&&['','#cerca'].includes(currentRoute))||(href==='#miei-abbonamenti'&&currentRoute==='#miei-gruppi')||(href==='#messaggi'&&currentRoute.startsWith('#privata-'));
+    return `<a href="${href}" class="nav-item ${active?'active':''}" ${active?'aria-current="page"':''}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg><span>${label}</span></a>`;
+  }).join('');
 }
 
 // =========================================================================

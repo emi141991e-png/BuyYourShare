@@ -92,3 +92,12 @@
 @media(max-width:420px){.market-hero.market-story{padding:20px 16px}.market-story h2{font-size:35px}.market-story .hero-secondary{margin-left:0}.market-story-art figcaption{font-size:10px}}
 
 .market-hero.market-story h2{color:#202944}.market-hero.market-story .market-story-copy>p{color:#566074}
+
+/* High contrast navigation dock, shared by signed-in and guest views. */
+body .bottom-nav{background:linear-gradient(115deg,#202d50,#29295c);border:1px solid #5d6394;box-shadow:0 12px 35px #18234440,0 2px 8px #18234420;padding:8px 10px calc(8px + env(safe-area-inset-bottom));gap:6px;border-radius:24px}
+body .bottom-nav .nav-item{flex:1;min-width:0;min-height:60px;justify-content:center;gap:6px;padding:8px 5px;border-radius:16px;color:#f1f5ff;font-size:12px;font-weight:700;letter-spacing:.01em;transition:background .18s,color .18s;position:relative}
+body .bottom-nav .nav-item svg{width:24px;height:24px;color:#a5ceff;flex-shrink:0}
+body .bottom-nav .nav-item:nth-child(2) svg{color:#c6b5ff}body .bottom-nav .nav-item:nth-child(3) svg{color:#91eed6}body .bottom-nav .nav-item:nth-child(4) svg{color:#ffcab0}
+body .bottom-nav .nav-item:hover{background:#ffffff17;color:#fff}body .bottom-nav .nav-item.active{background:#eef0ff;color:#29265f;box-shadow:0 3px 12px #090e2526}body .bottom-nav .nav-item.active svg{color:#4942c3}body .bottom-nav .nav-item.active:after{content:"";width:16px;height:3px;border-radius:3px;background:#6458d9;position:absolute;bottom:3px}body .bottom-nav .nav-item:focus-visible{outline:3px solid #ffce93;outline-offset:2px}
+@media(max-width:480px){body .bottom-nav{gap:3px;padding-left:6px;padding-right:6px;border-radius:20px}body .bottom-nav .nav-item{font-size:11px;min-height:58px;padding:7px 3px;border-radius:13px}}
+@media(prefers-reduced-motion:reduce){body .bottom-nav .nav-item{transition:none}}
