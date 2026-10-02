@@ -74,3 +74,12 @@
 .bys-pay-reminders{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;box-sizing:border-box;padding:18px 22px;margin:20px 0;border:1px solid #4338ca;border-radius:18px;background:#4338ca;color:#fff!important;text-decoration:none!important;box-shadow:0 8px 20px #4338ca24;font-size:17px;font-weight:750;line-height:1.4}
 .bys-pay-reminders>span:nth-child(2){flex:1}.bys-pay-reminders small{display:block;margin-top:4px;color:#fff;font-size:13px;font-weight:400}.bys-pay-reminders:hover{background:#3730a3}.bys-pay-reminders:focus-visible,.bys-enable-push:focus-visible{outline:3px solid #0ea5e9;outline-offset:4px}
 .bys-enable-push{width:100%;min-height:56px!important;font-size:17px!important;white-space:normal;box-shadow:0 8px 20px #4338ca24}.push-panel{border:2px solid #c7d2fe!important;background:#f5f7ff!important}
+
+/* Clear entry points for availability alerts and BYS access. */
+.bys-watch-panel{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px;margin:24px 0;background:#eef2ff;border:2px solid #c7d2fe;border-radius:22px}
+.bys-watch-panel strong{font-size:20px;color:#172554}.bys-watch-panel p{margin:8px 0 0;color:#475569;max-width:620px}
+.bys-watch-cta.btn,.access-preview .bys-access-cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:54px;padding:16px 22px;background:#4338ca!important;color:#fff!important;border:0;border-radius:14px;font-size:16px;font-weight:750;box-shadow:0 6px 16px #4338ca25;text-decoration:none}
+.bys-watch-cta.btn:hover,.access-preview .bys-access-cta:hover{background:#3730a3!important}.bys-watch-cta.btn:focus-visible,.bys-access-cta:focus-visible{outline:3px solid #818cf8;outline-offset:4px}
+.access-preview .bys-access-cta{width:100%;margin:16px 0}.access-preview .bys-access-active{font-size:32px;color:#166534}.bys-watch-cta:disabled{opacity:.75}
+.group-info-panel .bys-watch-cta{width:100%;margin-top:18px}
+@media(max-width:640px){.bys-watch-panel{flex-direction:column;align-items:stretch;padding:20px}.bys-watch-panel .bys-watch-cta{width:100%}.bys-watch-panel p{font-size:14px}}
