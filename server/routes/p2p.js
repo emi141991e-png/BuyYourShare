@@ -28,6 +28,9 @@ export function createP2pRoutes(service, quota) {
   router.post('/apple-pay/orders', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.create(req.user.id, req.body.planCode, 'APPLE_PAY'))));
   router.post('/apple-pay/orders/:id/capture', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.capture(req.user.id, req.params.id, 'APPLE_PAY'))));
   router.get('/google-pay/config', handle(async (req, res) => res.json(req.app.locals.p2pGooglePay.config())));
+  router.get('/paypal-onetime/config', handle(async (req, res) => res.json(req.app.locals.p2pGooglePay.config('PAYPAL_ONETIME'))));
+  router.post('/paypal-onetime/orders', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.create(req.user.id, req.body.planCode, 'PAYPAL_ONETIME'))));
+  router.post('/paypal-onetime/orders/:id/capture', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.capture(req.user.id, req.params.id, 'PAYPAL_ONETIME'))));
   router.post('/google-pay/orders', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.create(req.user.id, req.body.planCode))));
   router.post('/google-pay/orders/:id/capture', handle(async (req, res) => res.json(await req.app.locals.p2pGooglePay.capture(req.user.id, req.params.id))));
   router.get('/subscription', handle(async (req, res) => {

@@ -85,7 +85,7 @@ export class P2pGooglePay {
     let method = p.paymentMethod || 'GOOGLE_PAY';
     // A previously open browser may complete the original wallet on the SAME
     // order. Reconcile the verified source, without losing or duplicating access.
-    const actualWallet = order.payment_source?.apple_pay ? 'APPLE_PAY' : order.payment_source?.google_pay ? 'GOOGLE_PAY' : null;
+    const actualWallet = order.payment_source?.apple_pay ? 'APPLE_PAY' : order.payment_source?.google_pay ? 'GOOGLE_PAY' : order.payment_source?.paypal ? 'PAYPAL_ONETIME' : null;
     if (actualWallet && p.allowedWallets?.includes(actualWallet)) method = actualWallet;
     const amount = ((p.amountCents ?? 99) / 100).toFixed(2);
     const plan = accessPlan(p.planCode || 'MONTHLY');
@@ -123,7 +123,8 @@ export class P2pGooglePay {
     }
     if (order.status !== 'COMPLETED' || captures.length !== 1 || captures[0].status !== 'COMPLETED') return { pending: true };
     const capture = captures[0];
-    if (!capture.id || capture.amount?.currency_code !== 'EUR' || capture.amount.value !== amount || !order.payment_source?.[method === 'APPLE_PAY' ? 'apple_pay' : 'google_pay']) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
+    const source = { GOOGLE_PAY: 'google_pay', APPLE_PAY: 'apple_pay', PAYPAL_ONETIME: 'paypal' }[method];
+    if (!source || !capture.id || capture.amount?.currency_code !== 'EUR' || capture.amount.value !== amount || !order.payment_source?.[source]) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
     if (this.records().some(r => r.id !== p.id && r.captureId === capture.id)) throw new P2pError('PAYPAL_PAYMENT_REVIEW_REQUIRED');
     const paidAt = Date.parse(capture.create_time);
     if (!Number.isFinite(paidAt) || paidAt > this.s.now() + 60000) throw new P2pError('P2P_PROVIDER_RESPONSE_INVALID', 502);

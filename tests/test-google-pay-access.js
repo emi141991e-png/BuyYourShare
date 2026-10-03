@@ -6,8 +6,36 @@ import { P2pGooglePay } from '../server/services/p2pGooglePay.js';
 import { walletErrorCode } from '../js/ui/walletError.js';
 import { accessRemainingDays } from '../js/config/accessPlans.js';
 
+test('PayPal single payments require explicit live release and enable flags', async () => {
+  const f = fixture('PAYPAL_ONETIME');
+  f.s.provider.settings = () => ({ mode: 'live', clientId: 'test', secret: 'test' });
+  assert.deepEqual(f.g.config('PAYPAL_ONETIME'), { enabled: false });
+  await assert.rejects(f.g.create('u', 'MONTHLY', 'PAYPAL_ONETIME'), /PAYPAL_ONETIME_UNAVAILABLE/);
+  assert.equal(f.calls.length, 0);
+  f.g.env.P2P_PAYPAL_ONETIME_LIVE_VERIFIED = 'true';
+  assert.equal(f.g.config('PAYPAL_ONETIME').environment, 'PRODUCTION');
+  f.g.env.P2P_PAYPAL_ONETIME_ENABLED = 'false';
+  assert.deepEqual(f.g.config('PAYPAL_ONETIME'), { enabled: false });
+});
+
+test('PayPal single payment requires the PayPal source and a completed capture', async () => {
+  const f = fixture('PAYPAL_ONETIME');
+  await f.g.create('u', 'QUARTERLY', 'PAYPAL_ONETIME');
+  assert.equal((await f.g.recheck(f.g.records()[0].id)).pending, true);
+  assert.equal(f.s.view('u').accessAllowed, false);
+  f.order().payment_source = { google_pay: {} };
+  await assert.rejects(f.g.capture('u', 'ORDER1', 'PAYPAL_ONETIME'), /IDENTITY_MISMATCH/);
+  assert.equal(f.s.view('u').accessAllowed, false);
+  f.order().payment_source = { paypal: {} };
+  await f.g.capture('u', 'ORDER1', 'PAYPAL_ONETIME');
+  assert.equal(f.s.view('u').paymentMethod, 'PAYPAL_ONETIME');
+  assert.equal(f.s.view('u').accessAllowed, true);
+  await f.s.refresh('u');
+  assert.equal(f.s.view('u').accessAllowed, true);
+});
+
 test('monthly then annual preserves every residual day, including after a delay and repeated verification', async () => {
-  for (const wallet of ['GOOGLE_PAY','APPLE_PAY']) for (const delay of [0,10]) {
+  for (const wallet of ['GOOGLE_PAY','APPLE_PAY','PAYPAL_ONETIME']) for (const delay of [0,10]) {
     const f=fixture(wallet);let sequence=0;
     const request=f.s.provider.request;
     f.s.provider.request=async (...args)=>{
@@ -36,7 +64,7 @@ test('wallet diagnostics retain machine codes without leaking payment fields', (
 });
 
 test('admin recheck never charges; completed quarterly and yearly orders recover only once', async () => {
-  for (const wallet of ['GOOGLE_PAY','APPLE_PAY']) for (const plan of ['MONTHLY','QUARTERLY','YEARLY']) {
+  for (const wallet of ['GOOGLE_PAY','APPLE_PAY','PAYPAL_ONETIME']) for (const plan of ['MONTHLY','QUARTERLY','YEARLY']) {
     const f=fixture(wallet); await f.g.create('u',plan,wallet);
     const id=f.g.records()[0].id;
     assert.equal((await f.g.recheck(id)).pending,true);
@@ -56,7 +84,7 @@ function fixture(wallet = 'GOOGLE_PAY') {
   const provider = { settings: () => ({ mode: 'sandbox', clientId: 'test', secret: 'test' }), request: async (path, method, body, key) => {
     calls.push({ path, method, key });
     if (path === '/v2/checkout/orders') {
-      order = { id: 'ORDER1', status: 'APPROVED', purchase_units: body.purchase_units, payment_source: { [wallet === 'APPLE_PAY' ? 'apple_pay' : 'google_pay']: {} } };
+      order = { id: 'ORDER1', status: 'APPROVED', purchase_units: body.purchase_units, payment_source: { [wallet === 'APPLE_PAY' ? 'apple_pay' : wallet === 'PAYPAL_ONETIME' ? 'paypal' : 'google_pay']: {} } };
       if (failCreate) throw new Error('network');
       return order;
     }
@@ -64,7 +92,7 @@ function fixture(wallet = 'GOOGLE_PAY') {
     return structuredClone(order);
   } };
   const s = new P2pSubscriptions(repo, provider, { enabled: () => true, now: () => now });
-  const bank = new P2pBank(s), g = new P2pGooglePay(s, bank, { P2P_GOOGLE_PAY_ENABLED: 'true', P2P_APPLE_PAY_ENABLED: 'true' });
+  const bank = new P2pBank(s), g = new P2pGooglePay(s, bank, { P2P_GOOGLE_PAY_ENABLED: 'true', P2P_APPLE_PAY_ENABLED: 'true', P2P_PAYPAL_ONETIME_ENABLED: 'true' });
   return { repo, s, bank, g, calls, advance: days => { now += days * 86400000; }, order: () => order, fail: () => { failCreate = true; } };
 }
 

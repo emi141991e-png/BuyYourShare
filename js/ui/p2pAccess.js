@@ -175,15 +175,15 @@ export async function renderP2pAccess(container, route, user) {
         <button class="billing-refresh" id="p2pRefresh" type="button">Aggiorna stato del pagamento</button></div>
         ${s.paymentMethod === 'PAYPAL' && s.providerStatus && !['APPROVAL_PENDING', 'CANCELLED', 'EXPIRED'].includes(s.providerStatus) && !s.cancelAtPeriodEnd && s.status !== 'canceled' ? '<div class="billing-manage"><button id="p2pCancel" type="button">Disattiva rinnovo automatico</button></div>' : ''}
         </article><aside class="billing-aside"><span class="billing-eyebrow">SEMPLICE, TRASPARENTE</span><h3>Un accesso,<br>due possibilità.</h3><div><span class="billing-step">01</span><h4>Partecipa a un gruppo</h4><p>Scegli il gruppo e gestisci le tue partecipazioni in un unico spazio.</p></div><div><span class="billing-step">02</span><h4>Crea il tuo gruppo</h4><p>Diventa capogruppo senza un secondo abbonamento o costi aggiuntivi di accesso.</p></div><div class="billing-separate"><h4>Le quote restano separate</h4><p>Le quote dei membri vanno direttamente al capogruppo tramite bonifico o PayPal. BYS incassa solo l’abbonamento di accesso.</p></div></aside></div>`, true);
-      if (['BANK', 'GOOGLE_PAY', 'APPLE_PAY'].includes(s.paymentMethod)) {
+      if (['BANK', 'GOOGLE_PAY', 'APPLE_PAY', 'PAYPAL_ONETIME'].includes(s.paymentMethod)) {
         container.querySelector('.billing-price span').textContent = '/ ' + accessPlan(s.accessPlanCode).period;
         const details = container.querySelector('.billing-details');
         details.innerHTML = `<div><dt>Il piano include</dt><dd>Membro e capogruppo</dd></div><div><dt>Accesso fino al</dt><dd>${date(s.currentPeriodEnd)}</dd></div>`;
         const notice = container.querySelector('.billing-notice');
         if (notice) notice.textContent = s.accessAllowed ? 'Il tuo accesso BYS è attivo.' : 'Accesso e assistenza inclusa sospesi: rinnova per riattivarli. Il supporto per problemi di pagamento resta disponibile.';
-        if (['GOOGLE_PAY', 'APPLE_PAY'].includes(s.paymentMethod)) {
+        if (['GOOGLE_PAY', 'APPLE_PAY', 'PAYPAL_ONETIME'].includes(s.paymentMethod)) {
           container.querySelector('.billing-price span').textContent = '/ ' + accessPlan(s.accessPlanCode).period;
-          container.querySelector('.billing-caption').textContent = `${s.paymentMethod === 'APPLE_PAY' ? 'Apple Pay' : 'Google Pay'} · Pagamento singolo, senza rinnovo automatico`;
+          container.querySelector('.billing-caption').textContent = `${s.paymentMethod === 'APPLE_PAY' ? 'Apple Pay' : s.paymentMethod === 'PAYPAL_ONETIME' ? 'PayPal' : 'Google Pay'} · Pagamento singolo, senza rinnovo automatico`;
         }
       }
       if (s.accessAllowed) {

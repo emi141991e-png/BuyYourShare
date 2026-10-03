@@ -70,11 +70,11 @@ export class P2pBank {
   }); }
   reminders() { return this.transaction(async () => {
     for (const s of this.s.records()) {
-      if (!['BANK', 'GOOGLE_PAY', 'APPLE_PAY'].includes(s.paymentMethod) || !s.currentPeriodEnd) continue;
+      if (!['BANK', 'GOOGLE_PAY', 'APPLE_PAY', 'PAYPAL_ONETIME'].includes(s.paymentMethod) || !s.currentPeriodEnd) continue;
       const remaining = Date.parse(s.currentPeriodEnd) - this.s.now();
       if (remaining > 3 * 86400000) continue;
       const phase = remaining > 0 ? 'before' : 'due';
-      const message = ['GOOGLE_PAY', 'APPLE_PAY'].includes(s.paymentMethod)
+      const message = ['GOOGLE_PAY', 'APPLE_PAY', 'PAYPAL_ONETIME'].includes(s.paymentMethod)
         ? (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Scegli il piano e rinnova: non ci sono addebiti automatici.' : 'Accesso BYS scaduto: funzioni riservate e assistenza inclusa sono sospese fino al rinnovo. Puoi ancora accedere al conto e chiedere supporto sui pagamenti.')
         : (remaining > 0 ? 'Il tuo accesso BYS scade entro 3 giorni. Verifica il bonifico per il piano scelto e segnala il pagamento.' : 'Il tuo accesso BYS è scaduto. Segnala il bonifico per rinnovarlo dopo la verifica dell’incasso.');
       this.notify(s.userId, `bank-renew:${s.userId}:${s.currentPeriodEnd}:${phase}`, message, { bankPeriodEnd: s.currentPeriodEnd });
