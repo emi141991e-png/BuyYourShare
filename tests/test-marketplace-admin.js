@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { MarketplaceAdmin, marketplaceSnapshot } from '../server/services/marketplaceAdmin.js';
+function fixture(){const repo={data:{users:[{id:'a',role:'admin',email:'a@example.com',passwordHash:'SECRET'},{id:'u',role:'user',fullName:'User',email:'u@example.com'}],groups:[{id:'g',ownerId:'u',customServiceName:'Group',planName:'Family',status:'PUBLISHED'}],p2pManualRequests:[],sessions:[{userId:'u'}]},save:async()=>{}};return {repo,service:new MarketplaceAdmin({repo,exclusive:fn=>fn()})};}
+test('admin snapshot excludes credentials and private messages, resolves leader correctly',()=>{const {repo}=fixture();repo.data.p2pPrivateMessages=[{messageContent:'PRIVATE'}];repo.data.p2pManualRequests.push({id:'r',groupId:'g',userId:'u'});const result=marketplaceSnapshot(repo.data);assert.equal(JSON.stringify(result).includes('SECRET'),false);assert.equal(JSON.stringify(result).includes('PRIVATE'),false);assert.equal(result.requests[0].leader,'User');});
+test('suspension is explicit, revokes sessions and records actor/reason',async()=>{const {repo,service}=fixture();await service.change('users','u',{action:'suspend',reason:'Moderation review'},'bys-admin');assert.equal(repo.data.users[1].isSuspended,true);assert.equal(repo.data.sessions.length,0);assert.equal(repo.data.marketplaceAdminAudit[0].actor,'bys:bys-admin');await assert.rejects(service.change('users','a',{action:'suspend',reason:'Moderation review'},'bys-admin'));});
+test('archive is reversible and preserves history; pending money and paid periods are protected',async()=>{const {repo,service}=fixture();repo.data.p2pManualRequests.push({id:'r',groupId:'g',userId:'u',status:'reported'});await service.change('groups','g',{action:'archive',reason:'Close group'},'a');assert.equal(repo.data.groups[0].status,'CLOSED');assert.equal(repo.data.groups[0].isPublished,false);assert.equal(repo.data.p2pManualRequests[0].status,'reported');assert.equal(marketplaceSnapshot(repo.data).groups[0].archived,true);await assert.rejects(service.change('requests','r',{action:'cancel',reason:'Cancel request'},'a'));repo.data.p2pManualRequests[0].status='confirmed';repo.data.p2pManualRequests[0].periodEnd='2035-01-01';await assert.rejects(service.change('requests','r',{action:'cancel',reason:'Cancel request'},'a'));await service.change('groups','g',{action:'archive',reason:'Close group'},'a');assert.equal(repo.data.p2pManualRequests.length,1);await service.change('groups','g',{action:'restore',reason:'Restore group'},'a');assert.equal(repo.data.groups[0].status,'DRAFT');});
+test('failed persistence rolls back all admin changes',async()=>{const {repo,service}=fixture();repo.save=async()=>{throw new Error('disk failed')};await assert.rejects(service.change('users','u',{action:'edit',name:'New name',email:'u@example.com',reason:'Correct name'},'a'));assert.equal(repo.data.users[1].fullName,'User');assert.equal(repo.data.marketplaceAdminAudit,undefined);});
+
+test('issue reply reaches only the reporter and failed save rolls back status and notification',async()=>{
+ const {repo,service}=fixture();repo.data.groupIssues=[{id:'i',userId:'u',groupId:'g',status:'open',description:'Missing access'}];
+ await service.change('issues','i',{action:'reviewing',reply:'We are reviewing your report',reason:'Review report'},'a');
+ assert.equal(repo.data.groupIssues[0].status,'reviewing');assert.equal(repo.data.notifications.length,1);assert.equal(repo.data.notifications[0].userId,'u');assert.equal(marketplaceSnapshot(repo.data).issues[0].groupName,'Group');
+ repo.save=async()=>{throw new Error('disk')};await assert.rejects(service.change('issues','i',{action:'resolved',reply:'Resolved report',reason:'Close report'},'a'));assert.equal(repo.data.groupIssues[0].status,'reviewing');assert.equal(repo.data.notifications.length,1);
+});
+
+test('BYS deletion resolves linked identity, protects active groups and revokes sessions',async()=>{
+ const {repo,service}=fixture();repo.data.users[1].bysUserId='bys-u';
+ await assert.rejects(service.change('bys-users','bys-u',{action:'archive',reason:'Delete account'},'admin'));
+ repo.data.groups[0].status='CLOSED';
+ await service.change('bys-users','bys-u',{action:'archive',reason:'Delete account'},'admin');
+ assert.equal(repo.data.users[1].isSuspended,true);assert.ok(repo.data.users[1].archivedAt);assert.equal(repo.data.sessions.length,0);
+ assert.equal((await service.change('bys-users','not-linked',{action:'archive',reason:'Delete account'},'admin')).notLinked,true);
+});

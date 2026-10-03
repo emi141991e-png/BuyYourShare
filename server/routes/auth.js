@@ -38,7 +38,8 @@ authRouter.use((req, res, next) => {
   next();
 });
 
-function renderSsoCompletion(session, user) {
+function renderSsoCompletion(session, user, next) {
+  const destination = /^#(?:home|messaggi|miei-gruppi|miei-abbonamenti|p2p-abbonamento|notifiche|privata-[a-zA-Z0-9-]+|gruppo-[a-zA-Z0-9-]+)$/.test(next || '') ? next : '#home';
   const safeState = JSON.stringify({
     token: session.token,
     user: sanitizeUser(user)
@@ -52,7 +53,7 @@ function renderSsoCompletion(session, user) {
   localStorage.setItem('buyyourshare_cached_email',state.user.email);
   localStorage.setItem('buyyourshare_cached_name',state.user.fullName||state.user.name||'Utente');
   localStorage.setItem('buyyourshare_last_activity_ts',Date.now().toString());
-  location.replace('/#home');</script></body></html>`;
+  location.replace(${JSON.stringify('/' + destination)});</script></body></html>`;
 }
 
 // BYS 2.0 is the identity authority. The signed ticket is POSTed so it never appears in a URL.
@@ -65,7 +66,7 @@ authRouter.post('/bys/callback', async (req, res) => {
       'Referrer-Policy': 'no-referrer',
       'X-Content-Type-Options': 'nosniff'
     });
-    return res.type('html').send(renderSsoCompletion(session, user));
+    return res.type('html').send(renderSsoCompletion(session, user, req.body?.next));
   } catch (error) {
     const status = error instanceof BysSsoError && error.code !== 'SSO_NOT_CONFIGURED' ? 401 : 503;
     console.warn('[BYS SSO ERROR]', error.code || error.message);
@@ -311,7 +312,7 @@ authRouter.post('/forgot-password', async (req, res) => {
         resetPasswordExpires: expiresAt
       });
 
-      const host = req.get('host') || 'buyyourshare-production.up.railway.app';
+      const host = req.get('host') || 'marketplace.buyyourshare.it';
       const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
       const resetLink = `${proto}://${host}/#reset-password?email=${encodeURIComponent(cleanEmail)}&token=${encodeURIComponent(resetToken)}`;
       emailService.sendPasswordResetEmail(user, resetToken, resetLink).catch(err => {

@@ -1,3 +1,5 @@
+import { renderMarketplaceWelcome } from './ui/marketplaceWelcome.js';
+import { renderAdminOverview } from './ui/adminOverview.js';
 /**
  * BuyYourShare - Standalone Marketplace Controller & SPA Router
  * Modello P2P con Quote Mensili, Commissione 0,99€, Chat Privata Nativa e Accesso Automatico
@@ -115,6 +117,10 @@ export function renderApp() {
     }
 
     const routePath = (currentRoute || '#home').split('?')[0];
+    if (routePath === '#admin') {
+      window.location.replace('https://buyyourshare.it/admin');
+      return;
+    }
 
     // Rotte pubbliche esplicite di login / registrazione / recupero password
     if (routePath.startsWith('#reset-password')) {
@@ -124,21 +130,25 @@ export function renderApp() {
       return;
     }
     if (routePath === '#login') {
-      renderAuthLandingView(container, 'login');
+      renderMarketplaceWelcome(container);
       return;
     }
     if (routePath === '#register') {
-      renderAuthLandingView(container, 'register');
+      renderMarketplaceWelcome(container);
+      return;
+    }
+    if (routePath === '#login-locale') {
+      renderAuthLandingView(container, 'login');
       return;
     }
 
     // Se l'utente non è autenticato, proteggi tutte le aree private
-    const protectedRoutes = ['#crea', '#miei-abbonamenti', '#miei-gruppi', '#admin', '#notifiche'];
+    const protectedRoutes = ['#messaggi', '#crea', '#miei-abbonamenti', '#miei-gruppi', '#admin', '#notifiche'];
     const isChatRoute = routePath.startsWith('#chat-');
     const isProtected = protectedRoutes.includes(routePath) || isChatRoute;
 
     if (!isAuth && isProtected) {
-      renderAuthLandingView(container, 'login');
+      renderMarketplaceWelcome(container);
       return;
     }
 
@@ -218,14 +228,7 @@ function updateHeader(currentUser) {
   if (!headerActions) return;
 
   if (!isAuth || !currentUser) {
-    headerActions.innerHTML = `
-      <a href="#login" class="btn btn-secondary btn-sm" style="font-size:12px; font-weight:700; padding:6px 12px;">
-        🔐 Accedi
-      </a>
-      <a href="#register" class="btn btn-primary btn-sm" style="font-size:12px; font-weight:800; padding:6px 14px; background:#003087;">
-        ✨ Registrati
-      </a>
-    `;
+    headerActions.innerHTML = '<a class="btn btn-secondary btn-sm" href="https://buyyourshare.it/">← Torna a BYS</a>';
     return;
   }
 
@@ -234,10 +237,11 @@ function updateHeader(currentUser) {
   const roleColor = currentUser.role === 'admin' ? '#6b21a8' : (roleLabel.includes('Capogruppo') ? '#92400e' : '#0369a1');
 
   const unreadNotifs = db.getNotifications(currentUser.id).filter(n => !n.isRead).length;
+  const accountOpen = headerActions.querySelector('.account-menu')?.open;
 
   headerActions.innerHTML = `
     <!-- User Badge & Name -->
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div class="header-user" style="display:flex; align-items:center; gap:8px;">
       <span style="font-size:11px; background:${roleBg}; color:${roleColor}; padding:3px 8px; border-radius:var(--radius-full); font-weight:800; white-space:nowrap;">
         ${roleLabel}
       </span>
@@ -247,7 +251,7 @@ function updateHeader(currentUser) {
     </div>
 
     <!-- Notifiche Button -->
-    <a href="#notifiche" class="notif-btn" title="Notifiche">
+    <a href="#notifiche" class="notif-btn" title="Notifiche" aria-label="Notifiche: ${unreadNotifs} da leggere">
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
       </svg>
@@ -267,21 +271,10 @@ function updateHeader(currentUser) {
       </button>
     ` : ''}
 
-    <!-- Payment and Payout Settings Button -->
-    <a href="#p2p-abbonamento" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px;">Abbonamento P2P</a>
-
-    <!-- Delete Account Button (Tutti gli account registrati) -->
-    ${currentUser.role !== 'admin' ? `
-      <button id="btnDeleteAccountHeader" class="btn btn-secondary btn-sm" style="font-size:11px; padding:4px 8px; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; font-weight:700;" title="Elimina definitivamente il tuo account">
-        🗑️ Elimina Account
-      </button>
-    ` : ''}
-
-    <!-- Logout Button -->
-    <button id="btnLogoutHeader" class="btn btn-secondary btn-sm" style="font-size:11.5px; padding:4px 8px; color:#dc2626; border-color:#fca5a5;" title="Disconnetti account">
-      🚪 Esci
-    </button>
+    <a class="btn btn-secondary btn-sm" href="https://buyyourshare.it/">← Torna a BYS</a>
   `;
+
+  if (accountOpen && headerActions.querySelector('.account-menu')) headerActions.querySelector('.account-menu').open = true;
 
   // Bind Payment Modal
   const btnPayment = document.getElementById('btnOpenPaymentSettingsHeader');
@@ -375,40 +368,16 @@ function updateBottomNav() {
     return;
   }
 
-  bottomNav.innerHTML = `
-    <a href="#home" class="nav-item ${currentRoute === '#home' || currentRoute === '' ? 'active' : ''}">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-      </svg>
-      <span>Home</span>
-    </a>
-    <a href="#cerca" class="nav-item ${currentRoute === '#cerca' ? 'active' : ''}">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-      </svg>
-      <span>Cerca</span>
-    </a>
-    <a href="#crea" class="nav-item nav-item-highlight ${currentRoute === '#crea' ? 'active' : ''}">
-      <div class="nav-create-icon">
-        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
-        </svg>
-      </div>
-      <span>Crea</span>
-    </a>
-    <a href="#miei-gruppi" class="nav-item ${currentRoute === '#miei-gruppi' ? 'active' : ''}">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-      </svg>
-      <span>I Miei Gruppi</span>
-    </a>
-    <a href="#miei-abbonamenti" class="nav-item ${currentRoute === '#miei-abbonamenti' ? 'active' : ''}">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-      </svg>
-      <span>Abbonamenti</span>
-    </a>
-  `;
+  const items = [
+    ['#home','M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9','Esplora'],
+    ['#miei-abbonamenti','M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0','I miei gruppi'],
+    ['#messaggi','M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5','Messaggi'],
+    ['https://buyyourshare.it/account','M20 21v-2a7 7 0 0 0-14 0v2M17 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0','La mia area']
+  ];
+  bottomNav.innerHTML = items.map(([href,path,label])=>{
+    const active=currentRoute===href||(href==='#home'&&['','#cerca'].includes(currentRoute))||(href==='#miei-abbonamenti'&&currentRoute==='#miei-gruppi')||(href==='#messaggi'&&currentRoute.startsWith('#privata-'));
+    return `<a href="${href}" class="nav-item ${active?'active':''}" ${active?'aria-current="page"':''}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg><span>${label}</span></a>`;
+  }).join('');
 }
 
 // =========================================================================
@@ -430,7 +399,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
           </div>
           <h1 style="font-size:24px; font-weight:900; color:var(--text-main); margin-bottom:6px;">Benvenuto su BuyYourShare</h1>
           <p style="font-size:13.5px; color:var(--text-secondary); max-width:420px; margin:0 auto; line-height:1.4;">
-            Accedi al P2P: membro 0,99 €/mese, capogruppo 0,49 €/mese. Le quote dei gruppi si pagano direttamente al capogruppo.
+            Accedi al P2P: membro 0,99 €/mese, capogruppo 0,99 €/mese. Le quote dei gruppi si pagano direttamente al capogruppo.
           </p>
         </div>
 
@@ -633,7 +602,7 @@ function renderAuthLandingView(container, initialTab = 'login', emailPrefill = '
         </div>
 
         <p style="text-align:center; font-size:11.5px; color:var(--text-muted); margin-top:20px;">
-          Abbonamento BYS con rinnovo automatico tramite PayPal. Nessun incasso o distribuzione delle quote dei gruppi da parte di BYS.
+          Google Pay, quando disponibile, attiva automaticamente 30 giorni dopo la conferma del pagamento. Il bonifico richiede verifica dell’incasso: puoi impostarlo periodico nella tua banca. Nessun incasso o distribuzione delle quote dei gruppi da parte di BYS.
         </p>
       </div>
     `;
@@ -2660,17 +2629,10 @@ async function renderAdminView(container, currentUser) {
     console.warn('[ADMIN VIEW] Fallito fetch server-side admin, fallback locale:', err.message);
   }
 
-  // Fallback se offline/local
   if (!metrics) {
-    const localSummary = financialAuditService.getFinancialSummary();
-    metrics = {
-      users: { total: db.data.users.length, members: db.data.users.filter(u => u.role === 'user').length, owners: db.data.users.filter(u => u.role === 'owner').length, admins: 1 },
-      groups: { total: db.data.groups.length, published: db.data.groups.filter(g => g.status === 'PUBLISHED' || g.status === 'active').length, draft: db.data.groups.filter(g => g.status === 'DRAFT').length, closed: db.data.groups.filter(g => g.status === 'CLOSED').length, availableSlots: 5, occupiedSlots: 1, totalSlots: 6 },
-      finance: { totalVolumeCents: localSummary.totalGrossFeesCents, totalGrossFeesCents: localSummary.totalGrossFeesCents, totalProviderFeesCents: localSummary.totalProviderFeesCents, totalNetPlatformRevenueCents: localSummary.totalNetPlatformRevenueCents, totalTransferredToOwnersCents: 0, transactionsCount: localSummary.totalTransactionsCount }
-    };
-    allGroups = db.getGroups();
-    allUsers = db.data.users;
-    financialLogs = financialAuditService.getAllLogs();
+    container.innerHTML = '<section class="billing-card"><h1>Pannello admin non disponibile</h1><p role="alert">Non è stato possibile caricare i dati verificati del server. Accedi nuovamente o riprova.</p><a href="#login">Accedi</a> <button id="retryAdmin" class="btn btn-secondary">Riprova</button></section>';
+    container.querySelector('#retryAdmin').onclick = () => renderAdminView(container, currentUser);
+    return;
   }
 
   function getTabBtnStyle(tabName) {
@@ -2688,7 +2650,7 @@ async function renderAdminView(container, currentUser) {
             <span style="background:#f3e8ff; color:#6b21a8; font-size:11px; font-weight:800; padding:2px 8px; border-radius:var(--radius-full);">RISERVATO</span>
           </div>
           <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
-            Gestione globale BuyYourShare, moderazione gruppi, utenti e supervisione contabile immutabile.
+            Gestione marketplace: accessi BYS, richieste, gruppi e utenti. Le quote sono esterne a BYS.
           </p>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
@@ -2709,7 +2671,7 @@ async function renderAdminView(container, currentUser) {
           👥 Gestione Utenti (${metrics.users.total || allUsers.length})
         </button>
         <button type="button" class="btn-admin-tab" data-tab="ledger" style="${getTabBtnStyle('ledger')}">
-          📜 Audit Ledger & Azioni
+          📜 Storico legacy e azioni
         </button>
         <button type="button" class="btn-admin-tab" data-tab="gateway" style="${getTabBtnStyle('gateway')}">
           🅿️ Config Gateway
@@ -2719,58 +2681,7 @@ async function renderAdminView(container, currentUser) {
       <!-- ========================================== -->
       <!-- TAB 1: DASHBOARD KPI                       -->
       <!-- ========================================== -->
-      ${currentAdminTab === 'dashboard' ? `
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:24px;">
-          <!-- Card Utenti -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">👥 Utenti Totali</span>
-            <div style="font-size:26px; font-weight:900; color:#003087; margin:6px 0;">${metrics.users.total}</div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              <strong>${metrics.users.members}</strong> Membri • <strong>${metrics.users.owners}</strong> Capigruppo
-            </div>
-          </div>
-
-          <!-- Card Gruppi -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">📁 Gruppi a Sistema</span>
-            <div style="font-size:26px; font-weight:900; color:#166534; margin:6px 0;">${metrics.groups.total}</div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              <span style="color:#166534; font-weight:700;">${metrics.groups.published} Pubblicati</span> • 
-              <span style="color:#d97706; font-weight:700;">${metrics.groups.draft || 0} Draft</span> • 
-              <span style="color:#991b1b; font-weight:700;">${metrics.groups.closed || 0} Chiusi</span>
-            </div>
-          </div>
-
-          <!-- Card Posti -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">🟢 Posti Marketplace</span>
-            <div style="font-size:26px; font-weight:900; color:#0284c7; margin:6px 0;">${metrics.groups.availableSlots || 0} <span style="font-size:14px; color:var(--text-muted); font-weight:500;">liberi</span></div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              Totali: <strong>${metrics.groups.totalSlots || 0}</strong> • Occupati: <strong>${metrics.groups.occupiedSlots || 0}</strong>
-            </div>
-          </div>
-
-          <!-- Card Finanziaria -->
-          <div style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <span style="font-size:11.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase;">💰 Fee Lorde Incassate</span>
-            <div style="font-size:26px; font-weight:900; color:var(--accent); margin:6px 0;">${formatCents(metrics.finance.totalGrossFeesCents)}</div>
-            <div style="font-size:11.5px; color:var(--text-muted);">
-              Netto: <strong style="color:#166534;">${formatCents(metrics.finance.totalNetPlatformRevenueCents)}</strong> (${metrics.finance.transactionsCount || 0} cicli)
-            </div>
-          </div>
-        </div>
-
-        <!-- Riepilogo Finanziario Rapido -->
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:var(--radius-lg); padding:18px; margin-bottom:24px;">
-          <h3 style="font-size:14px; font-weight:800; color:var(--text-main); margin-bottom:8px;">📊 Riepilogo Economico Piattaforma</h3>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:12.5px;">
-            <div>Volume Totale Transato: <strong>${formatCents(metrics.finance.totalVolumeCents)}</strong></div>
-            <div>Fee BYS Lorde (1,49 €/quota): <strong>${formatCents(metrics.finance.totalGrossFeesCents)}</strong></div>
-            <div>Costi Gateway Stimati: <strong>${formatCents(metrics.finance.totalProviderFeesCents)}</strong></div>
-            <div>Quote Trasferite ai Capigruppo: <strong style="color:#1e40af;">${formatCents(metrics.finance.totalTransferredToOwnersCents)}</strong></div>
-          </div>
-        </div>
-      ` : ''}
+      ${currentAdminTab === 'dashboard' ? '<div id="adminP2pOverview"></div>' : ''}
 
       <!-- ========================================== -->
       <!-- TAB 2: GESTIONE GRUPPI                     -->
@@ -3112,6 +3023,7 @@ async function renderAdminView(container, currentUser) {
   `;
 
   // Bind Tab Click Listeners
+  if (currentAdminTab === 'dashboard') await renderAdminOverview(container.querySelector('#adminP2pOverview'), token, escapeHtml);
   container.querySelectorAll('.btn-admin-tab').forEach(btn => {
     btn.onclick = () => {
       currentAdminTab = btn.dataset.tab;
@@ -3271,7 +3183,7 @@ async function openAccessModal(groupId, currentUser) {
   if (!instructions || !instructions.accessUrl) {
     if (group) {
       instructions = {
-        accessUrl: group.accessUrl || 'https://buyyourshare-production.up.railway.app/#chat-' + groupId,
+        accessUrl: group.accessUrl || 'https://marketplace.buyyourshare.it/#chat-' + groupId,
         instructions: group.instructions || 'Accedi alla chat privata del gruppo per ricevere il link di invito e le credenziali dal Capogruppo.',
         accessCode: group.inviteCode || '',
         ownerSpotifyAccount: group.ownerSpotifyAccount || ''
@@ -4452,7 +4364,7 @@ function setupInactivityWatchdog() {
         const u = authService.getCurrentUser();
         await db.syncAllFromServer(u);
         const routePath = (currentRoute || '#home').split('?')[0];
-        if (routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+        if (routePath !== '#crea' && routePath !== '#p2p-abbonamento' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
           renderApp();
         }
       }
@@ -4466,7 +4378,7 @@ function setupInactivityWatchdog() {
       const u = authService.getCurrentUser();
       await db.syncAllFromServer(u);
       const routePath = (currentRoute || '#home').split('?')[0];
-      if (routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+      if (routePath !== '#crea' && routePath !== '#p2p-abbonamento' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
         renderApp();
       }
     }
@@ -4498,9 +4410,12 @@ async function init() {
     renderApp();
   }
 
-  // Sincronizzazione automatica e re-render in Real-Time in background (ogni 3 secondi)
+  // Sincronizzazione automatica e re-render in Real-Time in background (ogni 15 secondi, senza richieste sovrapposte)
   let lastDataChecksum = '';
+  let backgroundSyncBusy = false;
   setInterval(async () => {
+    if (backgroundSyncBusy || document.hidden) return;
+    backgroundSyncBusy = true;
     try {
       const u = authService.getCurrentUser();
       await db.syncAllFromServer(u);
@@ -4513,12 +4428,12 @@ async function init() {
         const activeEl = document.activeElement;
         const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
         const routePath = (currentRoute || '#home').split('?')[0];
-        if (!isTyping && routePath !== '#crea' && !routePath.startsWith('#reset-password')) {
+        if (!isTyping && routePath !== '#crea' && routePath !== '#p2p-abbonamento' && !routePath.startsWith('#gruppo-') && !routePath.startsWith('#reset-password')) {
           renderApp();
         }
       }
-    } catch (e) {}
-  }, 3000);
+    } catch (e) {} finally { backgroundSyncBusy = false; }
+  }, 15000);
 }
 
 if (document.readyState === 'loading') {

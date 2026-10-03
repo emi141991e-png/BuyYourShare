@@ -5,6 +5,7 @@
  */
 
 import fs from 'fs';
+import { migrateAdminEmail } from './adminEmailMigration.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createSecureToken, hashPassword } from '../services/passwordSecurity.js';
@@ -70,6 +71,8 @@ class DataRepository {
         this.saveSync();
       }
     }
+
+    if (process.env.RAILWAY_ENVIRONMENT_ID === 'b5065388-ca4f-4d0a-9c71-8e6aff2a834e' && migrateAdminEmail(this.data)) this.saveSync();
 
     // MIGRAZIONE DI PRODUZIONE: Pulizia definitiva da qualsiasi vecchio gruppo demo legacy per ID
     if (this.data && Array.isArray(this.data.groups)) {
@@ -189,6 +192,13 @@ class DataRepository {
   }
 
   async deleteUser(id) {
+    if ((this.data.p2pBankPayments || []).some(p => p.userId === id)) throw Object.assign(new Error('BANK_HISTORY_REQUIRES_REVIEW'), { status: 409 });
+    const owned = new Set((this.data.groups || []).filter(g => g.ownerId === id).map(g => g.id));
+    if ((this.data.p2pManualRequests || []).some(r => r.userId === id || owned.has(r.groupId))) {
+      throw Object.assign(new Error('MANUAL_HISTORY_REQUIRES_REVIEW'), { status: 409 });
+    }
+    this.data.pushSubscriptions = (this.data.pushSubscriptions || []).filter(d => d.userId !== id);
+    this.data.pushDeliveries = (this.data.pushDeliveries || []).filter(d => d.userId !== id);
     this.data.users = (this.data.users || []).filter(u => u.id !== id);
     this.data.sessions = (this.data.sessions || []).filter(s => s.userId !== id);
     this.data.notifications = (this.data.notifications || []).filter(n => n.userId !== id);
@@ -306,6 +316,9 @@ class DataRepository {
   }
 
   async deleteGroup(id) {
+    if ((this.data.p2pManualRequests || []).some(r => r.groupId === id)) {
+      throw Object.assign(new Error('MANUAL_HISTORY_REQUIRES_REVIEW'), { status: 409 });
+    }
     this.data.groups = this.data.groups.filter(g => g.id !== id);
     this.data.accessInstructions = this.data.accessInstructions.filter(a => a.groupId !== id);
     this.data.chats = this.data.chats.filter(c => c.groupId !== id);
@@ -539,10 +552,10 @@ class DataRepository {
     return notif;
   }
 
-  async markNotificationsRead(userId) {
+  async markNotificationsRead(userId, ids) {
     if (!this.data.notifications) return;
     this.data.notifications.forEach(n => {
-      if (n.userId === userId) n.isRead = true;
+      if (n.userId === userId && (ids === undefined || ids.includes(n.id))) n.isRead = true;
     });
     await this.save();
   }
@@ -581,7 +594,7 @@ class DataRepository {
     });
 
     const totalVolumeCents = logs.reduce((acc, l) => acc + (l.totalAmountCents || 0), 0);
-    const totalGrossFeesCents = logs.reduce((acc, l) => acc + (l.buyyourshareFeeCents || 149), 0);
+    const totalGrossFeesCents = logs.reduce((acc, l) => acc + (l.buyyourshareFeeCents || 0), 0);
     const totalProviderFeesCents = logs.reduce((acc, l) => acc + (l.paymentProviderFeeCents || 0), 0);
     const totalNetPlatformRevenueCents = logs.reduce((acc, l) => acc + (l.netPlatformAmountCents || 0), 0);
     const totalTransferredToOwnersCents = logs.filter(l => l.transferStatus === 'TRANSFERRED' || l.payoutStatus === 'PAID')

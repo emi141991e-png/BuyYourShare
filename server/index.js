@@ -4,6 +4,12 @@
  */
 
 import express from 'express';
+import {backupRouter} from './routes/backup.js';
+import { P2pBank } from './services/p2pBank.js';
+import { P2pGooglePay } from './services/p2pGooglePay.js';
+import { PushNotifications } from './services/pushNotifications.js';
+import { pushRoutes } from './routes/push.js';
+import { bysPushRoutes } from './routes/bysPush.js';
 import Stripe from 'stripe';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,6 +17,8 @@ import { config } from './config/env.js';
 import { authenticate } from './middleware/auth.js';
 import { dataRepository } from './db/dataRepository.js';
 import { P2pQuotaPayPal } from './services/p2pQuotaPayPal.js';
+import { P2pManual } from './services/p2pManual.js';
+import { manualRoutes } from './routes/manual.js';
 import { P2pQuota } from './services/p2pQuota.js';
 import { P2pPayPal } from './services/p2pPayPal.js';
 import { P2pSubscriptions } from './services/p2pSubscription.js';
@@ -26,6 +34,8 @@ import { chatRouter } from './routes/chat.js';
 import { ledgerRouter } from './routes/ledger.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { adminRouter } from './routes/admin.js';
+import { bysBankAdminRouter } from './routes/bysBankAdmin.js';
+import { bysMarketplaceAdmin } from './routes/bysMarketplaceAdmin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,9 +65,33 @@ if (process.env.P2P_LEGACY_CLEANUP_IDS) {
   }
 }
 export const p2pSubscriptions = new P2pSubscriptions(dataRepository, p2pProvider);
+const bank = new P2pBank(p2pSubscriptions);
+app.locals.p2pBank = bank;
+const googlePay = new P2pGooglePay(p2pSubscriptions, bank);
+app.locals.p2pGooglePay = googlePay;
 const quotaProvider = new P2pQuotaPayPal();
 const p2pQuota = new P2pQuota(p2pSubscriptions, quotaProvider);
 app.locals.p2pQuota = p2pQuota;
+const manual = new P2pManual(p2pSubscriptions);
+app.locals.p2pManual = manual;
+const pushNotifications = new PushNotifications(p2pSubscriptions);
+let backgroundRunning = false;
+const background = async () => {
+  if (backgroundRunning) return;
+  backgroundRunning = true;
+  try { await manual.reminders(); await bank.reminders(); await pushNotifications.flush(); }
+  catch { console.error('[P2P] Reminder delivery will retry.'); }
+  finally { backgroundRunning = false; }
+};
+setInterval(background, 20000).unref();
+void background();
+let recoveringGoogle = false;
+setInterval(async () => {
+  if (recoveringGoogle) return;
+  recoveringGoogle = true;
+  try { await googlePay.recover(); } catch { console.error('[P2P] Google Pay reconciliation will retry.'); }
+  finally { recoveringGoogle = false; }
+}, 60000).unref();
 const p2pGate = requireP2p(p2pSubscriptions);
 app.set('trust proxy', 1);
 
@@ -65,6 +99,7 @@ app.set('trust proxy', 1);
 app.post('/api/webhooks/p2p-paypal', express.json({ limit: '256kb' }), async (req, res) => {
   try {
     if (!await p2pProvider.verify(req.headers, req.body)) return res.status(400).json({ error: 'INVALID_SIGNATURE' });
+    if (req.body.event_type?.startsWith('PAYMENT.CAPTURE.')) return res.json(await googlePay.webhook(req.body));
     res.json(await p2pSubscriptions.webhook(req.body));
   } catch (e) { p2pError(res, e); }
 });
@@ -86,6 +121,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'private, no-store');
   next();
 });
 
@@ -95,6 +131,9 @@ app.use(authenticate);
 // 4. API Endpoints
 app.use('/api/auth', (req, res, next) => {
   if ((req.method === 'DELETE' && req.path === '/account') || (req.method === 'POST' && req.path === '/delete-account')) {
+    if (req.user && manual.records().some(r => r.userId === req.user.id || dataRepository.data.groups.some(g => g.id === r.groupId && g.ownerId === req.user.id))) {
+      return res.status(409).json({ error: 'MANUAL_HISTORY_REQUIRES_REVIEW', message: 'Contatta assistenza per eliminare un account con richieste o quote: occorre prima gestire le partecipazioni e la cronologia.' });
+    }
     const subscription = req.user && p2pSubscriptions.find(req.user.id);
     if (subscription && !['CANCELLED', 'EXPIRED'].includes(subscription.providerStatus)) {
       return res.status(409).json({ error: 'CANCEL_P2P_SUBSCRIPTION_FIRST', message: 'Disattiva prima il rinnovo nella pagina Abbonamento P2P.' });
@@ -103,19 +142,20 @@ app.use('/api/auth', (req, res, next) => {
   next();
 }, authRouter);
 app.use('/api/p2p', createP2pRoutes(p2pSubscriptions, p2pQuota));
-app.use('/api/groups', p2pGate, (req, res, next) => {
-  if (req.method === 'POST' && req.path === '/' && p2pSubscriptions.find(req.user.id)?.role !== 'GROUP_LEADER') {
-    return res.status(409).json({ error: 'P2P_LEADER_PLAN_REQUIRED', message: 'Conferma prima il piano capogruppo da 0,49 EUR/mese.' });
-  }
-  next();
-}, groupsRouter);
+app.use('/api/manual', (req,res,next)=>{if(req.method==='POST')res.on('finish',()=>{if(res.statusCode<400)pushNotifications.kick();});next();}, manualRoutes(manual));
+app.use('/api/push', pushRoutes(pushNotifications));
+app.use('/api/bys-push', bysPushRoutes(pushNotifications));
+app.use('/api/groups', (req, res, next) => req.method === 'GET' && req.path.replace(/\/+$/, '') !== '/my' ? next() : p2pGate(req, res, next), groupsRouter);
 app.use('/api/memberships', p2pGate, membershipsRouter);
 app.use('/api/access', p2pGate, accessRouter);
 app.use('/api/chat', p2pGate, chatRouter);
 app.use(['/api/connect', '/api/checkout'], (req, res) => res.status(410).json({ error: 'DIRECT_GROUP_PAYMENTS_ONLY', message: 'Le quote si pagano direttamente al capogruppo. BYS incassa solo l’abbonamento P2P.' }));
 app.use('/api/ledger', p2pGate, ledgerRouter);
-app.use('/api/notifications', p2pGate, notificationsRouter);
+app.use('/api/notifications', notificationsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/bys-admin/bank-payments', bysBankAdminRouter);
+app.use('/api/bys-admin/marketplace', bysMarketplaceAdmin(p2pSubscriptions));
+app.use('/api/internal-backup',backupRouter(p2pSubscriptions));
 
 // Endpoint Health Check
 app.get('/api/health', (req, res) => {
@@ -145,8 +185,23 @@ const staticOptions = {
 };
 
 // Publish only browser assets. Never expose server/, package files or the database.
+app.get('/.well-known/apple-developer-merchantid-domain-association', (req,res) => res.type('application/octet-stream').sendFile(path.join(ROOT_DIR, 'public/.well-known/apple-developer-merchantid-domain-association'), {dotfiles:'allow'}));
+app.get('/images/bys-passioni.webp', (req, res) => res.sendFile(path.join(ROOT_DIR, 'public/images/bys-passioni.webp')));
 app.use('/css', express.static(path.join(ROOT_DIR, 'css'), staticOptions));
 app.use('/js', express.static(path.join(ROOT_DIR, 'js'), staticOptions));
+for (const asset of ['push-sw.js', 'manifest.webmanifest', 'push-icon-192.png', 'push-icon-512.png']) {
+  app.get(`/${asset}`, (req, res) => res.sendFile(path.join(ROOT_DIR, asset)));
+}
+app.get('/gruppi/:id', async (req, res, next) => {
+  try {
+    const { groupSharePage } = await import('./services/groupSharePage.js');
+    const group = await dataRepository.findGroupById(req.params.id);
+    const origin = process.env.BASE_URL || 'https://marketplace.buyyourshare.it';
+    const html = groupSharePage(group, origin);
+    if (!html) return res.status(404).type('html').send('<!doctype html><html lang="it"><meta name="robots" content="noindex"><title>Gruppo non disponibile</title><h1>Gruppo non disponibile</h1><a href="/">Esplora il marketplace</a></html>');
+    res.type('html').send(html);
+  } catch (error) { next(error); }
+});
 app.get('/', (req, res) => res.sendFile(path.join(ROOT_DIR, 'index.html')));
 
 app.use((req, res, next) => {

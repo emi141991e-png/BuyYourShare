@@ -1,3 +1,6 @@
+import {requirements} from '../services/communityFeatures.js';
+import { paymentDestination } from '../services/p2pManual.js';
+import {ratingSummary} from '../services/leaderRatings.js';
 /**
  * BuyYourShare - Server Groups Routes
  * Macchina a stati rigorosa (DRAFT, PAYOUT_NOT_READY, PUBLISHED, FULL, CLOSED)
@@ -10,6 +13,12 @@ import { requireAuth } from '../middleware/auth.js';
 import { calculatePricingBreakdown, getGroupSlotsBreakdown } from '../engine/MoneyEngine.js';
 
 export const groupsRouter = express.Router();
+
+function withReservations(memberships) {
+  return [...memberships, ...(dataRepository.data.p2pManualRequests || [])
+    .filter(r => r.status === 'reported' && !r.membershipId || r.status === 'accepted' && Date.parse(r.reservedUntil) > Date.now())
+    .map(r => ({ groupId: r.groupId, slotNumber: r.slotNumber, status: 'ACTIVE' }))];
+}
 
 /**
  * Sanitizza le informazioni del gruppo per il catalogo pubblico.
@@ -38,6 +47,7 @@ function sanitizeGroupForPublic(group, ownerUser) {
     memberTotalCents: group.baseMemberShareCents,
     groupType: group.groupType || 'public',
     status: computedStatus,
+    requirements: group.requirements || null,
     rulesAndRequirements: group.rulesAndRequirements || '',
     description: group.description || '',
     createdAt: group.createdAt,
@@ -45,6 +55,8 @@ function sanitizeGroupForPublic(group, ownerUser) {
     owner: ownerUser ? {
       id: ownerUser.id,
       fullName: ownerUser.fullName,
+      avatarUrl: ownerUser.bysUserId ? `https://buyyourshare.it/api/profile-photo/${encodeURIComponent(ownerUser.bysUserId)}` : null,
+      rating: ratingSummary(dataRepository.data,ownerUser.id),
       isVerified: !!ownerUser.isVerified
     } : null
   };
@@ -55,7 +67,7 @@ groupsRouter.get('/', async (req, res) => {
   try {
     const { serviceId, search } = req.query;
     const rawGroups = await dataRepository.getGroups({ serviceId, search });
-    const memberships = await dataRepository.getMemberships({ status: 'ACTIVE' });
+    const memberships = await dataRepository.getMemberships();
     const users = dataRepository.data.users;
 
     // Filtro rigoroso: visualizza SOLO gruppi in stato PUBLISHED o FULL
@@ -68,7 +80,7 @@ groupsRouter.get('/', async (req, res) => {
     const result = publishedGroups.map(g => {
       const owner = users.find(u => u.id === g.ownerId);
       const safe = sanitizeGroupForPublic(g, owner);
-      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user, users);
+      safe.slotsInfo = getGroupSlotsBreakdown(g, withReservations(memberships), req.user, users);
       return safe;
     });
 
@@ -105,7 +117,7 @@ groupsRouter.get('/my', requireAuth, async (req, res) => {
         };
       });
 
-      safe.slotsInfo = getGroupSlotsBreakdown(g, memberships, req.user, users);
+      safe.slotsInfo = getGroupSlotsBreakdown(g, withReservations(memberships), req.user, users);
       return safe;
     });
 
@@ -136,7 +148,7 @@ groupsRouter.get('/:id', async (req, res) => {
     const memberships = await dataRepository.getMemberships({ groupId: group.id });
     const users = dataRepository.data.users;
     const safe = sanitizeGroupForPublic(group, owner);
-    safe.slotsInfo = getGroupSlotsBreakdown(group, memberships, req.user, users);
+    safe.slotsInfo = getGroupSlotsBreakdown(group, withReservations(memberships), req.user, users);
 
     return res.json({ group: safe });
   } catch (err) {
@@ -169,13 +181,16 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       payoutBankName
     } = req.body || {};
 
-    await req.app.locals.p2pQuota.refreshPayee(user.id);
-    const realCostCents = Math.round((parseFloat(realCostEuros) || 0) * 100);
-    const tSlots = parseInt(totalSlots, 10) || 6;
-    const oSlots = parseInt(ownerSlots, 10) || 1;
+    const manualPaymentDestination = paymentDestination(req.body);
+    const realCostCents = Math.round(Number(realCostEuros) * 100);
+    const tSlots = Number(totalSlots ?? 6);
+    const oSlots = Number(ownerSlots ?? 1);
     const feeCents = 0; // Group shares are direct; platform access has its own subscription.
 
-    if (!customServiceName || realCostCents <= 0 || tSlots < 2 || tSlots > 50 || oSlots < 1 || oSlots >= tSlots) {
+    if (typeof customServiceName !== 'string' || !customServiceName.trim() || customServiceName.length > 100 ||
+        (planName !== undefined && (typeof planName !== 'string' || planName.length > 100)) ||
+        !Number.isSafeInteger(realCostCents) || realCostCents <= 0 || !Number.isInteger(tSlots) || !Number.isInteger(oSlots) ||
+        tSlots < 2 || tSlots > 50 || oSlots < 1 || oSlots >= tSlots) {
       return res.status(400).json({ error: 'INVALID_INPUT', message: 'Dati del gruppo non validi.' });
     }
 
@@ -206,9 +221,11 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
       isPublished: true,
       publishedAt: new Date().toISOString(),
       ownerSpotifyAddress: (ownerSpotifyAddress || '').trim(),
+      requirements: requirements(req.body),
       rulesAndRequirements: (rulesAndRequirements || 'Rispetta le regole della community e del provider.').trim(),
       description: (description || `Gruppo condivisione ${customServiceName}`).trim(),
-      paymentMethod: 'PAYPAL_DIRECT',
+      paymentMethod: 'MANUAL_DIRECT',
+      manualPaymentDestination,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -309,9 +326,11 @@ groupsRouter.post('/:id/cancel', requireAuth, async (req, res) => {
     if (req.app.locals.p2pQuota.hasOpenPayments(group.id)) return res.status(409).json({ error: 'PAYPAL_PAYMENT_REVIEW_REQUIRED' });
     const memberships = await dataRepository.getMemberships({ groupId: group.id, status: 'ACTIVE' });
     const payingMembers = memberships.filter(m => m.role === 'MEMBER');
+    if (req.app.locals.p2pManual.records().some(r => r.groupId === group.id)) return res.status(409).json({ error: 'MANUAL_GROUP_HAS_HISTORY', message: 'Contatta assistenza per chiudere un gruppo con richieste o pagamenti: la cronologia deve essere conservata.' });
 
     if (payingMembers.length === 0) {
-      await dataRepository.deleteGroup(group.id);
+      if (req.app.locals.p2pManual.records().some(r => r.groupId === group.id)) return res.status(409).json({ error: 'MANUAL_GROUP_HAS_HISTORY' });
+    await dataRepository.deleteGroup(group.id);
       return res.json({ success: true, deleted: true, message: 'Gruppo annullato ed eliminato con successo.' });
     }
 
@@ -350,6 +369,7 @@ groupsRouter.delete('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Non puoi eliminare questo gruppo.' });
     }
 
+    if (req.app.locals.p2pManual.records().some(r => r.groupId === group.id)) return res.status(409).json({ error: 'MANUAL_GROUP_HAS_HISTORY' });
     await dataRepository.deleteGroup(group.id);
     return res.json({ success: true, message: 'Gruppo eliminato definitivamente.' });
   } catch (err) {

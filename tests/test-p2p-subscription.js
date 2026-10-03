@@ -2,6 +2,34 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { P2pSubscriptions, accessAllowed } from '../server/services/p2pSubscription.js';
 import { P2pPayPal } from '../server/services/p2pPayPal.js';
+import { subscriptionButtonOptions } from '../js/ui/paypalSubscriptionButton.js';
+
+test('experimental SDK is sandbox-only and exposes no secret', () => {
+  const env = { P2P_PAYPAL_SDK_SANDBOX: 'true', P2P_PAYPAL_MODE: 'sandbox', P2P_PAYPAL_CLIENT_ID: 'public-id', P2P_PAYPAL_CLIENT_SECRET: 'private-secret' };
+  assert.deepEqual(new P2pPayPal(env).checkoutConfig(), { enabled: true, mode: 'sandbox', clientId: 'public-id' });
+  assert.deepEqual(new P2pPayPal({ ...env, P2P_PAYPAL_MODE: 'live' }).checkoutConfig(), { enabled: false });
+  assert.deepEqual(new P2pPayPal({ ...env, P2P_PAYPAL_SDK_SANDBOX: 'false' }).checkoutConfig(), { enabled: false });
+});
+test('SDK reuses server subscription and approval only reconciles server truth', async () => {
+  const f = fixture();
+  let refreshed = 0;
+  const paths = [];
+  const api = async path => {
+    paths.push(path);
+    if (path.endsWith('sdk-start')) { await f.service.start('user', 'MEMBER'); return { subscriptionId: f.service.find('user').providerSubscriptionId }; }
+    return { subscription: await f.service.refresh('user') };
+  };
+  const options = subscriptionButtonOptions(api, () => {}, () => { refreshed++; });
+  const ids = await Promise.all([options.createSubscription(), options.createSubscription()]);
+  assert.deepEqual(ids, ['I-TEST', 'I-TEST']);
+  assert.equal(f.calls.filter(c => c[0] === 'create').length, 1);
+  await options.onApprove({ subscriptionID: 'I-ATTACKER' });
+  assert.equal(f.service.view('user').accessAllowed, false);
+  assert.equal(refreshed, 1);
+  assert.equal(paths.at(-1), '/api/p2p/subscription/refresh');
+  const before = paths.length; options.onCancel(); options.onError();
+  assert.equal(paths.length, before);
+});
 import { allocateMoneySplit, getGroupSlotsBreakdown } from '../server/engine/MoneyEngine.js';
 import { addOneMonth } from '../server/engine/DateEngine.js';
 

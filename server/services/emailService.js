@@ -10,12 +10,12 @@ class EmailService {
    * Restituisce il transporter nodemailer configurato (da env o da systemConfig)
    */
   getTransporter() {
+    if (process.env.EMAIL_PROVIDER === 'resend') return null;
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
     
     // 1. Gmail Dedicated App Password (Invio Universale per Libero, Outlook, Yahoo, Gmail, ecc.)
-    const defaultGmailPass = Buffer.from('cHZ5YXRlbXpsZXR6empldQ==', 'base64').toString();
     const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser || 'emi.141991e@gmail.com';
-    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass || defaultGmailPass;
+    const gmailPass = process.env.GMAIL_APP_PASSWORD || emailConfig.gmailPass;
     if (gmailUser && gmailPass) {
       return nodemailer.createTransport({
         service: 'gmail',
@@ -46,8 +46,10 @@ class EmailService {
   }
 
   async sendMail({ to, subject, html, text }) {
+    if (process.env.NODE_ENV === 'test' || process.env.EMAIL_DELIVERY_DISABLED === 'true') {
+      return { status: 'SKIPPED', to, subject };
+    }
     const emailConfig = dataRepository?.data?.systemConfig?.emailSettings || {};
-    const defaultGmailPass = Buffer.from('cHZ5YXRlbXpsZXR6empldQ==', 'base64').toString();
     const gmailUser = process.env.GMAIL_USER || emailConfig.gmailUser || 'emi.141991e@gmail.com';
 
     let fromAddress = process.env.EMAIL_FROM || emailConfig.emailFrom || `"BuyYourShare" <${gmailUser}>`;
@@ -58,12 +60,12 @@ class EmailService {
       subject,
       text: text || '',
       html,
-      status: 'DELIVERED',
+      status: 'FAILED',
       timestamp: new Date().toISOString()
     };
 
     console.log(`\n============================================================`);
-    console.log(`📧 [EMAIL AUTOMATICA INVIATA A ${to}]`);
+    console.log(`📧 [EMAIL IN ELABORAZIONE PER ${to}]`);
     console.log(`📋 Oggetto: ${subject}`);
     console.log(`============================================================\n`);
 
@@ -88,8 +90,7 @@ class EmailService {
 
     // 2. Fallback tramite Resend API se SMTP non configurato o non riuscito
     if (emailRecord.status !== 'DELIVERED_SMTP') {
-      const fallbackResendKey = Buffer.from('cmVfZ0xNb1ZQeUxfNzNBcUJBMUZZRWZIZ21rWHZxenJja3M2', 'base64').toString();
-      const resendKey = process.env.RESEND_API_KEY || emailConfig.resendApiKey || fallbackResendKey;
+      const resendKey = process.env.RESEND_API_KEY || emailConfig.resendApiKey;
       if (resendKey) {
         try {
           const resendRes = await fetch('https://api.resend.com/emails', {
@@ -99,7 +100,7 @@ class EmailService {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              from: 'BuyYourShare <onboarding@resend.dev>',
+              from: fromAddress,
               to: [to],
               subject: subject,
               html: html,
@@ -119,7 +120,7 @@ class EmailService {
 
     // 3. Invio tramite Brevo REST API (se configurato)
     const brevoKey = process.env.BREVO_API_KEY || emailConfig.brevoApiKey;
-    if (brevoKey) {
+    if (process.env.EMAIL_PROVIDER !== 'resend' && brevoKey && !emailRecord.status.startsWith('DELIVERED_')) {
       try {
         const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
@@ -200,7 +201,7 @@ class EmailService {
             </div>
 
             <div style="text-align: center; margin: 24px 0;">
-              <a href="https://buyyourshare-production.up.railway.app/#cerca" class="btn-cta">
+              <a href="https://marketplace.buyyourshare.it/#cerca" class="btn-cta">
                 🔍 Esplora il Marketplace Gruppi
               </a>
             </div>
@@ -210,7 +211,7 @@ class EmailService {
             </p>
           </div>
           <div class="footer">
-            © ${new Date().getFullYear()} BuyYourShare • Tutti i diritti riservati • <a href="https://buyyourshare-production.up.railway.app" style="color:#0070ba; text-decoration:none;">buyyourshare.com</a>
+            © ${new Date().getFullYear()} BuyYourShare • Tutti i diritti riservati • <a href="https://marketplace.buyyourshare.it" style="color:#0070ba; text-decoration:none;">buyyourshare.com</a>
           </div>
         </div>
       </body>
@@ -221,7 +222,7 @@ class EmailService {
       to: user.email,
       subject,
       html,
-      text: `Benvenuto su BuyYourShare ${user.fullName}! Il tuo account (${user.email}) è ora attivo. Accedi su https://buyyourshare-production.up.railway.app/#login`
+      text: `Benvenuto su BuyYourShare ${user.fullName}! Il tuo account (${user.email}) è ora attivo. Accedi su https://marketplace.buyyourshare.it/#login`
     });
   }
 
@@ -229,7 +230,7 @@ class EmailService {
    * 2. Email per Recupero Password con Link Diretto Cliccabile
    */
   async sendPasswordResetEmail(user, resetCode, customResetLink = null) {
-    const baseUrl = process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://buyyourshare-production.up.railway.app');
+    const baseUrl = process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://marketplace.buyyourshare.it');
     const resetLink = customResetLink || `${baseUrl}/#reset-password?email=${encodeURIComponent(user.email)}&token=${encodeURIComponent(resetCode)}`;
     const subject = '🔐 Link per Reimpostare la Password - BuyYourShare';
     const html = `

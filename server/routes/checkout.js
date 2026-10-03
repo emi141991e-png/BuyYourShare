@@ -643,7 +643,7 @@ checkoutRouter.post('/stripe/create-checkout-session', requireAuth, async (req, 
       throw reservationError;
     }
 
-    const host = req.get('origin') || req.get('referer') || 'https://buyyourshare-production.up.railway.app';
+    const host = req.get('origin') || req.get('referer') || 'https://marketplace.buyyourshare.it';
     const baseUrl = host.replace(/\/$/, '');
 
     let session;

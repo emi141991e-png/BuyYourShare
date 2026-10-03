@@ -1,0 +1,316 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { P2pSubscriptions } from '../server/services/p2pSubscription.js';
+import { P2pBank } from '../server/services/p2pBank.js';
+import { P2pGooglePay } from '../server/services/p2pGooglePay.js';
+import { walletErrorCode } from '../js/ui/walletError.js';
+import { accessRemainingDays } from '../js/config/accessPlans.js';
+
+test('PayPal single payments cannot be enabled live even with verification flags', async () => {
+  const f = fixture('PAYPAL_ONETIME');
+  f.s.provider.settings = () => ({ mode: 'live', clientId: 'test', secret: 'test' });
+  f.g.env.P2P_PAYPAL_ONETIME_LIVE_VERIFIED = 'true';
+  assert.deepEqual(f.g.config('PAYPAL_ONETIME'), { enabled: false });
+  await assert.rejects(f.g.create('u', 'MONTHLY', 'PAYPAL_ONETIME'), /PAYPAL_ONETIME_UNAVAILABLE/);
+  assert.equal(f.calls.length, 0);
+});
+
+test('PayPal single payment requires the PayPal source and a completed capture', async () => {
+  const f = fixture('PAYPAL_ONETIME');
+  await f.g.create('u', 'QUARTERLY', 'PAYPAL_ONETIME');
+  assert.equal((await f.g.recheck(f.g.records()[0].id)).pending, true);
+  assert.equal(f.s.view('u').accessAllowed, false);
+  f.order().payment_source = { google_pay: {} };
+  await assert.rejects(f.g.capture('u', 'ORDER1', 'PAYPAL_ONETIME'), /IDENTITY_MISMATCH/);
+  assert.equal(f.s.view('u').accessAllowed, false);
+  f.order().payment_source = { paypal: {} };
+  await f.g.capture('u', 'ORDER1', 'PAYPAL_ONETIME');
+  assert.equal(f.s.view('u').paymentMethod, 'PAYPAL_ONETIME');
+  assert.equal(f.s.view('u').accessAllowed, true);
+  await f.s.refresh('u');
+  assert.equal(f.s.view('u').accessAllowed, true);
+});
+
+test('monthly then annual preserves every residual day, including after a delay and repeated verification', async () => {
+  for (const wallet of ['GOOGLE_PAY','APPLE_PAY','PAYPAL_ONETIME']) for (const delay of [0,10]) {
+    const f=fixture(wallet);let sequence=0;
+    const request=f.s.provider.request;
+    f.s.provider.request=async (...args)=>{
+      const result=await request(...args);
+      if(args[0]==='/v2/checkout/orders') {sequence++; f.order().id=`ORDER${sequence}`; result.id=f.order().id;}
+      if(args[0].endsWith('/capture')) {f.order().purchase_units[0].payments.captures[0].id=`CAP${sequence}`;}
+      return result;
+    };
+    const monthly=await f.g.create('u','MONTHLY',wallet);
+    await f.g.capture('u',monthly.orderId,wallet);
+    const originalEnd=f.s.view('u').currentPeriodEnd;
+    f.advance(delay);
+    const yearly=await f.g.create('u','YEARLY',wallet);
+    await f.g.capture('u',yearly.orderId,wallet);
+    await f.g.capture('u',yearly.orderId,wallet);
+    assert.equal(f.s.view('u').currentPeriodEnd,'2027-03-02T12:00:00.000Z');
+    assert.equal(f.g.records()[1].periodStart,originalEnd);
+    assert.equal(accessRemainingDays(f.s.view('u').currentPeriodEnd,Date.parse('2026-01-31T12:00:00Z')+delay*86400000),395-delay);
+  }
+});
+
+test('wallet diagnostics retain machine codes without leaking payment fields', () => {
+  assert.equal(walletErrorCode({code:'ACCESS_PLAN_PAYMENT_PENDING'},'ORDER'), 'ORDER:ACCESS_PLAN_PAYMENT_PENDING');
+  assert.equal(walletErrorCode({details:[{issue:'INSTRUMENT_DECLINED'}],token:'secret'},'WALLET'), 'WALLET:INSTRUMENT_DECLINED');
+  assert.equal(walletErrorCode({code:'private@example.com',message:'secret'},'ORDER'), 'ORDER:NON_COMPLETATO');
+});
+
+test('admin recheck never charges; completed quarterly and yearly orders recover only once', async () => {
+  for (const wallet of ['GOOGLE_PAY','APPLE_PAY','PAYPAL_ONETIME']) for (const plan of ['MONTHLY','QUARTERLY','YEARLY']) {
+    const f=fixture(wallet); await f.g.create('u',plan,wallet);
+    const id=f.g.records()[0].id;
+    assert.equal((await f.g.recheck(id)).pending,true);
+    assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,0);
+    await f.s.provider.request('/v2/checkout/orders/ORDER1/capture','POST');
+    await f.g.recheck(id); const end=f.s.view('u').currentPeriodEnd;
+    await f.g.recheck(id);
+    assert.equal(f.s.view('u').currentPeriodEnd,end);
+    assert.equal(f.s.view('u').accessPlanCode,plan);
+    assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,1);
+  }
+});
+function fixture(wallet = 'GOOGLE_PAY') {
+  let now = Date.parse('2026-01-31T12:00:00Z'), order, failCreate = false;
+  const calls = [];
+  const repo = { data: { users: [], groups: [] }, save: async () => {} };
+  const provider = { settings: () => ({ mode: 'sandbox', clientId: 'test', secret: 'test' }), request: async (path, method, body, key) => {
+    calls.push({ path, method, key });
+    if (path === '/v2/checkout/orders') {
+      order = { id: 'ORDER1', status: 'APPROVED', purchase_units: body.purchase_units, payment_source: { [wallet === 'APPLE_PAY' ? 'apple_pay' : wallet === 'PAYPAL_ONETIME' ? 'paypal' : 'google_pay']: {} } };
+      if (failCreate) throw new Error('network');
+      return order;
+    }
+    if (path.endsWith('/capture')) { order.status = 'COMPLETED'; order.purchase_units[0].payments = { captures: [{ id:'CAP1', status:'COMPLETED', amount:structuredClone(order.purchase_units[0].amount), create_time:new Date(now).toISOString() }] }; }
+    return structuredClone(order);
+  } };
+  const s = new P2pSubscriptions(repo, provider, { enabled: () => true, now: () => now });
+  const bank = new P2pBank(s), g = new P2pGooglePay(s, bank, { P2P_GOOGLE_PAY_ENABLED: 'true', P2P_APPLE_PAY_ENABLED: 'true', P2P_PAYPAL_ONETIME_ENABLED: 'true' });
+  return { repo, s, bank, g, calls, advance: days => { now += days * 86400000; }, order: () => order, fail: () => { failCreate = true; } };
+}
+
+test('a verified declined capture no longer blocks another plan; uncertain payments still block', async () => {
+  const f=fixture(); await f.g.create('u');
+  await f.s.provider.request('/v2/checkout/orders/ORDER1/capture','POST');
+  f.order().purchase_units[0].payments.captures[0].status='DECLINED';
+  await f.g.create('u','QUARTERLY');
+  assert.equal(f.g.records()[0].status,'failed');
+  assert.equal(f.g.records()[1].amountCents,269);
+  assert.equal(f.s.view('u').accessAllowed,false);
+  assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,1);
+  const g=fixture();await g.g.create('u');
+  await assert.rejects(g.g.create('u','YEARLY'),/ACCESS_PLAN_PAYMENT_PENDING/);
+  assert.equal(g.g.records().length,1);
+});
+
+test('already completed payment is recovered before a new plan is created', async () => {
+  const f=fixture();await f.g.create('u','QUARTERLY');
+  await f.s.provider.request('/v2/checkout/orders/ORDER1/capture','POST');
+  const result=await f.g.create('u','YEARLY');
+  assert.equal(result.alreadyPaid,true); assert.equal(f.g.records().length,1);
+  assert.equal(f.s.view('u').accessPlanCode,'QUARTERLY');
+});
+
+test('Apple Pay verifies wallet, price and ownership; recovery activates once and reminders/refunds work', async()=>{
+  for(const plan of ['MONTHLY','QUARTERLY','YEARLY']) {
+    const f=fixture('APPLE_PAY');f.repo.data.users=[{id:'admin',role:'admin'}];
+    const {orderId}=await f.g.create('u',plan,'APPLE_PAY');
+    await assert.rejects(f.g.capture('other',orderId,'APPLE_PAY'),/NOT_FOUND/);
+    await assert.rejects(f.g.capture('u',orderId),/NOT_FOUND/);
+    await assert.rejects(f.g.create('u',plan),/WALLET_PAYMENT_IN_PROGRESS/);
+    await f.s.provider.request(`/v2/checkout/orders/${orderId}/capture`,'POST');
+    const event={id:'apple1',event_type:'PAYMENT.CAPTURE.COMPLETED',resource:{supplementary_data:{related_ids:{order_id:orderId}}}};
+    await f.g.webhook(event);const end=f.s.view('u').currentPeriodEnd;
+    await f.g.capture('u',orderId,'APPLE_PAY');await f.g.recover();
+    assert.equal(f.s.view('u').currentPeriodEnd,end);assert.equal(f.s.find('u').paymentMethod,'APPLE_PAY');
+    assert.equal(f.repo.data.notifications.filter(n=>n.id.startsWith('google-paid-admin:')).length,1);
+    if(plan==='MONTHLY'){f.advance(27);await f.bank.reminders();assert.ok(f.repo.data.notifications.some(n=>n.id.startsWith('bank-renew:')));}
+    f.order().purchase_units[0].payments.captures[0].status='REFUNDED';
+    await f.g.capture('u',orderId,'APPLE_PAY');assert.equal(f.s.view('u').accessAllowed,false);
+  }
+  const f=fixture('GOOGLE_PAY');const {orderId}=await f.g.create('u','MONTHLY','APPLE_PAY');
+  await assert.rejects(f.g.capture('u',orderId,'APPLE_PAY'),/IDENTITY/);assert.equal(f.s.view('u').accessAllowed,false);
+});
+
+test('quarterly and yearly capture use server prices, unlock automatically and notify admin once', async () => {
+  for (const [planCode, amount, end] of [['QUARTERLY','2.69','2026-04-30T12:00:00.000Z'],['YEARLY','9.90','2027-01-31T12:00:00.000Z']]) {
+    const f=fixture(); f.repo.data.users=[{id:'u',fullName:'Cliente Prova',email:'u@example.test'},{id:'a',role:'admin'}];
+    const {orderId}=await f.g.create('u',planCode);
+    assert.equal(f.order().purchase_units[0].amount.value,amount);
+    await assert.rejects(f.g.create('u','MONTHLY'),/ACCESS_PLAN_PAYMENT_PENDING/);
+    await f.g.capture('u',orderId); await f.g.capture('u',orderId);
+    assert.equal(f.s.view('u').accessAllowed,true); assert.equal(f.s.view('u').currentPeriodEnd,end);
+    assert.equal(f.s.view('u').accessPlanCode,planCode);
+    const notices=f.repo.data.notifications.filter(n=>n.id.startsWith('google-paid-admin:'));
+    assert.equal(notices.length,1); assert.ok(notices[0].message.includes('Cliente Prova'));
+  }
+  const f=fixture(); await assert.rejects(f.g.create('u','FREE'),/INVALID_ACCESS_PLAN/); assert.equal(f.calls.length,0);
+});
+test('annual payment with a monthly capture amount never grants annual access; full refund revokes the annual grant', async()=>{
+  const f=fixture();const {orderId}=await f.g.create('u','YEARLY');
+  await f.s.provider.request(`/v2/checkout/orders/${orderId}/capture`,'POST');
+  f.order().purchase_units[0].payments.captures[0].amount.value='0.99';
+  await assert.rejects(f.g.capture('u',orderId),/IDENTITY/);assert.equal(f.s.view('u').accessAllowed,false);
+  f.order().purchase_units[0].payments.captures[0].amount.value='9.90';
+  await f.g.capture('u',orderId);assert.equal(f.s.view('u').accessAllowed,true);
+  f.order().purchase_units[0].payments.captures[0].status='REFUNDED';
+  await f.g.capture('u',orderId);assert.equal(f.s.view('u').accessAllowed,false);
+});
+test('confirmed capture grants exactly 30 days and expires at the boundary, not a calendar month', async () => {
+  const f = fixture(); const { orderId } = await f.g.create('u');
+  assert.equal(f.s.view('u').accessAllowed, false);
+  await f.g.capture('u', orderId);
+  assert.equal(f.s.view('u').currentPeriodEnd, '2026-03-02T12:00:00.000Z');
+  assert.equal(f.s.view('u').includedSupportAllowed, true);
+  await f.g.capture('u', orderId);
+  assert.equal(f.calls.filter(c => c.path.endsWith('/capture')).length, 1);
+  f.advance(27); await f.bank.reminders(); await f.bank.reminders();
+  assert.equal(f.repo.data.notifications.filter(n => n.id.startsWith('bank-renew:')).length, 1);
+  f.advance(3); assert.equal(f.s.view('u').accessAllowed, false); assert.equal(f.s.view('u').includedSupportAllowed, false);
+});
+test('pending payment cannot unlock, another user cannot capture, identity mismatch fails closed', async () => {
+  const f = fixture(); const { orderId } = await f.g.create('u');
+  await assert.rejects(f.g.capture('other', orderId), /NOT_FOUND/);
+  f.order().status = 'CREATED'; assert.equal((await f.g.capture('u', orderId)).pending, true);
+  f.order().purchase_units[0].amount.value = '0.01';
+  await assert.rejects(f.g.capture('u', orderId), /IDENTITY/);
+  assert.equal(f.s.view('u').accessAllowed, false);
+});
+test('failed create retains intent and retries with same provider idempotency key', async () => {
+  const f = fixture(); f.fail();
+  await assert.rejects(f.g.create('u'), /network/); await assert.rejects(f.g.create('u'), /network/);
+  assert.equal(f.calls[0].key, f.calls[1].key); assert.equal(f.g.records().length, 1);
+  await assert.rejects(f.bank.report('u'), /REVIEW/);
+});
+test('capture persisted remotely is recovered after local save failure without second charge', async () => {
+  const f = fixture(); const { orderId } = await f.g.create('u');
+  f.repo.save = async () => { throw new Error('disk'); };
+  await assert.rejects(f.g.capture('u', orderId), /disk/);
+  assert.equal(f.s.view('u').accessAllowed, false);
+  f.repo.save = async () => {}; await f.g.recover();
+  assert.equal(f.s.view('u').accessAllowed, true);
+  assert.equal(f.calls.filter(c => c.path.endsWith('/capture')).length, 1);
+});
+test('early renewal preserves remaining paid days; live disabled until verified', async () => {
+  const f = fixture();
+  f.repo.data.p2pSubscriptions = [{ userId:'u', status:'active', paymentMethod:'BANK', currentPeriodEnd:'2026-02-10T12:00:00Z' }];
+  const { orderId } = await f.g.create('u'); await f.g.capture('u', orderId);
+  assert.equal(f.s.view('u').currentPeriodEnd, '2026-03-12T12:00:00.000Z');
+  f.s.provider.settings = () => ({ mode:'live',clientId:'x',secret:'y' });
+  assert.equal(f.g.config().enabled, false);
+});
+
+test('full refund removes only the latest grant, preserves prior access and is idempotent', async () => {
+  const f = fixture();
+  f.repo.data.p2pSubscriptions = [{ userId:'u', status:'active', paymentMethod:'BANK', currentPeriodEnd:'2026-02-10T12:00:00Z' }];
+  const { orderId } = await f.g.create('u'); await f.g.capture('u', orderId);
+  f.order().purchase_units[0].payments.captures[0].status = 'REFUNDED';
+  await f.g.capture('u', orderId); await f.g.capture('u', orderId);
+  assert.equal(f.s.view('u').currentPeriodEnd, '2026-02-10T12:00:00Z');
+  assert.equal(f.s.view('u').accessAllowed, true);
+  assert.equal(f.g.records()[0].status, 'refunded');
+  assert.equal(f.repo.data.notifications.filter(n => n.id.startsWith('google-refund:')).length, 1);
+});
+test('legacy grant refund restores its start; later independent credit is never erased', async () => {
+  const f = fixture(); const { orderId } = await f.g.create('u'); await f.g.capture('u', orderId);
+  delete f.g.records()[0].previousPeriodEnd;
+  f.order().purchase_units[0].payments.captures[0].status = 'REFUNDED';
+  await f.g.capture('u', orderId); assert.equal(f.s.view('u').accessAllowed, false);
+  const other = fixture(); const o = await other.g.create('u'); await other.g.capture('u', o.orderId);
+  other.s.find('u').currentPeriodEnd = '2026-05-01T12:00:00Z';
+  other.order().purchase_units[0].payments.captures[0].status = 'REFUNDED';
+  await other.g.capture('u', o.orderId);
+  assert.equal(other.s.view('u').currentPeriodEnd, '2026-05-01T12:00:00Z');
+  assert.equal(other.g.records()[0].reviewRequired, true);
+});
+test('refund rollback survives save failure and partial refunds require review without revoking paid days', async () => {
+  const f = fixture(); const { orderId } = await f.g.create('u'); await f.g.capture('u', orderId);
+  const end = f.s.view('u').currentPeriodEnd;
+  f.order().purchase_units[0].payments.captures[0].status = 'REFUNDED';
+  f.repo.save = async () => { throw new Error('disk'); };
+  await assert.rejects(f.g.capture('u', orderId), /disk/);
+  assert.equal(f.s.view('u').currentPeriodEnd, end);
+  f.repo.save = async () => {};
+  f.order().purchase_units[0].payments.captures[0].status = 'PARTIALLY_REFUNDED';
+  await f.g.capture('u', orderId);
+  assert.equal(f.s.view('u').currentPeriodEnd, end); assert.equal(f.g.records()[0].reviewRequired, true);
+});
+
+test('verified capture webhook recovers a browser interruption once; unrelated orders cannot grant access', async () => {
+  const f = fixture(); const { orderId } = await f.g.create('u');
+  await f.s.provider.request(`/v2/checkout/orders/${orderId}/capture`, 'POST');
+  const event = { id:'EV1', event_type:'PAYMENT.CAPTURE.COMPLETED', resource:{ id:'CAP1', supplementary_data:{related_ids:{order_id:orderId}} } };
+  assert.equal((await f.g.webhook({...event, resource:{supplementary_data:{related_ids:{order_id:'OTHER'}}}})).ignored, true);
+  assert.equal(f.s.view('u').accessAllowed, false);
+  await f.g.webhook(event); const end = f.s.view('u').currentPeriodEnd;
+  assert.equal(f.s.view('u').accessAllowed, true);
+  assert.equal((await f.g.webhook(event)).duplicate, true);
+  assert.equal(f.s.view('u').currentPeriodEnd, end);
+  f.repo.data.users.push({id:'admin',role:'admin'});
+  await f.g.webhook({...event, id:'EV2',event_type:'PAYMENT.CAPTURE.REVERSED'});
+  assert.equal(f.g.records()[0].reviewRequired, true);
+  assert.ok(f.repo.data.notifications.some(n=>n.id.startsWith('google-review:')));
+});
+
+test('one unavailable order cannot starve recovery of another completed payment', async () => {
+  const f = fixture(); const { orderId } = await f.g.create('u');
+  await f.s.provider.request(`/v2/checkout/orders/${orderId}/capture`, 'POST');
+  f.g.records().unshift({id:'bad',userId:'other',orderId:'BAD',status:'pending'});
+  const request = f.s.provider.request;
+  f.s.provider.request = async (...args) => { if(args[0].endsWith('/BAD')) throw new Error('provider unavailable'); return request(...args); };
+  await f.g.recover();
+  assert.equal(f.s.view('u').accessAllowed, true);
+  assert.ok(f.g.records()[0].checkedAt);
+});
+
+
+test('unapproved wallet switch reuses one order for every plan and recovers the actual paid wallet once', async () => {
+  for (const plan of ['MONTHLY','QUARTERLY','YEARLY']) for (const paidWallet of ['apple_pay','google_pay']) {
+    const f=fixture('APPLE_PAY');
+    const first=await f.g.create('u',plan,'APPLE_PAY');
+    f.order().status='CREATED'; delete f.order().payment_source;
+    const retry=await f.g.create('u',plan,'GOOGLE_PAY');
+    assert.equal(retry.orderId,first.orderId);
+    assert.equal(f.calls.filter(c=>c.path==='/v2/checkout/orders').length,1);
+    assert.equal(f.g.records().length,1);
+    assert.equal(f.s.view('u').accessAllowed,false);
+    f.order().status='APPROVED';f.order().payment_source={[paidWallet]:{}};
+    await f.g.capture('u',first.orderId,'GOOGLE_PAY');
+    const end=f.s.view('u').currentPeriodEnd;
+    await f.g.recheck(f.g.records()[0].id);
+    assert.equal(f.s.view('u').currentPeriodEnd,end);
+    assert.equal(f.s.view('u').accessAllowed,true);
+    assert.equal(f.s.find('u').paymentMethod,paidWallet==='apple_pay'?'APPLE_PAY':'GOOGLE_PAY');
+    assert.equal(f.calls.filter(c=>c.path.endsWith('/capture')).length,1);
+  }
+});
+
+test('wallet switch never overrides approval, a payment source, authorizations, captures or an uncertain provider', async () => {
+  for (const variant of ['approved','source','authorization','capture','unavailable']) {
+    const f=fixture('APPLE_PAY');await f.g.create('u','MONTHLY','APPLE_PAY');
+    f.order().status='CREATED';delete f.order().payment_source;
+    if(variant==='approved') f.order().status='APPROVED';
+    if(variant==='source') f.order().payment_source={apple_pay:{}};
+    if(variant==='authorization') f.order().purchase_units[0].payments={authorizations:[{status:'CREATED'}]};
+    if(variant==='capture') f.order().purchase_units[0].payments={captures:[{status:'PENDING'}]};
+    if(variant==='unavailable') f.s.provider.request=async()=>{throw new Error('network');};
+    await assert.rejects(f.g.create('u','MONTHLY','GOOGLE_PAY'));
+    assert.equal(f.g.records()[0].paymentMethod,'APPLE_PAY');
+    assert.equal(f.g.records().length,1);
+    assert.equal(f.s.view('u').accessAllowed,false);
+  }
+});
+
+test('wallet switch persistence failure preserves the old method and order', async () => {
+  const f=fixture('APPLE_PAY');await f.g.create('u','MONTHLY','APPLE_PAY');
+  f.order().status='CREATED';delete f.order().payment_source;
+  f.repo.save=async()=>{throw new Error('disk');};
+  await assert.rejects(f.g.create('u','MONTHLY','GOOGLE_PAY'),/disk/);
+  assert.equal(f.g.records()[0].paymentMethod,'APPLE_PAY');
+  assert.equal(f.g.records()[0].allowedWallets,undefined);
+  assert.equal(f.g.records().length,1);
+});

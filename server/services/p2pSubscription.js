@@ -9,12 +9,12 @@ export function accessAllowed(s, now = Date.now()) {
 }
 export function publicSubscription(s, now = Date.now()) {
   const active = accessAllowed(s, now);
-  return { role: s?.role || 'MEMBER', priceCents: PRICES[s?.role || 'MEMBER'], currency: 'EUR',
+  return { role: s?.role || 'MEMBER', priceCents: s?.accessAmountCents ?? PRICES[s?.role || 'MEMBER'], accessPlanCode: s?.accessPlanCode || 'MONTHLY', currency: 'EUR',
     status: s?.status === 'active' && !active ? (s.cancelAtPeriodEnd ? 'canceled' : 'past_due') : s?.status || 'inactive',
-    accessAllowed: active, currentPeriodStart: s?.currentPeriodStart || null, currentPeriodEnd: s?.currentPeriodEnd || null,
+    accessAllowed: active, includedSupportAllowed: active, currentPeriodStart: s?.currentPeriodStart || null, currentPeriodEnd: s?.currentPeriodEnd || null,
     nextBillingDate: s?.cancelAtPeriodEnd ? null : s?.nextBillingDate || null,
     cancelAtPeriodEnd: !!s?.cancelAtPeriodEnd, pendingRole: s?.pendingRole || null,
-    approvalUrl: s?.approvalUrl || null, providerStatus: s?.providerStatus || null };
+    approvalUrl: s?.approvalUrl || null, providerStatus: s?.providerStatus || null, paymentMethod: s?.paymentMethod || 'PAYPAL' };
 }
 function approval(result) {
   const link = result.links?.find(l => l.rel === 'approve')?.href;
@@ -46,8 +46,38 @@ export class P2pSubscriptions {
     return publicSubscription(this.find(userId) || { role: this.roleFor(userId), status: 'inactive' }, this.now());
   }
   async reconcile(s) {
+    if (['BANK', 'GOOGLE_PAY', 'APPLE_PAY', 'PAYPAL_ONETIME'].includes(s?.paymentMethod)) {
+      if (!s.providerSubscriptionId) return s;
+      const remoteState = { ...s, paymentMethod: 'PAYPAL', currentPeriodStart: null, currentPeriodEnd: null, lastPaymentAt: null };
+      await this.reconcile(remoteState);
+      s.providerStatus = remoteState.providerStatus;
+      s.paypalReviewRequired = !['APPROVAL_PENDING', 'CANCELLED', 'EXPIRED'].includes(remoteState.providerStatus) || !!remoteState.lastPaymentAt;
+      s.paypalObservedPaymentAt = remoteState.lastPaymentAt || null;
+      if (s.paypalReviewRequired) {
+        const notifications = this.repo.data.notifications ||= [];
+        for (const user of this.repo.data.users || []) if (user.role === 'admin') {
+          const id = `bank-paypal-review:${s.providerSubscriptionId}:${user.id}`;
+          if (!notifications.some(n => n.id === id)) notifications.push({ id, userId: user.id, title: 'Verifica pagamenti BYS',
+            message: 'Una richiesta PayPal conservata per un accesso con bonifico ha cambiato stato. Verifica eventuali incassi sovrapposti nel riepilogo admin.', isRead: false, createdAt: new Date(this.now()).toISOString() });
+        }
+      }
+      return s;
+    }
     if (!s?.providerSubscriptionId) return s;
-    const remote = await this.provider.get(s.providerSubscriptionId);
+    let remote;
+    try { remote = await this.provider.get(s.providerSubscriptionId); }
+    catch (error) {
+      // An unapproved, never-paid request can disappear at PayPal. Keep its
+      // identity for late webhooks, but do not let it block a separate bank grant.
+      if (error.message === 'P2P_PROVIDER_404' && s.providerStatus === 'APPROVAL_PENDING' &&
+          !s.lastPaymentAt && !s.paypalObservedPaymentAt && !s.paypalReviewRequired) {
+        s.providerMissingAt = new Date(this.now()).toISOString();
+        s.approvalUrl = null;
+        return s;
+      }
+      throw error;
+    }
+    s.providerMissingAt = null;
     if (remote.id !== s.providerSubscriptionId || remote.custom_id !== s.customId ||
         ![s.planId, s.pendingPlanId].filter(Boolean).includes(remote.plan_id)) throw new P2pError('P2P_PROVIDER_IDENTITY_MISMATCH', 502);
     if (s.pendingPlanId && remote.plan_id === s.pendingPlanId && remote.status === 'ACTIVE') {
@@ -90,6 +120,7 @@ export class P2pSubscriptions {
     this.ready();
     if (!Object.hasOwn(PRICES, requestedRole)) throw new P2pError('P2P_ROLE_INVALID', 400);
     let s = this.find(userId);
+    if ((this.repo.data.p2pBankPayments || []).some(p => p.userId === userId && p.status === 'reported') || ['BANK', 'GOOGLE_PAY', 'APPLE_PAY', 'PAYPAL_ONETIME'].includes(s?.paymentMethod)) throw new P2pError('BANK_PAYMENT_IN_PROGRESS');
     if (s?.migrationCredit && accessAllowed(s, this.now())) return this.view(userId);
     if (s?.providerSubscriptionId) {
       await this.reconcile(s); await this.save();
@@ -156,6 +187,13 @@ export class P2pSubscriptions {
       throw new P2pError('P2P_UNKNOWN_SUBSCRIPTION_REQUIRES_RECONCILIATION', 503);
     }
     await this.reconcile(s); // Read current provider truth: delivery order cannot resurrect stale states.
+    if (['BANK', 'GOOGLE_PAY', 'APPLE_PAY', 'PAYPAL_ONETIME'].includes(s.paymentMethod)) {
+      // Preserve the bank-paid period; a late PayPal event is recorded and flagged,
+      // never treated as a bank renewal or allowed to revoke bank-paid access.
+      this.repo.data.p2pWebhookEvents = [...events, { id: event.id, type: event.event_type, subscriptionId: id, processedAt: new Date(this.now()).toISOString() }];
+      try { await this.save(); } catch (e) { this.repo.data.p2pWebhookEvents = events; throw e; }
+      return { processed: true, reviewRequired: !!s.paypalReviewRequired };
+    }
     const eventTime = Date.parse(event.create_time);
     const laterPayment = Number.isFinite(eventTime) && Date.parse(s.lastPaymentAt) >= eventTime;
     if (event.event_type === 'BILLING.SUBSCRIPTION.PAYMENT.FAILED' && !laterPayment) {

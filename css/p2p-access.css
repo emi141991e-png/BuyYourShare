@@ -14,3 +14,114 @@
   .p2p-access { padding: 16px 8px 100px !important; }
   .p2p-access nav .btn { flex: 1 1 42%; font-size: 13px; }
 }
+/* Subscription page: scoped to P2P billing only. */
+.p2p-billing > h1 {font-size:26px;letter-spacing:-.8px;margin:8px 0 0;color:#14213b}
+.p2p-billing > nav {gap:4px!important;border-bottom:1px solid #e2e8f0;padding-bottom:16px}
+.p2p-billing > nav .btn {background:transparent;box-shadow:none;border:0;color:#61708a;font-size:13px;padding:7px 10px}
+.p2p-billing > p {display:none}
+.billing-grid {display:grid;grid-template-columns:minmax(0,1.5fr) minmax(230px,1fr);gap:24px;align-items:start}
+.billing-card {background:#fff;border:1px solid #e1e7f0;border-radius:24px;padding:32px;box-shadow:0 12px 40px #20356a09}
+.billing-top {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.billing-eyebrow {font-size:10px;font-weight:800;letter-spacing:1.8px;color:#5968a0}
+.billing-status {font-size:11px;font-weight:600;border-radius:20px;padding:6px 10px;background:#fff4df;color:#8a5b13;max-width:100%}
+.billing-status.is-active {background:#e9f8ef;color:#187044}
+.billing-card h2 {font-size:30px;line-height:1.2;letter-spacing:-1px;margin:24px 0 12px;color:#15233e}
+.billing-intro,.billing-caption {color:#718099;font-size:14px;line-height:1.6}
+.billing-price {font-size:54px;font-weight:800;letter-spacing:-2.5px;color:#192843;margin-top:24px;line-height:1.2}
+.billing-price span {font-size:15px;font-weight:500;letter-spacing:0;color:#718099;margin-left:8px}
+.billing-caption {font-size:11px;margin-top:8px}
+.billing-details {display:grid;grid-template-columns:1fr 1fr;gap:16px;border-top:1px solid #edf0f5;border-bottom:1px solid #edf0f5;padding:18px 0;margin:24px 0}
+.billing-details dt {font-size:11px;color:#718099;margin-bottom:5px}
+.billing-details dd {font-size:13px;font-weight:700;margin:0;color:#253651}
+.billing-notice {font-size:12px;line-height:1.65;background:#f3f6ff;border-radius:10px;padding:12px;color:#4c6084}
+.billing-actions {display:grid;gap:12px;margin-top:20px}
+.billing-actions .btn {margin:0;width:100%;box-sizing:border-box;display:flex;justify-content:center;gap:14px;align-items:center;border-radius:12px;font-size:14px;padding:15px 12px;background:#405be8;box-shadow:0 5px 12px #405be821}
+.billing-refresh,.billing-manage button {border:0;background:transparent;font:inherit;font-size:12px;color:#647494;cursor:pointer;padding:9px;text-decoration:underline;text-underline-offset:3px}
+.billing-manage {margin-top:18px;padding-top:14px;border-top:1px solid #edf0f5;text-align:center}
+.billing-manage button {color:#8d6170;font-size:11px}
+.billing-aside {padding:30px 24px;background:linear-gradient(145deg,#eef2ff,#f5f9fc);border-radius:24px;color:#253651}
+.billing-aside h3 {font-size:25px;line-height:1.25;letter-spacing:-.6px;margin:16px 0 28px}
+.billing-aside h4 {font-size:14px;margin:10px 0 6px}
+.billing-aside p {font-size:12px;line-height:1.75;color:#67758e;margin:0 0 24px}
+.billing-step {font-size:11px;font-weight:800;color:#536be5;background:#fff;border-radius:8px;display:inline-block;padding:5px 8px}
+.billing-separate {border-top:1px solid #dce3f1;padding-top:12px}
+.billing-separate p {margin-bottom:0}
+.p2p-billing button:focus-visible,.p2p-billing a:focus-visible {outline:3px solid #8a9dff;outline-offset:3px}
+@media(max-width:720px){.billing-grid{grid-template-columns:1fr}.billing-card{padding:24px}.billing-card h2{font-size:27px}.billing-aside{padding:24px}.billing-price{font-size:48px}.p2p-billing > nav .btn{flex:initial;font-size:12px}}
+
+/* BYS payment chooser: official Google Pay button, responsive surrounding card. */
+.bys-pay-card{background:linear-gradient(130deg,#fff,#f4f6ff)!important;border:1px solid #dce2f5!important;padding:clamp(22px,4vw,44px)!important;color:#182541}
+.bys-pay-heading{max-width:660px}.bys-pay-badge{display:inline-block;background:#e6f6ee;color:#167447;padding:7px 12px;border-radius:30px;font-size:11px;font-weight:800;letter-spacing:.08em}.bys-pay-heading h3{font-size:clamp(24px,3vw,34px);line-height:1.2;margin:16px 0 12px}.bys-pay-heading p,.bys-pay-note{color:#60708b;line-height:1.65}
+.bys-pay-options{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:26px 0}.bys-pay-options button{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:20px;border:2px solid #e0e5ef;border-radius:18px;background:#fff;color:#182541;text-align:left;cursor:pointer;box-shadow:none}.bys-pay-options button[aria-pressed=true]{border-color:#4b50e6;background:#eeefff;box-shadow:0 5px 20px #4344cc12}.bys-pay-options button:focus-visible{outline:3px solid #8589ff;outline-offset:3px}.bys-pay-options strong{font-size:28px}.bys-pay-options small{color:#65728a}.bys-pay-options span{font-weight:700}
+.bys-pay-checkout{display:flex;justify-content:space-between;align-items:center;gap:24px;background:#fff;border:1px solid #e2e7f3;border-radius:20px;padding:24px}.bys-pay-checkout>div:first-child{display:flex;flex-direction:column;gap:5px}.bys-pay-checkout strong{font-size:36px;letter-spacing:-1px}.bys-pay-checkout small,.bys-pay-checkout span{color:#60708b}.bys-pay-action{width:100%;max-width:360px}.bys-pay-action [data-google-button]{width:100%;height:56px}.bys-pay-action p{font-size:12px;text-align:center;color:#60708b;margin:9px 0 0}.bys-pay-note{font-size:13px;margin:20px 0 12px}.bys-pay-reminders{color:#4149cc!important;font-size:14px;font-weight:650}.bys-pay-details{font-size:13px;color:#60708b;margin-top:18px}.bys-pay-details summary{cursor:pointer}.bys-pay-card [data-google-status]:not(:empty){margin-top:16px;padding:12px;background:#edf2ff;border-radius:12px}
+@media(max-width:600px){.bys-pay-options{gap:7px}.bys-pay-options button{padding:14px 9px}.bys-pay-options strong{font-size:22px}.bys-pay-options span{font-size:12px}.bys-pay-checkout{flex-direction:column;align-items:stretch;padding:18px}.bys-pay-action{max-width:none}.bys-pay-options small{font-size:11px}}
+
+.bys-bank-card{padding:clamp(22px,4vw,44px)!important;color:#182541}.bys-bank-badge{font-size:11px;font-weight:800;letter-spacing:.07em;color:#51627b}.bys-bank-card h3{font-size:clamp(23px,3vw,30px);margin:12px 0}.bys-bank-intro{color:#60708b;line-height:1.65;margin-bottom:24px}.bys-bank-card label{display:flex;flex-direction:column;gap:8px;font-weight:650;max-width:440px;margin:20px 0}.bys-bank-card select{padding:14px 16px;border:1px solid #d4ddea;border-radius:12px;background:white;color:#182541;font:inherit;width:100%}.bys-bank-card dl{display:grid;grid-template-columns:140px 1fr;gap:12px 18px;background:#f6f8fc;border-radius:16px;padding:22px;margin:20px 0}.bys-bank-card dt{color:#65738b;font-size:14px}.bys-bank-card dd{margin:0;font-weight:650;overflow-wrap:anywhere}.bys-bank-card>p{line-height:1.65;margin:14px 0}.bys-bank-whatsapp{margin:24px 0;padding:24px;border:1px solid #c6e9d7;background:#f0faf5;border-radius:18px}.bys-bank-whatsapp h4{font-size:19px;margin:0 0 12px}.bys-bank-whatsapp p{line-height:1.65;color:#3b5a4c}.bys-bank-whatsapp a{display:inline-flex;align-items:center;justify-content:center;padding:15px 22px;background:#137b46;color:#fff!important;border-radius:12px;font-weight:700;text-decoration:none;margin:18px 0}.bys-bank-whatsapp a:hover{background:#0e6337}.bys-bank-whatsapp a:focus-visible{outline:3px solid #56c68a;outline-offset:3px}.bys-bank-whatsapp small{display:block;line-height:1.6;color:#52675d}.bys-bank-card [data-status]:not(:empty){padding:14px;border-radius:12px;background:#edf2ff}@media(max-width:600px){.bys-bank-card dl{grid-template-columns:1fr;gap:5px}.bys-bank-card dd{margin-bottom:12px}.bys-bank-whatsapp{padding:18px}.bys-bank-whatsapp a{width:100%;box-sizing:border-box}}
+
+/* Confirmed server-side access: prominent, persistent until the user continues. */
+.bys-access-confirmation{box-sizing:border-box;width:min(520px,calc(100% - 32px));max-height:90dvh;overflow:auto;border:1px solid #bbf7d0;border-radius:28px;padding:36px 28px;text-align:center;color:#12332a;background:linear-gradient(150deg,#fff,#ecfdf5);box-shadow:0 28px 90px #052e1640}
+.bys-access-confirmation::backdrop{background:rgba(15,23,42,.6)}
+.bys-active-check{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 20px;border-radius:50%;background:#047857;color:white;font-size:42px;font-weight:800}
+.bys-access-confirmation>p:first-of-type{font-size:13px;font-weight:800;letter-spacing:.12em;margin:0}
+.bys-access-confirmation h2{font-size:clamp(42px,10vw,64px);line-height:1.15;margin:8px 0 18px!important;color:#047857;font-weight:850}
+.bys-active-description{line-height:1.6;color:#46645b}
+.bys-active-summary{display:grid;gap:8px;background:#fff;border:1px solid #bbf7d0;border-radius:16px;padding:18px;margin:24px 0}
+.bys-access-confirmation .btn{width:100%;min-height:52px;white-space:normal}
+.bys-active-heading{color:#047857;font-size:clamp(36px,6vw,52px);font-weight:850}
+
+.bys-active-total{font-size:26px;color:#047857}.bys-active-summary small{line-height:1.5;color:#46645b}
+
+.bys-pay-reminders{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;box-sizing:border-box;padding:18px 22px;margin:20px 0;border:1px solid #4338ca;border-radius:18px;background:#4338ca;color:#fff!important;text-decoration:none!important;box-shadow:0 8px 20px #4338ca24;font-size:17px;font-weight:750;line-height:1.4}
+.bys-pay-reminders>span:nth-child(2){flex:1}.bys-pay-reminders small{display:block;margin-top:4px;color:#fff;font-size:13px;font-weight:400}.bys-pay-reminders:hover{background:#3730a3}.bys-pay-reminders:focus-visible,.bys-enable-push:focus-visible{outline:3px solid #0ea5e9;outline-offset:4px}
+.bys-enable-push{width:100%;min-height:56px!important;font-size:17px!important;white-space:normal;box-shadow:0 8px 20px #4338ca24}.push-panel{border:2px solid #c7d2fe!important;background:#f5f7ff!important}
+
+/* Clear entry points for availability alerts and BYS access. */
+.bys-watch-panel{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px;margin:24px 0;background:#eef2ff;border:2px solid #c7d2fe;border-radius:22px}
+.bys-watch-panel strong{font-size:20px;color:#172554}.bys-watch-panel p{margin:8px 0 0;color:#475569;max-width:620px}
+.bys-watch-cta.btn,.access-preview .bys-access-cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:54px;padding:16px 22px;background:#4338ca!important;color:#fff!important;border:0;border-radius:14px;font-size:16px;font-weight:750;box-shadow:0 6px 16px #4338ca25;text-decoration:none}
+.bys-watch-cta.btn:hover,.access-preview .bys-access-cta:hover{background:#3730a3!important}.bys-watch-cta.btn:focus-visible,.bys-access-cta:focus-visible{outline:3px solid #818cf8;outline-offset:4px}
+.access-preview .bys-access-cta{width:100%;margin:16px 0}.access-preview .bys-access-active{font-size:32px;color:#166534}.bys-watch-cta:disabled{opacity:.75}
+.group-info-panel .bys-watch-cta{width:100%;margin-top:18px}
+@media(max-width:640px){.bys-watch-panel{flex-direction:column;align-items:stretch;padding:20px}.bys-watch-panel .bys-watch-cta{width:100%}.bys-watch-panel p{font-size:14px}}
+
+.bys-group-tabs,.bys-journey{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0 28px;padding:0;list-style:none}.bys-journey li{background:#eef2ff;color:#312e81;padding:12px 16px;border-radius:12px;font-weight:650;font-size:14px}.bys-inbox{display:grid;gap:16px}.bys-inbox>a{display:block;text-decoration:none;color:inherit;margin:0}.bys-inbox strong{color:#4338ca}.access-preview .bys-access-active{color:#a7f3d0}
+
+/* A welcoming shared visual identity; payment state remains prominent. */
+.market-hero.market-story{background:#fff8ee;border:1px solid #f1e5d4;color:#23304d;grid-template-columns:1fr 1.1fr;padding:36px;gap:28px}.market-story .hero-kicker{color:#905338}.market-story h2{color:#202944;font-size:clamp(36px,4.5vw,58px);letter-spacing:-.05em}.market-story h2 em{font-family:Georgia,serif;color:#454fca;font-weight:400}.market-story p{color:#566074;font-size:16px;line-height:1.75}.market-story .hero-cta{background:#424bd1;color:#fff;min-height:48px;padding:14px 20px}.market-story .hero-cta:hover{background:#333ba9}.market-story .hero-secondary{color:#3d4667}.market-story-art{margin:0;min-width:0}.market-story-art img{display:block;width:100%;height:auto;border-radius:24px}.market-story-art figcaption{display:table;margin:-8px auto 0;position:relative;transform:rotate(-2deg);background:white;padding:12px 16px;border-radius:10px;box-shadow:0 8px 24px #47372812;font-size:12px;color:#454060;font-weight:650}.market-story .access-preview{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.5fr;gap:8px 30px;align-items:center;background:#263858;border:0;padding:24px 28px;backdrop-filter:none}.market-story .access-preview>span{grid-column:1;color:#d8e3ff}.market-story .access-preview>strong{grid-column:1;margin:0;font-size:32px;letter-spacing:-1px}.market-story .access-preview>p{grid-column:2;grid-row:1/4;margin:0;max-width:none;font-size:13px;color:#e0e6f2}.market-story .access-preview>a{grid-column:1;margin:10px 0 0;background:#fff!important;color:#263858!important;font-size:14px;min-height:46px;padding:12px 16px}.market-story .access-preview>a:hover{background:#ede9ff!important}.market-story .access-preview>small{grid-column:2;margin:0;color:#d8e3ff}.market-story .access-preview .bys-access-active{color:#a7f3d0}.market-story .access-preview strong small{color:#e0e6f2}
+@media(max-width:760px){.market-hero.market-story{grid-template-columns:1fr;padding:24px;gap:24px}.market-story h2{font-size:40px}.market-story-art{max-width:600px;margin:auto}.market-story .access-preview{display:block;padding:24px}.market-story .access-preview>p{margin:14px 0}.market-story .access-preview>small{margin-top:12px}.market-story .hero-secondary{margin-left:12px}.market-story .hero-cta{margin-top:14px}}
+@media(max-width:420px){.market-hero.market-story{padding:20px 16px}.market-story h2{font-size:35px}.market-story .hero-secondary{margin-left:0}.market-story-art figcaption{font-size:10px}}
+
+.market-hero.market-story h2{color:#202944}.market-hero.market-story .market-story-copy>p{color:#566074}
+
+/* High contrast navigation dock, shared by signed-in and guest views. */
+body .bottom-nav{background:linear-gradient(115deg,#202d50,#29295c);border:1px solid #5d6394;box-shadow:0 12px 35px #18234440,0 2px 8px #18234420;padding:8px 10px calc(8px + env(safe-area-inset-bottom));gap:6px;border-radius:24px}
+body .bottom-nav .nav-item{flex:1;min-width:0;min-height:60px;justify-content:center;gap:6px;padding:8px 5px;border-radius:16px;color:#f1f5ff;font-size:12px;font-weight:700;letter-spacing:.01em;transition:background .18s,color .18s;position:relative}
+body .bottom-nav .nav-item svg{width:24px;height:24px;color:#a5ceff;flex-shrink:0}
+body .bottom-nav .nav-item:nth-child(2) svg{color:#c6b5ff}body .bottom-nav .nav-item:nth-child(3) svg{color:#91eed6}body .bottom-nav .nav-item:nth-child(4) svg{color:#ffcab0}
+body .bottom-nav .nav-item:hover{background:#ffffff17;color:#fff}body .bottom-nav .nav-item.active{background:#eef0ff;color:#29265f;box-shadow:0 3px 12px #090e2526}body .bottom-nav .nav-item.active svg{color:#4942c3}body .bottom-nav .nav-item.active:after{content:"";width:16px;height:3px;border-radius:3px;background:#6458d9;position:absolute;bottom:3px}body .bottom-nav .nav-item:focus-visible{outline:3px solid #ffce93;outline-offset:2px}
+@media(max-width:480px){body .bottom-nav{gap:3px;padding-left:6px;padding-right:6px;border-radius:20px}body .bottom-nav .nav-item{font-size:11px;min-height:58px;padding:7px 3px;border-radius:13px}}
+@media(prefers-reduced-motion:reduce){body .bottom-nav .nav-item{transition:none}}
+
+/* Constrain app chrome to the actual viewport, including display cutouts. */
+body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));width:auto;max-width:640px;margin-left:auto;margin-right:auto;transform:none;bottom:max(8px,env(safe-area-inset-bottom))}
+.app-header{padding-top:max(10px,env(safe-area-inset-top))}.header-content,.header-actions,.workspace-heading,.workspace-links{min-width:0}.header-content{flex-wrap:wrap}.header-actions{max-width:100%;flex-wrap:wrap}.brand-logo{min-width:0}.workspace-heading{flex-wrap:wrap}.workspace-links{display:flex;flex-wrap:wrap;gap:10px}.p2p-access{min-width:0;max-width:100%}.p2p-access>*,.group-detail-layout>*,.notification-layout>*{min-width:0}.p2p-access p,.p2p-access h1,.p2p-access h2{overflow-wrap:anywhere}
+@media(max-width:600px){.app-header .container{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}.header-actions{margin-left:auto}.bottom-nav .nav-item{overflow-wrap:anywhere}.p2p-access input,.p2p-access select,.p2p-access textarea{font-size:16px}.market-filters{flex-wrap:wrap}.market-filters select{max-width:100%}}
+
+/* A compact, optional explanation below the payment choices. */
+.bys-access-explainer{margin:20px 0;border:1px solid #ccd7ef;border-radius:20px;background:#f7f9ff;overflow:hidden}
+.bys-access-explainer>summary{padding:20px 24px;cursor:pointer;color:#243a73;font-weight:700}
+.bys-access-explainer[open]>summary{border-bottom:1px solid #dce4f3}
+.bys-access-explainer .billing-grid{margin:0;padding:16px;gap:16px}
+.bys-pay-card{box-shadow:0 12px 40px rgba(65,74,160,.08)}
+.bys-pay-options button:focus-visible,.bys-access-explainer>summary:focus-visible{outline:3px solid #2563eb;outline-offset:4px}
+
+
+.bys-renewal-overview{display:block!important}
+.bys-renewal-overview>.billing-aside{display:none}
+.bys-renewal-overview>.billing-card{padding:24px}
+.bys-renewal-overview .billing-intro,.bys-renewal-overview .billing-notice.is-active{display:none}
+.bys-renewal-overview h2{font-size:24px;margin:12px 0}
+.bys-renewal-overview h2 br{display:none}
+.bys-renewal-overview .billing-price{font-size:32px;margin:12px 0}
+.bys-renewal-overview .billing-details{margin:12px 0;padding:12px 0}
+

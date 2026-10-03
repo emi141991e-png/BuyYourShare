@@ -1,0 +1,122 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { P2pSubscriptions } from '../server/services/p2pSubscription.js';
+import { P2pBank, bankCode } from '../server/services/p2pBank.js';
+import { PushNotifications } from '../server/services/pushNotifications.js';
+function fixture() {
+  let now = Date.parse('2026-01-31T12:00:00Z');
+  const repo = { data: { users: [{ id: 'u', role: 'user' }, { id: 'a', role: 'admin' }], groups: [] }, save: async () => {} };
+  const s = new P2pSubscriptions(repo, {}, { enabled: () => true, now: () => now });
+  return { repo, s, b: new P2pBank(s), advance: days => { now += days * 86400000; } };
+}
+
+test('bank plans require admin confirmation but no manually typed TRN; repeated confirmation cannot extend twice',async()=>{
+  for(const [code,amount,end] of [['QUARTERLY',269,'2026-04-30T12:00:00.000Z'],['YEARLY',990,'2027-01-31T12:00:00.000Z']]){
+    const {b,s}=fixture();const p=await b.report('u',code);assert.equal(p.amountCents,amount);assert.equal(s.view('u').accessAllowed,false);
+    await assert.rejects(b.report('u','MONTHLY'),/ACCESS_PLAN_PAYMENT_PENDING/);
+    await b.confirmFromBys(p.id,'admin');await b.confirmFromBys(p.id,'admin');assert.equal(s.view('u').currentPeriodEnd,end);
+    assert.ok(b.records()[0].bankReference.startsWith('BYS-CONFIRM-'));
+  }
+});
+test('BYS admin confirmation shares ledger and cannot be impersonated by a local member', async () => {
+  const { b, s } = fixture(); const p = await b.report('u');
+  await assert.rejects(b.confirm(p.id, 'bys:admin-bys', 'TRN-BYS-1'), /FORBIDDEN/);
+  const confirmed = await b.confirmFromBys(p.id, 'admin-bys', 'TRN-BYS-1');
+  assert.equal(confirmed.confirmedBy, 'bys:admin-bys');
+  const end = s.view('u').currentPeriodEnd;
+  await b.confirm(p.id, 'a', 'TRN-BYS-1');
+  assert.equal(s.view('u').currentPeriodEnd, end);
+});
+test('bank report does not unlock; only admin confirms once; renewal preserves paid days', async () => {
+  const { b, s } = fixture();
+  const [p, duplicate] = await Promise.all([b.report('u'), b.report('u')]);
+  assert.equal(p.id, duplicate.id); assert.equal(s.view('u').accessAllowed, false);
+  await assert.rejects(b.confirm(p.id, 'u', 'TRN-123'), /FORBIDDEN/);
+  await b.confirm(p.id, 'a', 'TRN-123');
+  assert.equal(s.view('u').currentPeriodEnd, '2026-03-02T12:00:00.000Z');
+  assert.equal(s.view('u').accessAllowed, true);
+  await b.confirm(p.id, 'a', 'TRN-123');
+  assert.equal(s.view('u').currentPeriodEnd, b.records().find(r => r.id === p.id).periodEnd);
+  const p2 = await b.report('u');
+  await assert.rejects(b.confirm(p2.id, 'a', 'TRN-123'), /DUPLICATE/);
+  await b.confirm(p2.id, 'a', 'TRN-456');
+  assert.equal(s.view('u').currentPeriodEnd, '2026-04-01T12:00:00.000Z');
+  await s.upgrade('u'); assert.equal(s.view('u').role, 'GROUP_LEADER');
+  await assert.rejects(s.start('u', 'MEMBER'), /BANK_PAYMENT_IN_PROGRESS/);
+  assert.equal(b.view('u').payments[0].bankReference, undefined);
+  assert.equal(bankCode('u'), b.view('u').code);
+});
+test('active PayPal blocks bank; canceled identity is retired and stale webhook ignored', async () => {
+  const { b, s, repo } = fixture();
+  repo.data.p2pSubscriptions = [{ userId: 'u', providerSubscriptionId: 'I-OLD', providerStatus: 'ACTIVE', customId:'c', planId:'p' }];
+  s.provider.get = async () => ({ id:'I-OLD', status:'ACTIVE', custom_id:'c', plan_id:'p' });
+  await assert.rejects(b.report('u'), /BANK_PAYPAL_OPEN/);
+  s.find('u').providerStatus = 'CANCELLED';
+  const p = await b.report('u'); await b.confirm(p.id, 'a', 'TRN-ONE');
+  assert.deepEqual(await s.webhook({ id: 'event', event_type: 'BILLING.SUBSCRIPTION.SUSPENDED', resource: { id: 'I-OLD' } }), { ignored: true });
+  assert.equal(s.view('u').accessAllowed, true);
+});
+
+test('pending PayPal survives bank activation and late payment alerts admin without replacing bank period', async () => {
+  const { b, s, repo } = fixture();
+  repo.data.p2pSubscriptions = [{ userId:'u', role:'MEMBER', providerSubscriptionId:'I-PENDING', providerStatus:'APPROVAL_PENDING', customId:'c', planId:'p' }];
+  let status = 'APPROVAL_PENDING';
+  s.provider.get = async () => ({ id:'I-PENDING', status, custom_id:'c', plan_id:'p', ...(status === 'ACTIVE' ? { billing_info:{last_payment:{time:'2026-01-31T11:59:00Z',amount:{value:'0.99',currency_code:'EUR'}}, next_billing_time:'2026-02-28T11:59:00Z'} } : {}) });
+  s.provider.cancel = () => { throw new Error('must not cancel'); };
+  const payment = await b.report('u'); await b.confirm(payment.id, 'a', 'PENDING-TRN');
+  const end = s.view('u').currentPeriodEnd;
+  assert.equal(s.find('u').providerSubscriptionId, 'I-PENDING');
+  assert.equal(b.view('u').blocked, false);
+  status = 'ACTIVE';
+  const event = { id:'late-payment', event_type:'PAYMENT.SALE.COMPLETED', resource:{billing_agreement_id:'I-PENDING'} };
+  assert.equal((await s.webhook(event)).reviewRequired, true);
+  assert.equal((await s.webhook(event)).duplicate, true);
+  assert.equal(s.view('u').currentPeriodEnd, end);
+  assert.equal(s.view('u').accessAllowed, true);
+  assert.equal(b.view('u').blocked, true);
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('bank-paypal-review:')).length, 1);
+  await assert.rejects(b.report('u'), /BANK_PAYPAL_OPEN/);
+});
+test('failed save rolls back grant; expiry blocks access and reminders are deduplicated and push eligible', async () => {
+  const { b, s, repo, advance } = fixture(); const p = await b.report('u');
+  repo.save = async () => { throw new Error('disk'); };
+  await assert.rejects(b.confirm(p.id, 'a', 'TRN-ONE'), /disk/);
+  assert.equal(s.view('u').accessAllowed, false);
+  repo.save = async () => {}; await b.confirm(p.id, 'a', 'TRN-ONE');
+  advance(27); await b.reminders(); await b.reminders();
+  const notices = repo.data.notifications.filter(n => n.id.startsWith('bank-renew:'));
+  assert.equal(notices.length, 1);
+  const push = new PushNotifications(s, { now: s.now });
+  assert.equal(push.relevant(notices[0]), true);
+  advance(3); await b.reminders(); assert.equal(s.view('u').accessAllowed, false);
+  assert.equal(push.relevant(notices[0]), false);
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('bank-renew:')).length, 2);
+});
+
+
+test('missing never-approved PayPal request cannot block bank confirmation or refresh; late payment remains reviewable', async () => {
+  const { b, s, repo } = fixture();
+  const p = await b.report('u');
+  repo.data.p2pSubscriptions = [{ userId:'u', role:'MEMBER', providerSubscriptionId:'I-MISSING', providerStatus:'APPROVAL_PENDING', customId:'c', planId:'p' }];
+  s.provider.get = async () => { throw new Error('P2P_PROVIDER_404'); };
+  await b.confirmFromBys(p.id, 'bys-admin');
+  const end = s.view('u').currentPeriodEnd;
+  await b.confirmFromBys(p.id, 'bys-admin');
+  await s.refresh('u');
+  assert.equal(s.view('u').accessAllowed, true);
+  assert.equal(s.view('u').currentPeriodEnd, end);
+  assert.equal(s.find('u').providerSubscriptionId, 'I-MISSING');
+  s.provider.get = async () => ({id:'I-MISSING', status:'ACTIVE',custom_id:'c',plan_id:'p',billing_info:{last_payment:{time:'2026-01-31T11:59:00Z',amount:{value:'0.99',currency_code:'EUR'}},next_billing_time:'2026-02-28T11:59:00Z'}});
+  assert.equal((await s.webhook({id:'late-missing',event_type:'PAYMENT.SALE.COMPLETED',resource:{billing_agreement_id:'I-MISSING'}})).reviewRequired,true);
+  assert.equal(s.view('u').currentPeriodEnd,end);
+});
+test('provider errors and missing paid or active subscriptions still block bank confirmation', async () => {
+  for (const [status,paid,code] of [['ACTIVE',null,'P2P_PROVIDER_404'],['APPROVAL_PENDING','2026-01-01','P2P_PROVIDER_404'],['APPROVAL_PENDING',null,'P2P_PROVIDER_500'],['APPROVAL_PENDING',null,'P2P_PROVIDER_401']]) {
+    const {b,s,repo}=fixture();const p=await b.report('u');
+    repo.data.p2pSubscriptions=[{userId:'u',providerSubscriptionId:'I-OLD',providerStatus:status,lastPaymentAt:paid}];
+    s.provider.get=async()=>{throw new Error(code);};
+    await assert.rejects(b.confirmFromBys(p.id,'admin'),new RegExp(code));
+    assert.equal(b.records()[0].status,'reported');
+    assert.equal(s.view('u').accessAllowed,false);
+  }
+});
