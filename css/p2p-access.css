@@ -106,3 +106,22 @@ body .bottom-nav .nav-item:hover{background:#ffffff17;color:#fff}body .bottom-na
 body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));width:auto;max-width:640px;margin-left:auto;margin-right:auto;transform:none;bottom:max(8px,env(safe-area-inset-bottom))}
 .app-header{padding-top:max(10px,env(safe-area-inset-top))}.header-content,.header-actions,.workspace-heading,.workspace-links{min-width:0}.header-content{flex-wrap:wrap}.header-actions{max-width:100%;flex-wrap:wrap}.brand-logo{min-width:0}.workspace-heading{flex-wrap:wrap}.workspace-links{display:flex;flex-wrap:wrap;gap:10px}.p2p-access{min-width:0;max-width:100%}.p2p-access>*,.group-detail-layout>*,.notification-layout>*{min-width:0}.p2p-access p,.p2p-access h1,.p2p-access h2{overflow-wrap:anywhere}
 @media(max-width:600px){.app-header .container{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}.header-actions{margin-left:auto}.bottom-nav .nav-item{overflow-wrap:anywhere}.p2p-access input,.p2p-access select,.p2p-access textarea{font-size:16px}.market-filters{flex-wrap:wrap}.market-filters select{max-width:100%}}
+
+/* A compact, optional explanation below the payment choices. */
+.bys-access-explainer{margin:20px 0;border:1px solid #ccd7ef;border-radius:20px;background:#f7f9ff;overflow:hidden}
+.bys-access-explainer>summary{padding:20px 24px;cursor:pointer;color:#243a73;font-weight:700}
+.bys-access-explainer[open]>summary{border-bottom:1px solid #dce4f3}
+.bys-access-explainer .billing-grid{margin:0;padding:16px;gap:16px}
+.bys-pay-card{box-shadow:0 12px 40px rgba(65,74,160,.08)}
+.bys-pay-options button:focus-visible,.bys-access-explainer>summary:focus-visible{outline:3px solid #2563eb;outline-offset:4px}
+
+
+.bys-renewal-overview{display:block!important}
+.bys-renewal-overview>.billing-aside{display:none}
+.bys-renewal-overview>.billing-card{padding:24px}
+.bys-renewal-overview .billing-intro,.bys-renewal-overview .billing-notice.is-active{display:none}
+.bys-renewal-overview h2{font-size:24px;margin:12px 0}
+.bys-renewal-overview h2 br{display:none}
+.bys-renewal-overview .billing-price{font-size:32px;margin:12px 0}
+.bys-renewal-overview .billing-details{margin:12px 0;padding:12px 0}
+

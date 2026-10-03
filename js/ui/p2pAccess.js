@@ -187,6 +187,7 @@ export async function renderP2pAccess(container, route, user) {
         }
       }
       if (s.accessAllowed) {
+        container.querySelector('.billing-grid').classList.add('bys-renewal-overview');
         container.querySelector('.billing-price').innerHTML = `${accessRemainingDays(s.currentPeriodEnd)}<span> giorni residui totali</span>`;
         container.querySelector('.billing-caption').textContent = `Ultimo acquisto: ${accessPlan(s.accessPlanCode).label} · ${money(s.priceCents)}. Il totale include i giorni precedenti ancora disponibili.`;
       }
@@ -195,6 +196,19 @@ export async function renderP2pAccess(container, route, user) {
       void renderBankAccess(bankTarget, api, esc, reload);
       const googleTarget = document.createElement('section'); googleTarget.className = 'billing-card';
       bankTarget.before(googleTarget);
+      // Keep payment choices ahead of the long introduction for first-time access.
+      if (!s.accessAllowed) {
+        const overview = container.querySelector('.billing-grid');
+        overview.before(googleTarget);
+        const details = document.createElement('details');
+        details.className = 'bys-access-explainer';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Il tuo accesso BYS · dettagli e verifica del pagamento';
+        overview.before(details);
+        details.append(summary, overview);
+        // Pending payments must remain visible so users do not pay twice.
+        details.open = s.status === 'pending' || !state.available;
+      }
       void mountGooglePayAccess(googleTarget, api, reload);
       const sdkTarget = container.querySelector('#p2pSdkButton');
       if (sdkTarget) void mountSubscriptionButton(sdkTarget, state.checkout, api, message => {
