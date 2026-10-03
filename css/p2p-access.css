@@ -125,3 +125,7 @@ body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));r
 .bys-renewal-overview .billing-price{font-size:32px;margin:12px 0}
 .bys-renewal-overview .billing-details{margin:12px 0;padding:12px 0}
 
+
+.bys-pay-checkout [data-paypal-onetime-button] strong{display:inline;font-size:14px;line-height:1.4;color:#334155}
+.bys-pay-checkout [data-paypal-onetime-button]>p{margin:12px 0 8px;font-size:14px;line-height:1.5}
+
