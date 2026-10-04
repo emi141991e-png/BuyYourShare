@@ -10,7 +10,9 @@ export function manualRoutes(service) {
   router.post('/community/watch',handle(async(req,res)=>res.json(await service.community.watch(req.user.id,req.body))));
   router.post('/groups/:id/requirements',handle(async(req,res)=>res.json(await service.community.updateRequirements(req.user.id,req.params.id,req.body))));
   router.get('/', handle(async (req, res) => { await service.reminders(); res.json({ requests: service.list(req.user.id), ownedGroups: service.ownedGroups(req.user.id) }); }));
-  router.post('/groups/:id/request', handle(async (req, res) => { await service.request(req.user.id, req.params.id, req.body.slotNumber, req.body.requirementsAccepted); res.json({ success: true }); }));
+  router.post('/groups/:id/request', handle(async (req, res) => { const existing=service.records().some(r=>r.userId===req.user.id&&r.groupId===req.params.id&&!['canceled','rejected'].includes(r.status));
+    if(!existing&&!(service.repo.data.pushSubscriptions||[]).some(d=>d.id===req.body.pushDeviceId&&d.userId===req.user.id))throw new P2pError('Prima di una nuova richiesta, apri il marketplace installato e attiva le notifiche su questo dispositivo.',409);
+    await service.request(req.user.id, req.params.id, req.body.slotNumber, req.body.requirementsAccepted); res.json({ success: true }); }));
   router.get('/:id/messages', handle(async (req, res) => res.json({ messages: service.chat(req.user.id, req.params.id) })));
   router.post('/:id/messages', handle(async (req, res) => { await service.send(req.user.id, req.params.id, req.body.content, req.body.clientMessageId, req.body.attachment); res.json({ success: true }); }));
   router.get('/:id/attachments/:messageId', handle(async(req,res)=>{res.set('Cache-Control','private, no-store');res.json(await service.attachment(req.user.id,req.params.id,req.params.messageId));}));

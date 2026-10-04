@@ -5,6 +5,14 @@ let installPrompt = null;
 let card = null;
 let dismissed = false;
 const installed = () => standalone.matches || navigator.standalone === true;
+export function hideInstallSuggestion() { card?.remove(); card = null; dismissed = true; }
+export async function installMarketplace() {
+  if (installed()) return 'App già aperta. Puoi attivare le notifiche.';
+  if (!installPrompt) return instructions();
+  const prompt = installPrompt; installPrompt = null;
+  await prompt.prompt(); await prompt.userChoice;
+  return 'Apri il marketplace dall’icona installata e torna al gruppo per continuare.';
+}
 function snoozed() {
   try { return Date.now() < Number(localStorage.getItem(KEY) || 0); } catch { return false; }
 }

@@ -13,6 +13,7 @@ before(async () => {
   writeFileSync(dbFile, JSON.stringify({ users,
     sessions: users.map(u => ({ userId: u.id, token: `test-${u.id}`, createdAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(), expiresAt: end })),
     groups: [{ id: 'group', ownerId: 'leader', customServiceName: 'Test Group', planName: 'Test Plan', totalSlots: 3, ownerSlots: 1, availableSlots: 2, realSubscriptionCostCents: 900, baseMemberShareCents: 300, status: 'PUBLISHED', manualPaymentDestination: { paypalEmail: 'private@example.test' } }],
+    pushSubscriptions: ['member','unpaid'].map(userId=>({id:'device-'+userId,userId,createdAt:'2099-01-01',subscription:{endpoint:'https://example.test/'+userId}})),
     memberships: [], services: [], accessInstructions: [{ groupId: 'group', instructions: 'private access' }],
     chats: [], chatMessages: [], connectedAccounts: [], notifications: [{ id: 'n-member', userId: 'member', isRead: false }, { id: 'n-other', userId: 'other', isRead: false }, { id: 'n-second', userId: 'member', isRead: false }], financialAuditLogs: [],
     systemConfig: { securityHardeningV1: 'fixture' },
@@ -74,7 +75,7 @@ test('manual confirmation is disabled and unconfigured PayPal quota fails closed
   assert.equal((await request('/api/access/group')).status, 403);
   assert.equal((await request('/api/p2p/requests/unknown/confirm', 'leader', { paymentReceived: true })).status, 410);
   assert.equal((await request('/api/p2p/groups/group/direct-payment', 'member')).status, 410);
-  assert.equal((await request('/api/p2p/groups/group/request', 'member', { slotNumber: 2 })).status, 410);
+  assert.equal((await request('/api/p2p/groups/group/request', 'member', { slotNumber: 2, pushDeviceId:'device-member' })).status, 410);
   const payee = await request('/api/p2p/payee', 'leader');
   assert.equal(payee.body.available, false);
   const stored = JSON.parse(readFileSync(dbFile, 'utf8'));
@@ -116,8 +117,10 @@ test('admin can close and republish a group without leaving it hidden', async ()
 test('manual HTTP lifecycle protects recipient and private messages', async () => {
   const catalogue = await request('/api/groups', null);
   assert.equal(JSON.stringify(catalogue.body).includes('private@example.test'), false);
-  assert.equal((await request('/api/manual/groups/group/request', 'unpaid', { slotNumber: 2 })).status, 402);
-  assert.equal((await request('/api/manual/groups/group/request', 'member', { slotNumber: 2 })).status, 200);
+  assert.equal((await request('/api/manual/groups/group/request', 'unpaid', { slotNumber: 2, pushDeviceId:'device-unpaid' })).status, 402);
+  assert.equal((await request('/api/manual/groups/group/request', 'member', {slotNumber:2})).status,409);
+  assert.equal((await request('/api/manual/groups/group/request', 'member', {slotNumber:2,pushDeviceId:'device-unpaid'})).status,409);
+  assert.equal((await request('/api/manual/groups/group/request', 'member', { slotNumber: 2, pushDeviceId:'device-member' })).status, 200);
   const r = (await request('/api/manual')).body.requests[0];
   assert.equal(r.paymentDestination, undefined);
   assert.equal((await request(`/api/manual/${r.id}/messages`, 'other')).status, 403);
@@ -192,5 +195,5 @@ test('unpaid owners can create and manage only their own groups',async()=>{
  assert.equal((await request('/api/access/'+own.id,'unpaid',{instructions:'Private owner info'})).status,200);
  assert.equal((await request('/api/access/'+own.id,'other')).status,403);
  assert.equal((await request('/api/groups/'+own.id+'/publish','expired',{})).status,403);
- assert.equal((await request('/api/manual/groups/group/request','unpaid',{slotNumber:3})).status,402);
+ assert.equal((await request('/api/manual/groups/group/request','unpaid',{slotNumber:3,pushDeviceId:'device-unpaid'})).status,402);
 });

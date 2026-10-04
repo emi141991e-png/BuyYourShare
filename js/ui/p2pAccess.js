@@ -1,3 +1,4 @@
+import {requireParticipationDevice} from './participationDevice.js';
 import {issueForm,watchButton,requirementsBox} from './communityFeatures.js';
 import { accessPlan, accessRemainingDays } from '../config/accessPlans.js';
 import {leaderProfile,mountLeaderRating} from './leaderRating.js';
@@ -116,13 +117,17 @@ export async function renderP2pAccess(container, route, user) {
         requirementsBox(panel,g,{owner,user,api,esc});issueForm(panel,{groupId:g.id,user,api,esc});if(!owner&&!available)watchButton(panel,{service:g.customServiceName,groupId:g.id,user,api});
         panel.insertAdjacentHTML('beforeend',leaderProfile(g,esc));
         void mountLeaderRating(container,g,user,api);
-        g.slotsInfo.slots.forEach(slot => bind(`join${slot.slotNumber}`, async () => {
+        g.slotsInfo.slots.forEach(slot => bind(`join${slot.slotNumber}`, async function requestPlace() {
           if (!user) { window.location.hash = '#login'; return; }
+          const current = await api('/api/manual');
+          if(current.requests.some(r=>r.groupId===g.id&&r.userId===user.id&&!['canceled','rejected'].includes(r.status))){window.location.hash='#miei-abbonamenti';return;}
+          const pushDeviceId = await requireParticipationDevice(container,user,api,esc,requestPlace);
+          if(!pushDeviceId)return;
           if(!g.requirements){container.querySelector('#p2pMessage').textContent='Il capogruppo deve completare i requisiti prima di nuove richieste.';return;}
           if(!window.confirm('Hai letto paese, modalità di accesso e requisiti del gruppo? Conferma di rispettarli per inviare la richiesta.'))return;
           const { subscription } = await api('/api/p2p/subscription');
           if (!subscription.accessAllowed) { window.location.hash = '#p2p-abbonamento?group=' + encodeURIComponent(g.id); return; }
-          await api(`/api/manual/groups/${encodeURIComponent(g.id)}/request`, { slotNumber: slot.slotNumber, requirementsAccepted:true }); window.location.hash = '#miei-abbonamenti';
+          await api(`/api/manual/groups/${encodeURIComponent(g.id)}/request`, { slotNumber: slot.slotNumber, requirementsAccepted:true, pushDeviceId }); window.location.hash = '#miei-abbonamenti';
         }));
       }
     } catch (e) { shell(`<p role="alert">${esc(e.message)}</p>`); }
