@@ -56,6 +56,7 @@ export class P2pManual {
     return this.records().filter(r => this.repo.data.groups.some(g => g.id === r.groupId && (r.userId === userId || g.ownerId === userId))).map(r => ({ ...r,
       groupName: this.group(r.groupId).customServiceName, groupStatus: this.group(r.groupId).status, ownerId: this.group(r.groupId).ownerId,
       memberName: (this.repo.data.users || []).find(u => u.id === r.userId)?.fullName || 'Membro',
+      confirmations: (this.repo.data.p2pManualConfirmations || []).filter(c => c.requestId === r.id).map(c => ({confirmedAt:c.confirmedAt, amountCents:c.amountCents, periodEnd:c.periodEnd})),
       memberAvatar: this.avatar(r.userId), ownerAvatar: this.avatar(this.group(r.groupId).ownerId),
       ownerName: (this.repo.data.users || []).find(u => u.id === this.group(r.groupId).ownerId)?.fullName || 'Capogruppo',
       unreadMessages: (this.repo.data.p2pPrivateMessages || []).filter(m => m.requestId === r.id).slice(r.chatReadCount?.[userId] || 0).filter(m => m.senderId && m.senderId !== userId).length,
