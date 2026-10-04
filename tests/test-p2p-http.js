@@ -133,7 +133,7 @@ test('manual HTTP lifecycle protects recipient and private messages', async () =
   assert.equal((await request(`/api/manual/${r.id}/confirm`, 'leader', {})).status, 200);
   assert.equal((await request('/api/access/group')).status, 200);
   const publicGroup = await request('/api/groups/group', null);
-  assert.equal(publicGroup.body.group.slotsInfo.slots[1].assignedUser, null);
+  assert.deepEqual(publicGroup.body.group.slotsInfo.slots[1].assignedUser, {fullName:'member',avatarUrl:null});
   assert.equal((await request(`/api/manual/${r.id}/messages`, 'other', { content: 'intrusion' })).status, 403);
   assert.equal((await request('/api/auth/delete-account', 'member', {})).status,409);
   assert.equal((await request('/api/groups/my/', 'unpaid')).status,200);
