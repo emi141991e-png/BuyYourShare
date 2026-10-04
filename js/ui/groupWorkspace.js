@@ -44,6 +44,13 @@ export async function mountGroupWorkspace(container,g,user,{api,reload,esc,money
       ${!owner&&r.paymentDestination?`<details class="quota-destination"><summary>Come pagare al capogruppo</summary>${r.paymentDestination.iban?`<p>IBAN: <strong>${esc(r.paymentDestination.iban)}</strong><br>${esc(r.paymentDestination.accountHolder)}</p>`:''}${r.paymentDestination.paypalEmail?`<p>PayPal: ${esc(r.paymentDestination.paypalEmail)}</p>`:''}<p>Concorda la causale in chat e segnala il pagamento dopo averlo effettuato.</p></details>`:''}
       <div class="quota-actions"><a class="btn btn-secondary" href="#privata-${esc(r.id)}">${r.unreadMessages?`Chat · ${Number(r.unreadMessages)} nuovi`:'Apri chat'}</a>${owner&&r.status==='pending'?`<button class="btn btn-primary" data-action="accept" data-row="${i}">Accetta richiesta</button>`:''}${owner&&r.status==='reported'?`${r.receiptMessageId?`<button class="btn btn-secondary" data-action="receipt" data-row="${i}">Apri ricevuta</button>`:''}<button class="btn btn-primary" data-action="confirm" data-row="${i}">Conferma accredito</button>`:''}${canReport?`<button class="btn btn-primary" data-action="report" data-row="${i}">Ho pagato · invia ricevuta</button>`:''}</div><div data-area="${i}"></div></article>`;
     }).join('')||'<div class="empty-state"><h4>Il gruppo è pronto</h4><p>Condividi il link per invitare i primi membri. Le loro richieste appariranno qui.</p></div>'}</div><p role="status" class="quota-feedback"></p>`;
+  if(!owner){
+    const roster=document.createElement('section');roster.className='group-roster';
+    roster.innerHTML=`<h3>Chi c’è nel gruppo</h3>${g.slotsInfo.slots.map(slot=>`<div class="roster-row"><span class="quota-avatar" aria-hidden="true">${esc((slot.assignedUser?.fullName||'?').slice(0,1))}</span><div><strong>${esc(slot.assignedUser?.fullName||(slot.isOccupied?'Posto occupato':'Posto disponibile'))}</strong><small>${slot.isOwnerSlot?'Capogruppo':`Posto ${slot.slotNumber}`}</small></div><span class="quota-label ${slot.isOccupied?'waiting':'paid'}">${slot.isOccupied?'Occupato':'Libero'}</span></div>`).join('')}`;
+    panel.append(roster);
+    roster.querySelectorAll('.roster-row').forEach((row,i)=>addPhoto(row,g.slotsInfo.slots[i].assignedUser?.avatarUrl));
+  }
+  panel.querySelectorAll('.quota-member').forEach((row,i)=>addPhoto(row,owner?list[i].memberAvatar:list[i].ownerAvatar));
   panel.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',async()=>{
     const r=list[Number(button.dataset.row)],area=panel.querySelector(`[data-area="${button.dataset.row}"]`),action=button.dataset.action;
     if(action==='report'){reportForm(area,r,{api,reload,esc,money});return;}
@@ -55,4 +62,11 @@ export async function mountGroupWorkspace(container,g,user,{api,reload,esc,money
       await reload();
     }catch(error){panel.querySelector('.quota-feedback').textContent=error.message;}finally{button.disabled=false;}
   }));
+}
+
+function addPhoto(row,url){
+ if(!url)return;
+ const holder=row.querySelector('.quota-avatar'),img=document.createElement('img');
+ img.alt='';img.width=40;img.height=40;img.src=url;img.style.cssText='width:40px;height:40px;object-fit:cover;border-radius:50%';
+ img.onload=()=>holder.replaceChildren(img);
 }

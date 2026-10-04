@@ -58,6 +58,8 @@ export function getGroupSlotsBreakdown(group, memberships = [], requestingUser =
   const groupMemberships = memberships.filter(m => m.groupId === group.id && (m.status === 'ACTIVE' || m.status === 'CANCELLATION_SCHEDULED') &&
     (m.paymentProvider === 'MANUAL' || m.paymentMethod !== 'DIRECT' || Date.parse(m.currentPeriodEnd) > Date.now()));
 
+  const canSeeParticipants = requestingUser && (requestingUser.id === group.ownerId || groupMemberships.some(m => m.userId === requestingUser.id));
+  const profile = u => u ? {fullName: u.username || u.fullName || 'Membro', avatarUrl: u.bysUserId ? `https://buyyourshare.it/api/profile-photo/${encodeURIComponent(u.bysUserId)}` : null} : null;
   const slots = [];
   for (let i = 1; i <= totalSlots; i++) {
     const isOwner = i <= ownerSlots;
@@ -74,7 +76,7 @@ export function getGroupSlotsBreakdown(group, memberships = [], requestingUser =
       platformFeeCents: isOwner ? 0 : feeCents,
       memberTotalCents: isOwner ? baseShare : (baseShare + feeCents),
       assignedUserId: isOwner ? group.ownerId : (assignedMembership && (requestingUser?.id === group.ownerId || requestingUser?.id === assignedMembership.userId) ? assignedMembership.userId : null),
-      assignedUser: isOwner ? (group.owner ? { fullName: group.owner.fullName } : null) : (mUser && (requestingUser?.id === group.ownerId || requestingUser?.id === mUser.id) ? { fullName: mUser.fullName } : null)
+      assignedUser: isOwner ? profile(allUsers.find(u => u.id === group.ownerId) || group.owner) : (canSeeParticipants ? profile(mUser) : null)
     });
   }
 

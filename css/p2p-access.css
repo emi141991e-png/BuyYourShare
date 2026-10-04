@@ -169,3 +169,5 @@ body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));r
 
 .watch-service-form:not([hidden]){display:flex;flex-wrap:wrap;gap:10px;align-items:end}.watch-service-form label{display:grid;gap:8px;flex:1 1 220px;font-weight:600}.watch-service-form input{display:block;width:100%;min-width:0;padding:12px;border:1px solid #9eacc9;border-radius:10px;background:#fff;color:#17253e}.watch-service-form[hidden]{display:none}
 .bys-watch-cta[hidden]{display:none}
+
+.group-roster{margin-top:24px;border-top:1px solid #dce5ef;padding-top:18px}.roster-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #edf0f6}.roster-row>div{flex:1;min-width:0;overflow-wrap:anywhere}.roster-row small{display:block;color:#536780;margin-top:4px}.roster-row .quota-label{margin-left:0}

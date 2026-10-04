@@ -17,7 +17,7 @@ export const groupsRouter = express.Router();
 function withReservations(memberships) {
   return [...memberships, ...(dataRepository.data.p2pManualRequests || [])
     .filter(r => r.status === 'reported' && !r.membershipId || r.status === 'accepted' && Date.parse(r.reservedUntil) > Date.now())
-    .map(r => ({ groupId: r.groupId, slotNumber: r.slotNumber, status: 'ACTIVE' }))];
+    .map(r => ({ groupId: r.groupId, userId:r.userId, slotNumber: r.slotNumber, status: 'ACTIVE' }))];
 }
 
 /**
