@@ -166,3 +166,6 @@ body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));r
  .explore-first .group-search input{width:100%}
  .explore-first .market-filters{display:flex;flex-wrap:wrap;font-size:13px}
 }
+
+.watch-service-form:not([hidden]){display:flex;flex-wrap:wrap;gap:10px;align-items:end}.watch-service-form label{display:grid;gap:8px;flex:1 1 220px;font-weight:600}.watch-service-form input{display:block;width:100%;min-width:0;padding:12px;border:1px solid #9eacc9;border-radius:10px;background:#fff;color:#17253e}.watch-service-form[hidden]{display:none}
+.bys-watch-cta[hidden]{display:none}
