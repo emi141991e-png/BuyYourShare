@@ -27,15 +27,15 @@ test('personal group list keeps closed groups private to their owner', () => {
   assert.equal(service.ownedGroups('o')[0].manualPaymentDestination, undefined);
 });
 
-test('expiry and renewal reminders notify both participants without duplicates', async () => {
+test('expiry alerts and member renewal reminders are deduplicated without chasing leaders', async () => {
   const { service: s, repo, time } = setup();
   const first = await s.request('m', 'g', 2); await s.action('o', first.id, 'accept');
   time('2026-02-03T12:00:00Z'); await s.reminders(); await s.reminders();
   assert.equal(repo.data.notifications.filter(n => n.id.startsWith('reservation-expired')).length, 2);
   const second = await s.request('m', 'g', 2); await s.action('o', second.id, 'accept'); await s.action('m', second.id, 'report'); await s.action('o', second.id, 'confirm');
   time('2026-03-04T12:00:00Z'); await s.reminders(); await s.reminders();
-  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('leader-renew:')).length, 1);
-  assert.equal(repo.data.notifications.find(n => n.id.startsWith('leader-renew:')).userId, 'o');
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('leader-renew:')).length, 0);
+  assert.equal(repo.data.notifications.filter(n => n.id.startsWith('renew:') && n.userId === 'm').length, 1);
 });
 test('destination requires valid IBAN checksum or PayPal email', () => {
   assert.throws(() => paymentDestination({})); assert.throws(() => paymentDestination({ payoutIban: 'IT00X0542811101000000123456', payoutLegalName: 'Test' }));
@@ -140,5 +140,32 @@ test('PDF receipts are private, validated, deduplicated and rolled back on save 
  assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
  repo.save=async()=>{throw new Error('disk failure')};await assert.rejects(s.send('m',r.id,'','pdf-two',attachment));
  assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
+ }finally{if(old===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=old;await fs.rm(dir,{recursive:true,force:true});}
+});
+
+
+test('report and receipt commit together, retry once, remain private and stop reminders',async()=>{
+ const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path');
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'bys-report-')),old=process.env.DATA_DIR;process.env.DATA_DIR=dir;
+ try{
+ const {service:s,repo,time}=setup(),r=await s.request('m','g',2);await s.action('o',r.id,'accept');
+ const attachment={data:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4\n%%EOF').toString('base64')};
+ await assert.rejects(s.action('o',r.id,'report',null,attachment));
+ await assert.rejects(s.action('stranger',r.id,'report',null,attachment));
+ repo.save=async()=>{throw new Error('disk failure')};
+ await assert.rejects(s.action('m',r.id,'report',null,attachment));
+ assert.equal(s.list('m')[0].status,'accepted');
+ assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,0);
+ repo.save=async()=>{};
+ await s.action('m',r.id,'report',null,attachment);await s.action('m',r.id,'report',null,attachment);
+ const reported=s.list('o')[0];assert.equal(reported.status,'reported');assert.ok(reported.receiptMessageId);
+ assert.equal((await s.attachment('o',r.id,reported.receiptMessageId)).data,attachment.data);
+ await assert.rejects(s.attachment('stranger',r.id,reported.receiptMessageId));
+ assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('report:')).length,1);
+ assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
+ time('2026-02-05T12:00:00Z');await s.reminders();assert.equal(s.list('m')[0].status,'reported');
+ await s.action('o',r.id,'confirm');time('2026-03-04T12:00:00Z');
+ await s.action('m',r.id,'report');assert.equal(s.list('o')[0].receiptMessageId,null);
+ await s.reminders();assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('renew:')).length,0);
  }finally{if(old===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=old;await fs.rm(dir,{recursive:true,force:true});}
 });

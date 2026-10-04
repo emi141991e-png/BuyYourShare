@@ -15,6 +15,6 @@ export function manualRoutes(service) {
   router.post('/:id/messages', handle(async (req, res) => { await service.send(req.user.id, req.params.id, req.body.content, req.body.clientMessageId, req.body.attachment); res.json({ success: true }); }));
   router.get('/:id/attachments/:messageId', handle(async(req,res)=>{res.set('Cache-Control','private, no-store');res.json(await service.attachment(req.user.id,req.params.id,req.params.messageId));}));
   router.post('/:id/read', handle(async (req, res) => { await service.markRead(req.user.id, req.params.id, req.body.lastMessageId); res.json({ success: true }); }));
-  router.post('/:id/:action', handle(async (req, res) => { await service.action(req.user.id, req.params.id, req.params.action, req.body.periodEnd); res.json({ success: true }); }));
+  router.post('/:id/:action', handle(async (req, res) => { await service.action(req.user.id, req.params.id, req.params.action, req.body.periodEnd, req.body.attachment); res.json({ success: true }); }));
   return router;
 }

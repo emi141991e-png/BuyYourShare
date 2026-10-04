@@ -129,3 +129,11 @@ body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));r
 .bys-pay-checkout [data-paypal-onetime-button] strong{display:inline;font-size:14px;line-height:1.4;color:#334155}
 .bys-pay-checkout [data-paypal-onetime-button]>p{margin:12px 0 8px;font-size:14px;line-height:1.5}
 
+
+/* Member receipt and leader verification flow */
+.participation-card[hidden]{display:none!important}
+.quota-report{display:grid;gap:14px;background:#f1f5ff;border:1px solid #c7d2fe;border-radius:18px;padding:20px;margin:12px 0;color:#172554}
+.quota-report label{display:block;font-weight:600}
+.quota-report input[type=file]{display:block;max-width:100%;margin-top:10px}
+.quota-report input[type=checkbox]{width:auto;margin-right:8px}
+.quota-report h4,.quota-report p{margin:0}

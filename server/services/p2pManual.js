@@ -85,7 +85,7 @@ export class P2pManual {
     this.notify(g.ownerId, `request:${r.id}`, 'Nuova richiesta di partecipazione: apri la chat privata.', r.id);
     await this.repo.save(); return r;
   }); }
-  action(userId, id, action, periodEnd) { return this.exclusive(async () => {
+  action(userId, id, action, periodEnd, attachment) { let stored; return this.exclusive(async () => {
     const r = this.authorized(id, userId), g = this.group(r.groupId), owner = g.ownerId === userId;
     if (action === 'accept') {
       if (!owner || r.status !== 'pending') throw new P2pError('INVALID_TRANSITION');
@@ -101,8 +101,17 @@ export class P2pManual {
       if(r.leaveAtPeriodEnd)throw new P2pError('Hai programmato l’uscita. Annullala prima di rinnovare.',400);
       if (owner || !['accepted', 'confirmed', 'reported'].includes(r.status)) throw new P2pError('INVALID_TRANSITION');
       if (r.status === 'reported') { await this.repo.save(); return r; }
+      if (periodEnd !== undefined && (r.periodEnd || null) !== (periodEnd || null)) throw new P2pError('La quota è già stata aggiornata. Aggiorna la pagina prima di proseguire.',409);
       if (r.status === 'accepted' && Date.parse(r.reservedUntil) <= this.now()) throw new P2pError('RESERVATION_EXPIRED');
       if (r.status === 'confirmed' && Date.parse(r.periodEnd) - this.now() > 3 * 86400000) throw new P2pError('RENEWAL_NOT_DUE');
+      if (attachment) {
+        if ((this.repo.data.p2pPrivateMessages || []).filter(m => m.senderId === userId && m.attachment && Date.parse(m.createdAt) > this.now()-86400000).length >= 50) throw new P2pError('Hai raggiunto il limite di 50 allegati al giorno. Riprova domani.',429);
+        stored = await saveAttachment(attachment);
+        this.message(r, 'Ricevuta della quota segnalata. Accredito da verificare.', userId);
+        const receipt = this.repo.data.p2pPrivateMessages.at(-1);
+        receipt.attachment = stored;
+        r.receiptMessageId = receipt.id;
+      } else r.receiptMessageId = null;
       r.status = 'reported'; r.reportedAt = new Date(this.now()).toISOString();
     } else if (action === 'confirm') {
       if (!owner) throw new P2pError('FORBIDDEN', 403);
@@ -130,7 +139,7 @@ export class P2pManual {
     g.occupiedMemberSlots = (this.repo.data.memberships || []).filter(m => m.groupId === g.id && m.role === 'MEMBER' && ['ACTIVE', 'CANCELLATION_SCHEDULED'].includes(m.status) && (m.paymentProvider === 'MANUAL' || Date.parse(m.currentPeriodEnd) > this.now())).length;
     this.message(r, labels[action]); this.notify(owner ? r.userId : g.ownerId, `${action}:${id}:${r.periodEnd || r.reportedAt || ''}`, labels[action], id);
     await this.repo.save(); return r;
-  }); }
+  }).catch(async error => { if (stored) await removeAttachment(stored.id, stored.mime); throw error; }); }
   chat(userId, id) { const r = this.authorized(id, userId); return (this.repo.data.p2pPrivateMessages || []).filter(m => m.requestId === r.id); }
   markRead(userId, id, lastMessageId) { return this.exclusive(async () => {
     const r = this.authorized(id, userId);
@@ -181,7 +190,6 @@ export class P2pManual {
       if ((this.repo.data.notifications || []).some(n => n.id === key)) continue;
       const text = remaining > 0 ? 'La quota scade entro 3 giorni. Organizza il pagamento diretto al capogruppo.' : 'Rinnovo in attesa: paga la quota al capogruppo e indica «Ho pagato». Se hai già pagato, attendi la sua conferma.';
       this.notify(r.userId, key, text, r.id); this.message(r, text); changed = true;
-      if (phase === 'due') this.notify(this.group(r.groupId).ownerId, `leader-${key}`, 'Una quota è scaduta. Il membro ha ricevuto un promemoria automatico. Verifica l’accredito prima di confermare il rinnovo.', r.id);
     }
     if(this.community.checkWatches())changed=true;
     if (changed) await this.repo.save();
