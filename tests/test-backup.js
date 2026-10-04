@@ -11,7 +11,8 @@ test('backup exports snapshot and only referenced private photos, fails on missi
  const d=await fs.mkdtemp(path.join(os.tmpdir(),'bys-backup-test-'));try{
  await fs.writeFile(path.join(d,'push-vapid.json'),'{}');await fs.mkdir(path.join(d,'private-chat-attachments'));
  const id='00000000-0000-0000-0000-000000000000';await fs.writeFile(path.join(d,'private-chat-attachments',id+'.jpg'),'photo');await fs.writeFile(path.join(d,'unrelated-secret'),'excluded');
- const snapshot={users:[{id:'test'}],p2pPrivateMessages:[{attachment:{id}}]};const lines=[];for await(const row of backupRecords(snapshot,d))lines.push(JSON.parse(row));assert.equal(lines.at(-1).files,3);assert.equal(lines.some(r=>r.path==='unrelated-secret'),false);assert.deepEqual(JSON.parse(Buffer.from(lines[1].data,'base64')),snapshot);
+ await fs.writeFile(path.join(d,'private-chat-attachments',id+'.pdf'),'%PDF-1.4 test %%EOF');
+ const snapshot={users:[{id:'test'}],p2pPrivateMessages:[{attachment:{id}},{attachment:{id,mime:'application/pdf'}}]};const lines=[];for await(const row of backupRecords(snapshot,d))lines.push(JSON.parse(row));assert.equal(lines.at(-1).files,4);assert.equal(lines.some(r=>r.path==='unrelated-secret'),false);assert.deepEqual(JSON.parse(Buffer.from(lines[1].data,'base64')),snapshot);
  await fs.unlink(path.join(d,'private-chat-attachments',id+'.jpg'));await assert.rejects(async()=>{for await(const row of backupRecords(snapshot,d)){};});
  }finally{await fs.rm(d,{recursive:true,force:true});}
 });

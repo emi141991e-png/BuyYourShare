@@ -89,7 +89,7 @@ export class P2pManual {
     const r = this.authorized(id, userId), g = this.group(r.groupId), owner = g.ownerId === userId;
     if (action === 'accept') {
       if (!owner || r.status !== 'pending') throw new P2pError('INVALID_TRANSITION');
-      this.active(userId); this.active(r.userId); this.slotFree(g, r.slotNumber, r.id);
+      this.active(r.userId); this.slotFree(g, r.slotNumber, r.id);
       r.destination = structuredClone(g.manualPaymentDestination); r.status = 'accepted';
       r.reservedUntil = new Date(this.now() + 48 * 3600000).toISOString();
     } else if (action === 'schedule-exit' || action === 'keep-place') {
@@ -142,13 +142,13 @@ export class P2pManual {
     for(const n of this.repo.data.notifications||[])if(n.userId===userId&&n.requestId===id&&n.id.startsWith('chat:')&&readIds.has(n.messageId))n.isRead=true;
     await this.repo.save();
   }); }
-  async attachment(userId,id,messageId){this.authorized(id,userId);const m=(this.repo.data.p2pPrivateMessages||[]).find(m=>m.requestId===id&&m.id===messageId);if(!m?.attachment)throw new P2pError('Allegato non trovato.',404);return {data:await readAttachment(m.attachment.id)};}
+  async attachment(userId,id,messageId){this.authorized(id,userId);const m=(this.repo.data.p2pPrivateMessages||[]).find(m=>m.requestId===id&&m.id===messageId);if(!m?.attachment)throw new P2pError('Allegato non trovato.',404);return {data:await readAttachment(m.attachment.id,m.attachment.mime)};}
   send(userId, id, content, clientMessageId, attachment) { return this.exclusive(async () => {
     const r = this.authorized(id, userId);
     if (typeof content !== 'string' || (!content.trim() && !attachment) || content.length > 2000) throw new P2pError('INVALID_MESSAGE', 400);
     if (clientMessageId && (typeof clientMessageId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(clientMessageId))) throw new P2pError('INVALID_MESSAGE', 400);
     if (clientMessageId && (this.repo.data.p2pPrivateMessages || []).some(m => m.requestId === id && m.senderId === userId && m.clientMessageId === clientMessageId)) return;
-    if(attachment&&(this.repo.data.p2pPrivateMessages||[]).filter(m=>m.senderId===userId&&m.attachment&&Date.parse(m.createdAt)>this.now()-86400000).length>=50)throw new P2pError('Hai raggiunto il limite di 50 foto al giorno. Riprova domani.',429);
+    if(attachment&&(this.repo.data.p2pPrivateMessages||[]).filter(m=>m.senderId===userId&&m.attachment&&Date.parse(m.createdAt)>this.now()-86400000).length>=50)throw new P2pError('Hai raggiunto il limite di 50 allegati al giorno. Riprova domani.',429);
     const stored=attachment?await saveAttachment(attachment):null;
     try {
     this.message(r, content.trim(), userId);
@@ -158,7 +158,7 @@ export class P2pManual {
     this.notify(userId === r.userId ? this.group(r.groupId).ownerId : r.userId, notificationId, 'Hai ricevuto un messaggio nella chat privata del gruppo.', r.id);
     this.repo.data.notifications.find(n=>n.id===notificationId).messageId=this.repo.data.p2pPrivateMessages.at(-1).id;
     await this.repo.save();
-    } catch(error){if(stored)await removeAttachment(stored.id);throw error;}
+    } catch(error){if(stored)await removeAttachment(stored.id,stored.mime);throw error;}
   }); }
   reminders() { return this.exclusive(async () => {
     let changed = false;
@@ -181,7 +181,7 @@ export class P2pManual {
       if ((this.repo.data.notifications || []).some(n => n.id === key)) continue;
       const text = remaining > 0 ? 'La quota scade entro 3 giorni. Organizza il pagamento diretto al capogruppo.' : 'Rinnovo in attesa: paga la quota al capogruppo e indica «Ho pagato». Se hai già pagato, attendi la sua conferma.';
       this.notify(r.userId, key, text, r.id); this.message(r, text); changed = true;
-      if (phase === 'due') this.notify(this.group(r.groupId).ownerId, `leader-${key}`, 'Una quota è scaduta. Contatta il membro in chat e verifica l’accredito prima di confermare il rinnovo.', r.id);
+      if (phase === 'due') this.notify(this.group(r.groupId).ownerId, `leader-${key}`, 'Una quota è scaduta. Il membro ha ricevuto un promemoria automatico. Verifica l’accredito prima di confermare il rinnovo.', r.id);
     }
     if(this.community.checkWatches())changed=true;
     if (changed) await this.repo.save();

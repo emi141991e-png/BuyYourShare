@@ -16,10 +16,10 @@ export async function* backupRecords(snapshot,directory){
  yield emit('database.json',db);let count=1;
  // VAPID keys are needed to keep existing devices subscribed after recovery.
  yield emit('push-vapid.json',await fs.readFile(path.join(directory,'push-vapid.json')));count++;
- const ids=new Set((snapshot.p2pPrivateMessages||[]).filter(m=>m.attachment).map(m=>m.attachment.id));
+ const ids=new Set((snapshot.p2pPrivateMessages||[]).filter(m=>m.attachment).map(m=>m.attachment.id+(m.attachment.mime==='application/pdf'?'.pdf':'.jpg')));
  for(const id of ids){
-  if(!/^[a-f0-9-]{36}$/.test(id))throw new Error('BACKUP_INVALID_ATTACHMENT');
-  const name='private-chat-attachments/'+id+'.jpg';
+  if(!/^[a-f0-9-]{36}\.(jpg|pdf)$/.test(id))throw new Error('BACKUP_INVALID_ATTACHMENT');
+  const name='private-chat-attachments/'+id;
   yield emit(name,await fs.readFile(path.join(directory,name)));count++;
  }
  yield JSON.stringify({type:'end',files:count})+'\n';

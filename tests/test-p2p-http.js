@@ -53,7 +53,7 @@ test('actual server gates every user P2P surface and retains subscription manage
   assert.equal((await request('/api/p2p/subscription/start', 'unpaid', {role:'MEMBER'})).body.error, 'P2P_PAYPAL_TEMPORARILY_DISABLED');
   assert.equal((await request('/api/p2p/subscription', 'unpaid')).body.paypalAvailable, false);
   assert.deepEqual((await request('/api/p2p/subscription', 'unpaid')).body.checkout, { enabled: false });
-  for (const url of ['/api/groups/my', '/api/memberships/my', '/api/access/group', '/api/chat/group', '/api/ledger', '/api/p2p/direct-memberships']) {
+  for (const url of ['/api/memberships/my', '/api/access/group', '/api/chat/group', '/api/ledger', '/api/p2p/direct-memberships']) {
     assert.equal((await request(url, null)).status, 401, url);
     assert.equal((await request(url, 'unpaid')).status, 402, url);
     assert.equal((await request(url, 'expired')).status, 402, url);
@@ -133,7 +133,7 @@ test('manual HTTP lifecycle protects recipient and private messages', async () =
   assert.equal(publicGroup.body.group.slotsInfo.slots[1].assignedUser, null);
   assert.equal((await request(`/api/manual/${r.id}/messages`, 'other', { content: 'intrusion' })).status, 403);
   assert.equal((await request('/api/auth/delete-account', 'member', {})).status,409);
-  assert.equal((await request('/api/groups/my/', 'unpaid')).status,402);
+  assert.equal((await request('/api/groups/my/', 'unpaid')).status,200);
 });
 
 test('push registration requires authentication and explicit consent; devices cannot be removed by others', async () => {
@@ -182,4 +182,15 @@ test('bank HTTP flow requires administrator confirmation and isolates user histo
   assert.equal((await request(`/api/admin/bank-payments/${payment.id}/confirm`, 'admin', {reference:'TEST-TRN-HTTP'})).status, 200);
   assert.equal((await request('/api/p2p/subscription', 'expired')).body.subscription.accessAllowed, true);
   assert.equal((await request('/api/p2p/bank', 'unpaid')).body.payments.length, 0);
+});
+
+test('unpaid owners can create and manage only their own groups',async()=>{
+ assert.equal((await request('/api/groups',null,{})).status,401);
+ const created=await request('/api/groups','unpaid',{customServiceName:'Owner free test',country:'Italia',accessMethod:'Invito',eligibility:'Account personale',planName:'Family',realCostEuros:9,totalSlots:3,ownerSlots:1,paypalEmail:'owner@example.test'});
+ assert.equal(created.status,201,JSON.stringify(created.body));
+ const own=(await request('/api/groups/my','unpaid')).body.groups.find(g=>g.customServiceName==='Owner free test');assert.ok(own);
+ assert.equal((await request('/api/access/'+own.id,'unpaid',{instructions:'Private owner info'})).status,200);
+ assert.equal((await request('/api/access/'+own.id,'other')).status,403);
+ assert.equal((await request('/api/groups/'+own.id+'/publish','expired',{})).status,403);
+ assert.equal((await request('/api/manual/groups/group/request','unpaid',{slotNumber:3})).status,402);
 });

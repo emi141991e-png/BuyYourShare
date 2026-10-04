@@ -1,10 +1,10 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { p2pError } from './p2p.js';
+import { P2pError } from '../services/p2pSubscription.js';
 export function manualRoutes(service) {
   const router = express.Router();
   router.use(requireAuth);
-  const handle = fn => async (req, res) => { try { await fn(req, res); } catch (e) { p2pError(res, e); } };
+  const handle = fn => async (req, res) => { try { await fn(req, res); } catch (e) { res.status(e.status || 503).json({error:e instanceof P2pError ? e.message : 'CHAT_UNAVAILABLE',message:e instanceof P2pError ? e.message : 'Operazione non completata. Il messaggio e l’allegato restano disponibili: riprova.'}); } };
   router.get('/community',handle(async(req,res)=>res.json(service.community.list(req.user.id))));
   router.post('/community/issues',handle(async(req,res)=>res.json(await service.community.issue(req.user.id,req.body))));
   router.post('/community/watch',handle(async(req,res)=>res.json(await service.community.watch(req.user.id,req.body))));

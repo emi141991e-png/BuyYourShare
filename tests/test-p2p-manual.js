@@ -117,3 +117,28 @@ test('requirements are owner controlled, acknowledged and snapshotted; issues pr
  const x=await s.community.issue('m',{groupId:'g',requestId:r.id,description:'Non ho ricevuto accesso'});assert.equal((await s.community.issue('m',{groupId:'g',description:'Altra descrizione valida'})).id,x.id);assert.equal(s.community.list('other').issues.length,0);await assert.rejects(s.community.issue('other',{groupId:'g',requestId:r.id,description:'Accesso non consentito'}));
  repo.save=async()=>{throw new Error('disk')};await assert.rejects(s.community.watch('m',{service:'Example'}));assert.equal((repo.data.groupWatches||[]).length,0);
 });
+
+ test('unpaid leader manages own group but cannot join someone else', async()=>{
+ const {service:s,repo}=setup();repo.data.groups[0].ownerId='unpaid';
+ const r=await s.request('m','g',2);await s.action('unpaid',r.id,'accept');
+ await s.action('m',r.id,'report');await s.action('unpaid',r.id,'confirm');
+ assert.equal(s.list('unpaid')[0].status,'confirmed');
+ repo.data.groups.push({...repo.data.groups[0],id:'other-group',ownerId:'someone'});
+ await assert.rejects(s.request('unpaid','other-group',2),e=>e.status===402||e.code==='P2P_ACTIVE_SUBSCRIPTION_REQUIRED');
+ });
+
+test('PDF receipts are private, validated, deduplicated and rolled back on save failure',async()=>{
+ const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path');
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'bys-pdf-')),old=process.env.DATA_DIR;process.env.DATA_DIR=dir;
+ try{const {service:s,repo}=setup(),r=await s.request('m','g',2);
+ const attachment={data:'data:application/pdf;base64,'+Buffer.from('%PDF-1.4\n1 0 obj <</Type /Catalog>> endobj\n%%EOF').toString('base64')};
+ await s.send('m',r.id,'','pdf-one',attachment);await s.send('m',r.id,'','pdf-one',attachment);
+ const msg=s.chat('o',r.id).at(-1);assert.equal(msg.attachment.mime,'application/pdf');
+ assert.equal((await s.attachment('o',r.id,msg.id)).data,attachment.data);
+ await assert.rejects(s.attachment('stranger',r.id,msg.id));
+ await assert.rejects(s.send('m',r.id,'','pdf-invalid',{data:'data:application/pdf;base64,'+Buffer.from('<html>not PDF</html>').toString('base64')}));
+ assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
+ repo.save=async()=>{throw new Error('disk failure')};await assert.rejects(s.send('m',r.id,'','pdf-two',attachment));
+ assert.equal((await fs.readdir(path.join(dir,'private-chat-attachments'))).length,1);
+ }finally{if(old===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=old;await fs.rm(dir,{recursive:true,force:true});}
+});

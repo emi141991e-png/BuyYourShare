@@ -145,10 +145,17 @@ app.use('/api/p2p', createP2pRoutes(p2pSubscriptions, p2pQuota));
 app.use('/api/manual', (req,res,next)=>{if(req.method==='POST')res.on('finish',()=>{if(res.statusCode<400)pushNotifications.kick();});next();}, manualRoutes(manual));
 app.use('/api/push', pushRoutes(pushNotifications));
 app.use('/api/bys-push', bysPushRoutes(pushNotifications));
-app.use('/api/groups', (req, res, next) => req.method === 'GET' && req.path.replace(/\/+$/, '') !== '/my' ? next() : p2pGate(req, res, next), groupsRouter);
+// Group routes authenticate mutations and enforce ownership themselves. Creating is free.
+app.use('/api/groups', groupsRouter);
+const ownerOrPaid = (req, res, next) => {
+  const groupId = req.path.split('/')[1];
+  const group = dataRepository.data.groups.find(g => g.id === groupId);
+  if (req.user && group && group.ownerId === req.user.id) return next();
+  return p2pGate(req, res, next);
+};
 app.use('/api/memberships', p2pGate, membershipsRouter);
-app.use('/api/access', p2pGate, accessRouter);
-app.use('/api/chat', p2pGate, chatRouter);
+app.use('/api/access', ownerOrPaid, accessRouter);
+app.use('/api/chat', ownerOrPaid, chatRouter);
 app.use(['/api/connect', '/api/checkout'], (req, res) => res.status(410).json({ error: 'DIRECT_GROUP_PAYMENTS_ONLY', message: 'Le quote si pagano direttamente al capogruppo. BYS incassa solo l’abbonamento P2P.' }));
 app.use('/api/ledger', p2pGate, ledgerRouter);
 app.use('/api/notifications', notificationsRouter);
