@@ -1,3 +1,4 @@
+import {simplifyQuota,actionSummary} from './quickQuota.js';
 import {reportForm, openReceipt} from './receiptReport.js';
 import {issueForm,participationProgress,communityInbox} from './communityFeatures.js';
 import { groupShareLink } from './groupShare.js';
@@ -30,7 +31,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       return `<article class="billing-card participation-card"><div class="participation-top"><span class="eyebrow">${owner ? 'CAPOGRUPPO' : 'MEMBRO'} · POSTO ${r.slotNumber}</span><span class="participation-status status-${esc(r.status)}">${esc(labels[r.status] || r.status)}</span></div><h3>${esc(r.groupName)}</h3><p>${owner ? "Membro" : "Capogruppo"}: <strong>${esc(owner ? r.memberName || "Membro" : r.ownerName || "Capogruppo")}</strong></p><p class="eyebrow">QUOTA DEL GRUPPO · DESTINATARIO: CAPOGRUPPO</p><p class="participation-price">${money(r.amountCents)} <span>/ mese al capogruppo</span></p>
       ${r.periodEnd ? `<p>Periodo confermato fino al ${date(r.periodEnd)}${Date.parse(r.periodEnd) <= Date.now() ? ' · Rinnovo in attesa' : ''}</p>` : ''}
       ${r.status === 'accepted' ? `<p>Posto riservato fino al ${esc(new Date(r.reservedUntil).toLocaleString('it-IT'))}. Non inviare denaro dopo la scadenza.</p>` : ''}
-      ${d && !owner ? `<div style="background:#eff6ff;padding:16px;border-radius:12px"><strong>Paga direttamente al capogruppo</strong>${d.iban ? `<p>IBAN: ${esc(d.iban)}<br>Intestatario: ${esc(d.accountHolder)}</p>` : ''}${d.paypalEmail ? `<p>Email PayPal: ${esc(d.paypalEmail)}</p>` : ''}<p>Concordate la causale e le modalità in chat. Non è un pagamento a BYS.</p></div>` : ''}
+      ${d && !owner ? `<div data-payment-details style="background:#eff6ff;padding:16px;border-radius:12px"><strong>Paga direttamente al capogruppo</strong>${d.iban ? `<p>IBAN: ${esc(d.iban)}<br>Intestatario: ${esc(d.accountHolder)}</p>` : ''}${d.paypalEmail ? `<p>Email PayPal: ${esc(d.paypalEmail)}</p>` : ''}<p>Concordate la causale e le modalità in chat. Non è un pagamento a BYS.</p></div>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">${owner && r.status === 'pending' && !['CLOSED','DRAFT'].includes(r.groupStatus) ? button(`accept${i}`, 'Accetta e riserva 48 ore') : ''}
       ${!owner && !r.leaveAtPeriodEnd && (r.status === 'accepted' || (r.status === 'confirmed' && Date.parse(r.periodEnd) - Date.now() <= 3 * 86400000)) ? button(`report${i}`, 'Ho pagato al capogruppo') : ''}
       ${owner && r.status === 'reported' && r.receiptMessageId ? button(`receipt${i}`, 'Apri ricevuta') : ''}${owner && r.status === 'reported' ? button(`confirm${i}`, 'Confermo: quota accreditata') : ''}
@@ -40,10 +41,11 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     ${selected ? '<section class="private-chat"><h3>La vostra conversazione</h3><div id="privateMessages" aria-live="polite" role="log" aria-label="Messaggi della chat privata"></div><form id="privateForm"><label>Messaggio privato<textarea name="content" maxlength="2000" style="width:100%"></textarea></label><label class="btn btn-secondary" style="display:block">Allega ricevuta<input id="receiptPhoto" type="file" accept="image/*,.pdf,application/pdf" style="display:block;max-width:100%;margin-top:8px"></label><div id="receiptPreview"></div><p>Foto o PDF privato della ricevuta. Oscura i dati non necessari. L’accredito va comunque verificato dal capogruppo.</p><button class="btn btn-primary">Invia</button></form></section>' : ''}`);
   const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna stato delle richieste'; refresh.type = 'button';
   container.querySelectorAll('.participation-card').forEach((card,i)=>{
-    const r=list[i];participationProgress(card,r,{user,api,reload,esc});issueForm(card,{groupId:r.groupId,requestId:r.id,user,api,esc});const url=r.ownerId===user.id?r.memberAvatar:r.ownerAvatar;
+    const r=list[i];simplifyQuota(card,r,user.id,card.querySelector('[style*=flex]'));participationProgress(card,r,{user,api,reload,esc});issueForm(card,{groupId:r.groupId,requestId:r.id,user,api,esc});const url=r.ownerId===user.id?r.memberAvatar:r.ownerAvatar;
     if(url){const img=document.createElement('img');img.src=url;img.alt='Foto profilo';img.width=44;img.height=44;img.style.cssText='border-radius:50%;object-fit:cover;margin:12px 0';card.querySelector('h3').after(img);}
     if(r.ownerId!==user.id&&r.periodEnd){const a=document.createElement('a');a.href='#gruppo-'+r.groupId;a.className='btn btn-secondary';a.textContent='★ Valuta il capogruppo';card.append(a);}
   });
+  if(!selected)actionSummary(container.querySelector('.p2p-access'),list,user.id,esc);
   container.querySelector('#manualRefresh').append(refresh); refresh.addEventListener('click', reload);
   groups.filter(g => managing && g.ownerId === user.id).forEach((g, i) => bind(`editInstructions${i}`, async () => {
     const result = await api(`/api/access/${encodeURIComponent(g.id)}`);

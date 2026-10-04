@@ -171,3 +171,5 @@ body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));r
 .bys-watch-cta[hidden]{display:none}
 
 .group-roster{margin-top:24px;border-top:1px solid #dce5ef;padding-top:18px}.roster-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #edf0f6}.roster-row>div{flex:1;min-width:0;overflow-wrap:anywhere}.roster-row small{display:block;color:#536780;margin-top:4px}.roster-row .quota-label{margin-left:0}
+
+.quota-todo{border-left:4px solid #4949df;margin-bottom:20px}.quota-todo .btn{margin:4px}.quota-more{display:flex;flex-wrap:wrap}.quota-more summary{cursor:pointer;padding:12px;font-weight:600;color:#344767}.quota-more[open] .btn{margin:4px}.quota-destination .btn,[data-payment-details] .btn{margin:4px}

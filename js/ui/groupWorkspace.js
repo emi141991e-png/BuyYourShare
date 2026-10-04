@@ -1,3 +1,4 @@
+import {simplifyQuota,actionSummary} from './quickQuota.js';
 import {reportForm, openReceipt} from './receiptReport.js';
 
 export function quotaState(r, now = Date.now()) {
@@ -51,6 +52,8 @@ export async function mountGroupWorkspace(container,g,user,{api,reload,esc,money
     roster.querySelectorAll('.roster-row').forEach((row,i)=>addPhoto(row,g.slotsInfo.slots[i].assignedUser?.avatarUrl));
   }
   panel.querySelectorAll('.quota-member').forEach((row,i)=>addPhoto(row,owner?list[i].memberAvatar:list[i].ownerAvatar));
+  actionSummary(panel,list,user.id,esc);
+  panel.querySelectorAll('.quota-member').forEach((card,i)=>simplifyQuota(card,list[i],user.id,card.querySelector('.quota-actions')));
   panel.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',async()=>{
     const r=list[Number(button.dataset.row)],area=panel.querySelector(`[data-area="${button.dataset.row}"]`),action=button.dataset.action;
     if(action==='report'){reportForm(area,r,{api,reload,esc,money});return;}
