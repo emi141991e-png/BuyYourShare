@@ -137,3 +137,10 @@ body .bottom-nav{box-sizing:border-box;left:max(8px,env(safe-area-inset-left));r
 .quota-report input[type=file]{display:block;max-width:100%;margin-top:10px}
 .quota-report input[type=checkbox]{width:auto;margin-right:8px}
 .quota-report h4,.quota-report p{margin:0}
+
+.device-guide{max-width:580px;margin:24px auto;text-align:center;background:linear-gradient(145deg,#fff,#f0f3ff);border:1px solid #cbd5ff}
+.device-guide-icon{font-size:42px;margin:14px 0}
+.device-guide h2{margin:12px 0;font-size:clamp(24px,4vw,32px)}
+.device-guide p{line-height:1.6;margin:16px 0;color:#425575}
+.device-guide .btn-primary{width:100%;min-height:54px;margin:8px 0;font-size:16px}
+.device-guide-back{display:inline-block;margin-top:16px;color:#445575;font-size:14px}

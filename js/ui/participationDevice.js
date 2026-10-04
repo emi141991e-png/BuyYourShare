@@ -12,27 +12,41 @@ export async function participationDevice(api, user) {
   return config.devices.some(d => d.id === device.id) ? device.id : null;
 }
 
+let activeGuide;
 export async function requireParticipationDevice(container, user, api, esc, retry) {
   const ready = await participationDevice(api,user);
   if (ready) return ready;
   hideInstallSuggestion();
+  activeGuide?.abort();
+  const controller = new AbortController(); activeGuide = controller;
   container.querySelector('#participationDevice')?.remove();
-  const box = document.createElement('section'); box.id = 'participationDevice'; box.className = 'billing-card';
-  box.innerHTML = `<h2>Prima di richiedere un posto</h2><p>Per le nuove partecipazioni devi aprire il marketplace come app e attivare le notifiche di chat e rinnovo. Le tue chat e le partecipazioni già esistenti restano accessibili.</p><h3>1. Installa e apri il marketplace</h3><button type="button" class="btn btn-primary" data-install>Installa il marketplace</button><p data-help role="status"></p><h3>2. Attiva le notifiche</h3><div data-push></div><h3>3. Controlla che arrivino</h3><p>Usa “Invia notifica di prova” e verifica l’avviso sul dispositivo. Poi continua al gruppo.</p><button type="button" class="btn btn-primary" data-continue>Ho completato: continua al gruppo</button><p data-result role="status"></p><a href="#miei-abbonamenti" class="btn btn-secondary">Le mie partecipazioni</a>`;
+  const box = document.createElement('section'); box.id = 'participationDevice'; box.className = 'billing-card device-guide';
   container.prepend(box);
-  box.querySelector('[data-install]').onclick = async () => {
-    try { box.querySelector('[data-help]').textContent = await installMarketplace(); }
-    catch { box.querySelector('[data-help]').textContent = 'Usa il menu del browser → Installa app / Aggiungi alla schermata Home. Poi apri l’icona del marketplace.'; }
-  };
-  box.querySelector('[data-continue]').onclick = async e => {
-    const b=e.currentTarget; b.disabled=true;
+  let checking=false, lastStage, completed=false;
+  const finish=async()=>{if(completed)return;completed=true;controller.abort();box.remove();await retry();};
+  const paint=async()=>{
+    if(!box.isConnected||checking)return;
+    checking=true;
     try {
-      if (await participationDevice(api,user)) { box.remove(); await retry(); }
-      else box.querySelector('[data-result]').textContent = 'Apri il marketplace dalla sua icona e attiva le notifiche su questo dispositivo. Se sono bloccate, consentile nelle impostazioni del browser. Non effettuare altri pagamenti.';
-    } catch { box.querySelector('[data-result]').textContent = 'Verifica non riuscita. Riprova tra poco.'; }
-    finally { b.disabled=false; }
+      if(await participationDevice(api,user)){await finish();return;}
+      const installed=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+      const stage=String(installed)+':'+(window.Notification ? Notification.permission : 'unsupported');
+      if(stage===lastStage)return;lastStage=stage;
+      box.innerHTML=`<span class="eyebrow">${installed?'ULTIMO PASSAGGIO':'PREPARA BYS · 1 DI 2'}</span><div class="device-guide-icon" aria-hidden="true">${installed?'🔔':'📲'}</div><h2>${installed?'Non perderti un messaggio':'Porta BYS sul tuo dispositivo'}</h2>${installed?'<div data-push></div>':'<p>Installa il marketplace e aprilo dalla sua icona. Poi attiveremo gli avvisi per il tuo gruppo.</p><button type="button" class="btn btn-primary" data-install>Installa BYS →</button><p data-help role="status"></p>'}<a href="#miei-abbonamenti" class="device-guide-back">Torna alle mie partecipazioni</a>`;
+      if(installed)await renderPushSettings(box.querySelector('[data-push]'),user,api,esc,{compact:true,onReady:async()=>{if(await participationDevice(api,user)){await finish();}else throw new Error('Notifiche non ancora pronte. Riprova.');}});
+      else box.querySelector('[data-install]').onclick=async e=>{
+        const button=e.currentTarget;button.disabled=true;
+        try{box.querySelector('[data-help]').textContent=await installMarketplace();}
+        catch{box.querySelector('[data-help]').textContent='Apri il menu del browser e scegli Installa app o Aggiungi alla schermata Home. Poi apri l’icona BYS.';}
+        finally{button.disabled=false;}
+      };
+    }catch{box.innerHTML='<h2>Riproviamo?</h2><p>Non è stato possibile verificare le notifiche.</p><button type="button" class="btn btn-primary">Riprova</button>';box.querySelector('button').onclick=paint;}
+    finally{checking=false;}
   };
-  await renderPushSettings(box.querySelector('[data-push]'),user,api,esc);
+  window.addEventListener('focus',paint,{signal:controller.signal});
+  window.addEventListener('hashchange',()=>controller.abort(),{once:true,signal:controller.signal});
+  window.matchMedia('(display-mode: standalone)').addEventListener('change',paint,{signal:controller.signal});
+  await paint();
   box.scrollIntoView({block:'start',behavior:'smooth'});
   return null;
 }
