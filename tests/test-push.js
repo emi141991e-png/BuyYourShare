@@ -105,3 +105,14 @@ test('private chat is pushed only to the recipient, once, without message text, 
 });
 
 
+
+test('BYS renewal push supports every one-time payment method and rejects obsolete expiry', async()=>{
+ for(const paymentMethod of ['BANK','GOOGLE_PAY','APPLE_PAY','PAYPAL_ONETIME']){
+  const f=setup();const end='2026-09-22T12:00:00.000Z';
+  f.serial.find=()=>({paymentMethod,currentPeriodEnd:end});
+  await f.push.subscribe('member',subscription());
+  f.repo.data.notifications.push({id:`bank-renew:member:${end}:before`,userId:'member',bankPeriodEnd:end,createdAt:'2026-09-20T12:00:00.000Z'});
+  await f.push.flush();assert.equal(f.calls.length,1,paymentMethod);
+  assert.equal(f.push.relevant({...f.repo.data.notifications[0],bankPeriodEnd:'2026-09-21T12:00:00.000Z'}),false);
+ }
+});

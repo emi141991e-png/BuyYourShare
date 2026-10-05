@@ -28,14 +28,18 @@ export async function renderPushSettings(target, user, api, esc, options = {}) {
     const config = await api('/api/push/config');
     if (!target.isConnected) return;
     const device = localDevice();
-    const enabled = device?.userId === user.id && config.devices.some(d => d.id === device.id) && Notification.permission === 'granted';
-    target.innerHTML = options.compact ? `<p>${Notification.permission === 'denied' ? 'Le notifiche sono bloccate. Consentile nelle impostazioni del browser, poi torna qui.' : 'Tocca il pulsante e scegli “Consenti”. Ti avviseremo per chat e rinnovi.'}</p><button type="button" class="btn btn-primary bys-enable-push" id="enablePush" ${Notification.permission === 'denied' ? 'disabled' : ''}>Attiva notifiche e continua →</button><p id="pushFeedback" role="status" aria-live="polite"></p>` : `<h3>Chat e notifiche sul dispositivo</h3><p>Ricevi messaggi della chat, richieste e promemoria anche quando il sito non è aperto. Puoi disattivarlo in qualsiasi momento. Il dispositivo deve essere connesso e consentire le notifiche.</p>
-      <p>Stato: <strong>${enabled ? 'Attivate su questo browser' : Notification.permission === 'denied' ? 'Bloccate nelle impostazioni del browser' : 'Non attivate su questo browser'}</strong></p>
-      <p>Su iPhone/iPad: aggiungi il marketplace alla schermata Home e aprilo da lì prima di attivarle.</p>
-      ${!enabled && Notification.permission !== 'denied' ? '<button type="button" class="btn btn-primary bys-enable-push" id="enablePush"><span aria-hidden="true">🔔</span> Attiva notifiche e promemoria</button>' : ''}
-      ${enabled ? '<button type="button" class="btn btn-primary" id="testPush">Invia notifica di prova</button>' : ''}
-      <div>${config.devices.map((d, i) => `<p>${esc(d.label)} · ${esc(new Date(d.createdAt).toLocaleDateString('it-IT'))} <button class="btn btn-secondary" type="button" id="removePush${i}">Disattiva dispositivo</button></p>`).join('')}</div>
+    const registration = await navigator.serviceWorker.getRegistration('/');
+    const subscription = await registration?.pushManager.getSubscription();
+    if (!target.isConnected) return;
+    const enabled = !!subscription && device?.userId === user.id && config.devices.some(d => d.id === device.id) && Notification.permission === 'granted';
+    const blocked = Notification.permission === 'denied';
+    target.classList.add('bys-notifications-control');
+    target.innerHTML = `<div class="push-main"><div><h3>${enabled ? '✓ Notifiche attive' : 'Non perdere messaggi e scadenze'}</h3><p>${enabled ? 'Chat, richieste, quote e posti disponibili: avvisi attivi su questo dispositivo.' : blocked ? 'Consenti le notifiche nelle impostazioni del sito del browser, poi premi Riprova.' : 'Chat, richieste, quote e posti disponibili. Un solo consenso per gli avvisi BYS.'}</p></div>
+      ${!enabled && !blocked ? `<button type="button" class="btn btn-primary bys-enable-push" id="enablePush">🔔 ${options.compact ? 'Attiva notifiche e continua →' : 'Attiva notifiche'}</button>` : blocked ? '<button type="button" class="btn btn-secondary" id="retryPush">Riprova</button>' : options.compact ? '<button type="button" class="btn btn-primary" id="continuePush">Continua al gruppo →</button>' : '<a class="btn btn-secondary" href="#notifiche">Vedi gli avvisi →</a>'}</div>
+      ${!options.banner && !options.compact ? `<details class="push-management"><summary>Gestisci notifiche e dispositivi</summary>${enabled ? '<button type="button" class="btn btn-secondary" id="testPush">Invia notifica di prova</button>' : ''}<div>${config.devices.map((d, i) => `<p>${esc(d.label)} · ${esc(new Date(d.createdAt).toLocaleDateString('it-IT'))} <button class="btn btn-secondary" type="button" id="removePush${i}">Disattiva dispositivo</button></p>`).join('')}</div><small>Puoi disattivarle quando vuoi. La consegna dipende da connessione e impostazioni del dispositivo.</small></details>` : ''}
       <p id="pushFeedback" role="status" aria-live="polite"></p>`;
+    target.querySelector('#retryPush')?.addEventListener('click', () => void renderPushSettings(target,user,api,esc,options));
+    target.querySelector('#continuePush')?.addEventListener('click', () => void options.onReady?.());
     const feedback = message => { const el = target.querySelector('#pushFeedback'); if (el) el.textContent = message; };
     const perform = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (e) { feedback(text[e.message] || e.message || 'Operazione non riuscita. Riprova.'); } finally { if (btn.isConnected) btn.disabled = false; } };
     target.querySelector('#enablePush')?.addEventListener('click', e => {
@@ -76,7 +80,7 @@ export async function renderPushSettings(target, user, api, esc, options = {}) {
     config.devices.forEach((d, i) => target.querySelector(`#removePush${i}`)?.addEventListener('click', e => void perform(e.currentTarget, async () => {
       await api(`/api/push/${encodeURIComponent(d.id)}/remove`, {});
       if (device?.id === d.id) { const reg = await navigator.serviceWorker.getRegistration('/'); await (await reg?.pushManager.getSubscription())?.unsubscribe(); localStorage.removeItem(STORAGE); }
-      await renderPushSettings(target, user, api, esc);
+      await renderPushSettings(target, user, api, esc, options);
     })));
-  } catch (e) { target.innerHTML = `<p role="status">${esc(text[e.message] || 'Le impostazioni push non sono disponibili. Riprova più tardi.')}</p>`; }
+  } catch (e) { target.innerHTML = `<p role="status">${esc(text[e.message] || 'Impossibile controllare le notifiche.')}</p><button type="button" class="btn btn-secondary" data-retry>Riprova</button>`; target.querySelector('[data-retry]')?.addEventListener('click',()=>void renderPushSettings(target,user,api,esc,options)); }
 }
