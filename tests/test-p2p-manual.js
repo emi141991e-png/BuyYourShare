@@ -169,3 +169,16 @@ test('report and receipt commit together, retry once, remain private and stop re
  await s.reminders();assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('renew:')).length,0);
  }finally{if(old===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=old;await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('chat retries and stale tabs cannot confirm or report the next period',async()=>{
+ const {service:s,repo,time}=setup();const r=await s.request('m','g',2);await s.action('o',r.id,'accept');
+ await Promise.all([s.action('m',r.id,'report',null),s.action('m',r.id,'report',null)]);
+ await Promise.all([s.action('o',r.id,'confirm',null),s.action('o',r.id,'confirm',null)]);
+ assert.equal(repo.data.p2pManualConfirmations.length,1);const firstEnd=r.periodEnd;
+ time('2026-02-27T12:00:00Z');
+ await assert.rejects(s.action('m',r.id,'report',null));
+ await s.action('m',r.id,'report',firstEnd);
+ await assert.rejects(s.action('o',r.id,'confirm',null));
+ assert.equal(r.status,'reported');assert.equal(repo.data.p2pManualConfirmations.length,1);
+ await s.action('o',r.id,'confirm',firstEnd);assert.equal(repo.data.p2pManualConfirmations.length,2);
+});
