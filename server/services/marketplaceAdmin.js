@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { adminOverview } from './adminOverview.js';
-import { paymentDestination } from './p2pManual.js';
+import { P2pManual, paymentDestination } from './p2pManual.js';
 import { P2pError } from './p2pSubscription.js';
 
 export function marketplaceSnapshot(data) {
@@ -75,6 +75,16 @@ export class MarketplaceAdmin {
         for(const userId of recipients) (d.notifications ||= []).push({id:randomUUID(),userId,title:'Aggiornamento gruppo',message:`BYS ha aggiornato il gruppo ${g.customServiceName}. ${reason}`,actionUrl:`#gruppo-${id}`,isRead:false,createdAt:now});
       } else if(kind==='requests') {
         const r=(d.p2pManualRequests || []).find(r=>r.id===id);if(!r) fail('Partecipazione non trovata.');
+        if(input.action==='restore') {
+          if(r.status!=='canceled'||r.membershipId||r.periodEnd||!r.destination) fail('Ripristino disponibile solo per prenotazioni annullate senza periodo confermato.');
+          const g=(d.groups||[]).find(g=>g.id===r.groupId);
+          const member=(d.users||[]).find(u=>u.id===r.userId);
+          if(!g||g.archivedAt||!member||member.isSuspended||member.archivedAt) fail('Verifica che gruppo e membro siano attivi.');
+          if((d.p2pManualRequests||[]).some(x=>x.id!==id&&x.groupId===r.groupId&&x.userId===r.userId&&!['canceled','rejected'].includes(x.status))) fail('Il membro ha già una partecipazione nel gruppo.');
+          new P2pManual(this.s).slotFree(g,r.slotNumber,r.id);
+          before={status:r.status};r.status='accepted';r.restoredAt=now;r.restoredBy=actor;r.reservedUntil=null;
+          after={status:r.status,restoredAt:now};
+        } else {
         if(input.action!=='cancel') fail('Operazione non valida.');
         if(r.status==='reported'||(r.periodEnd&&Date.parse(r.periodEnd)>Date.now())) fail('Non annullare pagamenti dichiarati o periodi già pagati: occorre risolvere prima con i partecipanti.');
         before={status:r.status};r.status='canceled';after={status:r.status};
@@ -82,6 +92,7 @@ export class MarketplaceAdmin {
         const g=(d.groups || []).find(g=>g.id===r.groupId);
         if(g)g.occupiedMemberSlots=(d.memberships || []).filter(m=>m.groupId===g.id&&m.role==='MEMBER'&&['ACTIVE','CANCELLATION_SCHEDULED'].includes(m.status)).length;
         for(const userId of [r.userId,g?.ownerId].filter(Boolean)) (d.notifications ||= []).push({id:randomUUID(),userId,title:'Partecipazione aggiornata',message:`BYS ha annullato la richiesta: ${reason}`,requestId:r.id,isRead:false,createdAt:now});
+        }
       } else fail('Risorsa non valida.');
       (d.marketplaceAdminAudit ||= []).push({id:randomUUID(),actor:`bys:${actor}`,kind,targetId:id,action:input.action,reason,before,after,createdAt:now});
       await this.repo.save();return {success:true};

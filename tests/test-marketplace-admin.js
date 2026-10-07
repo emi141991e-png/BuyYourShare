@@ -22,3 +22,17 @@ test('BYS deletion resolves linked identity, protects active groups and revokes 
  assert.equal(repo.data.users[1].isSuspended,true);assert.ok(repo.data.users[1].archivedAt);assert.equal(repo.data.sessions.length,0);
  assert.equal((await service.change('bys-users','not-linked',{action:'archive',reason:'Delete account'},'admin')).notLinked,true);
 });
+
+test('restore preserves history without confirming money, protects occupied slots and rolls back',async()=>{
+ const {repo,service}=fixture();Object.assign(repo.data.groups[0],{ownerId:'owner',ownerSlots:1,totalSlots:3});
+ repo.data.p2pManualRequests=[{id:'r',groupId:'g',userId:'u',slotNumber:2,status:'canceled',destination:{paypalEmail:'owner@example.com'}}];
+ repo.data.memberships=[{groupId:'g',slotNumber:2,status:'ACTIVE',paymentProvider:'MANUAL'}];
+ await assert.rejects(service.change('requests','r',{action:'restore',reason:'Recover reservation'},'a'));
+ assert.equal(repo.data.p2pManualRequests[0].status,'canceled');repo.data.memberships=[];
+ repo.save=async()=>{throw new Error('disk')};await assert.rejects(service.change('requests','r',{action:'restore',reason:'Recover reservation'},'a'));
+ assert.equal(repo.data.p2pManualRequests[0].status,'canceled');repo.save=async()=>{};
+ await service.change('requests','r',{action:'restore',reason:'Recover reservation'},'a');
+ assert.equal(repo.data.p2pManualRequests[0].status,'accepted');assert.equal(repo.data.p2pManualRequests[0].reservedUntil,null);
+ assert.equal(repo.data.memberships.length,0);assert.equal(repo.data.p2pManualRequests[0].periodEnd,undefined);
+ await assert.rejects(service.change('requests','r',{action:'restore',reason:'Recover reservation'},'a'));
+});
