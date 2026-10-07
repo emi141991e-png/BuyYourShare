@@ -82,7 +82,7 @@ export class MarketplaceAdmin {
           if(!g||g.archivedAt||!member||member.isSuspended||member.archivedAt) fail('Verifica che gruppo e membro siano attivi.');
           if((d.p2pManualRequests||[]).some(x=>x.id!==id&&x.groupId===r.groupId&&x.userId===r.userId&&!['canceled','rejected'].includes(x.status))) fail('Il membro ha già una partecipazione nel gruppo.');
           new P2pManual(this.s).slotFree(g,r.slotNumber,r.id);
-          before={status:r.status};r.status='accepted';r.restoredAt=now;r.restoredBy=actor;r.reservedUntil=null;
+          before={status:r.status};r.status='accepted';r.restoredAt=now;r.restoredBy=actor;r.reservedUntil=new Date(Date.now()+48*3600000).toISOString();
           after={status:r.status,restoredAt:now};
         } else {
         if(input.action!=='cancel') fail('Operazione non valida.');
