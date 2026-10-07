@@ -32,7 +32,7 @@ test('restore preserves history without confirming money, protects occupied slot
  repo.save=async()=>{throw new Error('disk')};await assert.rejects(service.change('requests','r',{action:'restore',reason:'Recover reservation'},'a'));
  assert.equal(repo.data.p2pManualRequests[0].status,'canceled');repo.save=async()=>{};
  await service.change('requests','r',{action:'restore',reason:'Recover reservation'},'a');
- assert.equal(repo.data.p2pManualRequests[0].status,'accepted');assert.equal(repo.data.p2pManualRequests[0].reservedUntil,null);
+ assert.equal(repo.data.p2pManualRequests[0].status,'reported');assert.equal(repo.data.p2pManualRequests[0].reservedUntil,null);
  assert.equal(repo.data.memberships.length,0);assert.equal(repo.data.p2pManualRequests[0].periodEnd,undefined);
  await assert.rejects(service.change('requests','r',{action:'restore',reason:'Recover reservation'},'a'));
 });
