@@ -182,3 +182,13 @@ test('chat retries and stale tabs cannot confirm or report the next period',asyn
  assert.equal(r.status,'reported');assert.equal(repo.data.p2pManualConfirmations.length,1);
  await s.action('o',r.id,'confirm',firstEnd);assert.equal(repo.data.p2pManualConfirmations.length,2);
 });
+
+
+test('reservation reminder arrives once before expiry and report preserves the seat', async () => {
+ const {service:s,repo,time}=setup(); const r=await s.request('m','g',2);await s.action('o',r.id,'accept');
+ await s.reminders();assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('reservation-reminder:')).length,0);
+ time('2026-02-01T12:00:00Z');await s.reminders();await s.reminders();
+ assert.equal(repo.data.notifications.filter(n=>n.id.startsWith('reservation-reminder:')).length,1);
+ await s.action('m',r.id,'report',null);time('2026-02-04T12:00:00Z');await s.reminders();
+ assert.equal(r.status,'reported');await assert.rejects(s.request('other','g',2));
+});

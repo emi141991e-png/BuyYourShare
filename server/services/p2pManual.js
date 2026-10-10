@@ -176,9 +176,17 @@ export class P2pManual {
       if(r.leaveAtPeriodEnd&&r.status==='confirmed'){
         if(Date.parse(r.periodEnd)<=this.now()){r.status='canceled';r.leftAt=new Date(this.now()).toISOString();const m=(this.repo.data.memberships||[]).find(m=>m.id===r.membershipId);if(m)m.status='CANCELED';const g=this.group(r.groupId);g.occupiedMemberSlots=(this.repo.data.memberships||[]).filter(m=>m.groupId===g.id&&m.role==='MEMBER'&&['ACTIVE','CANCELLATION_SCHEDULED'].includes(m.status)).length;this.message(r,'Uscita completata alla scadenza. Il posto è nuovamente disponibile.');for(const userId of [r.userId,g.ownerId])this.notify(userId,'exit:'+r.id+':'+userId,'Uscita dal gruppo completata alla scadenza.',r.id);changed=true;}continue;
       }
+      if (r.status === 'accepted') {
+        const remaining = Date.parse(r.reservedUntil) - this.now();
+        const key = `reservation-reminder:${r.id}`;
+        if (remaining > 0 && remaining <= 24 * 3600000 && !(this.repo.data.notifications || []).some(n => n.id === key)) {
+          const text = 'Il tuo posto resta riservato per meno di 24 ore. Hai già versato la quota? Premi «Ho pagato» nella chat per tenerlo riservato mentre il capogruppo verifica. Non pagare di nuovo.';
+          this.notify(r.userId, key, text, r.id); this.message(r, text); changed = true;
+        }
+      }
       if (r.status === 'accepted'  && Date.parse(r.reservedUntil) <= this.now()) {
         r.status = 'canceled';
-        const text = 'Prenotazione scaduta senza dichiarazione di pagamento. Richiedi nuovamente il posto prima di pagare.';
+        const text = 'La prenotazione è scaduta. Se hai già pagato, scrivi qui al capogruppo e contatta BYS per recuperare il posto: non pagare di nuovo. Altrimenti puoi richiedere un posto disponibile.';
         this.message(r, text);
         this.notify(r.userId, `reservation-expired:${r.id}`, text, r.id);
         this.notify(this.group(r.groupId).ownerId, `reservation-expired-owner:${r.id}`, 'Una prenotazione è scaduta. Il posto è nuovamente disponibile.', r.id);
