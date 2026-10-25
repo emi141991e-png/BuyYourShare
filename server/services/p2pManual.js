@@ -54,7 +54,7 @@ export class P2pManual {
   }
   list(userId) {
     return this.records().filter(r => this.repo.data.groups.some(g => g.id === r.groupId && (r.userId === userId || g.ownerId === userId))).map(r => ({ ...r,
-      groupName: this.group(r.groupId).customServiceName, groupStatus: this.group(r.groupId).status, ownerId: this.group(r.groupId).ownerId,
+      groupName: this.group(r.groupId).customServiceName, groupStatus: this.group(r.groupId).status, listingRemovedAt: this.group(r.groupId).listingRemovedAt || null, ownerId: this.group(r.groupId).ownerId,
       memberName: (this.repo.data.users || []).find(u => u.id === r.userId)?.fullName || 'Membro',
       confirmations: (this.repo.data.p2pManualConfirmations || []).filter(c => c.requestId === r.id).map(c => ({confirmedAt:c.confirmedAt, amountCents:c.amountCents, periodEnd:c.periodEnd})),
       memberAvatar: this.avatar(r.userId), ownerAvatar: this.avatar(this.group(r.groupId).ownerId),
@@ -64,7 +64,7 @@ export class P2pManual {
   }
   ownedGroups(userId) {
     return this.repo.data.groups.filter(g => g.ownerId === userId).map(g => ({
-      id: g.id, ownerId: g.ownerId, customServiceName: g.customServiceName, status: g.status,
+      id: g.id, ownerId: g.ownerId, customServiceName: g.customServiceName, status: g.status, listingRemovedAt: g.listingRemovedAt || null,
     }));
   }
   slotFree(g, slot, exceptId) {
@@ -75,6 +75,7 @@ export class P2pManual {
   }
   request(userId, groupId, slot, acknowledged) { return this.exclusive(async () => {
     this.subscriptions.ready?.(); this.active(userId); const g = this.group(groupId);
+    if (g.listingRemovedAt) throw new P2pError('Questo annuncio non è più disponibile.', 409);
     if(g.requirements&&acknowledged!==true)throw new P2pError('Leggi e conferma i requisiti prima di richiedere un posto.',400);
     if (g.ownerId === userId) throw new P2pError('OWN_GROUP');
     if (!g.manualPaymentDestination) throw new P2pError('PAYMENT_DESTINATION_REQUIRED');
@@ -89,6 +90,7 @@ export class P2pManual {
   action(userId, id, action, periodEnd, attachment) { let stored; return this.exclusive(async () => {
     const r = this.authorized(id, userId), g = this.group(r.groupId), owner = g.ownerId === userId;
     if (action === 'accept') {
+      if (g.listingRemovedAt) throw new P2pError('Annuncio eliminato: non puoi accettare nuovi ingressi.', 409);
       if (!owner || r.status !== 'pending') throw new P2pError('INVALID_TRANSITION');
       this.active(r.userId); this.slotFree(g, r.slotNumber, r.id);
       r.destination = structuredClone(g.manualPaymentDestination); r.status = 'accepted';

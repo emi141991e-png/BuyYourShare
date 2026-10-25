@@ -197,3 +197,17 @@ test('unpaid owners can create and manage only their own groups',async()=>{
  assert.equal((await request('/api/groups/'+own.id+'/publish','expired',{})).status,403);
  assert.equal((await request('/api/manual/groups/group/request','unpaid',{slotNumber:3,pushDeviceId:'device-unpaid'})).status,402);
 });
+test('owner can remove listing without deleting payment history; strangers cannot', async () => {
+ const created=await request('/api/groups','leader',{customServiceName:'Removal test',country:'Italia',accessMethod:'Invito',eligibility:'Account personale',realCostEuros:9,totalSlots:3,ownerSlots:1,paypalEmail:'leader@example.test'});
+ assert.equal(created.status,201);
+ const id=created.body.group.id;
+ assert.equal((await request(`/api/groups/${id}/remove-listing`,null,{})).status,401);
+ assert.equal((await request(`/api/groups/${id}/remove-listing`,'other',{})).status,403);
+ assert.equal((await request(`/api/groups/${id}/remove-listing`,'leader',{})).status,200);
+ assert.equal((await request(`/api/groups/${id}/remove-listing`,'leader',{})).status,200);
+ assert.ok(!(await request('/api/groups')).body.groups.some(g=>g.id===id));
+ assert.equal((await request(`/api/groups/${id}`,null)).status,404);
+ assert.equal((await request(`/api/groups/${id}`,'leader')).status,200);
+ assert.equal((await fetch(base+`/gruppi/${id}`)).status,404);
+ assert.ok(JSON.parse(readFileSync(dbFile)).groups.find(g=>g.id===id).listingRemovedAt);
+});

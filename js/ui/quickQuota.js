@@ -1,5 +1,5 @@
 export function needsAction(r,userId,now=Date.now()) {
- if(r.ownerId===userId)return ['pending','reported'].includes(r.status)&&!['CLOSED','DRAFT'].includes(r.groupStatus);
+ if(r.ownerId===userId)return (r.status==='reported'||r.status==='pending'&&!r.listingRemovedAt)&&!['CLOSED','DRAFT'].includes(r.groupStatus);
  return !r.leaveAtPeriodEnd&&(r.status==='accepted'&&Date.parse(r.reservedUntil)>now||r.status==='confirmed'&&Date.parse(r.periodEnd)-now<=3*86400000);
 }
 export function simplifyQuota(card,r,userId,actions){

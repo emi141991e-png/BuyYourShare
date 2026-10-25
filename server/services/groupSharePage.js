@@ -1,6 +1,6 @@
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function publicShareGroup(group) {
-  return !!group && ['PUBLISHED','FULL','active','available'].includes(group.status) && group.groupType !== 'private';
+  return !!group && !group.listingRemovedAt && ['PUBLISHED','FULL','active','available'].includes(group.status) && group.groupType !== 'private';
 }
 // Explicitly allowlisted fields: never serialize the group or its payment/chat data.
 export function groupSharePage(group, origin) {

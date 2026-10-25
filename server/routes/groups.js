@@ -33,6 +33,7 @@ function sanitizeGroupForPublic(group, ownerUser) {
 
   return {
     id: group.id,
+    listingRemovedAt: group.listingRemovedAt || null,
     ownerId: group.ownerId,
     serviceId: group.serviceId,
     customServiceName: group.customServiceName,
@@ -74,7 +75,7 @@ groupsRouter.get('/', async (req, res) => {
     const publishedGroups = rawGroups.filter(g => {
       const isDraftOrHidden = g.status === 'DRAFT' || g.status === 'PAYOUT_NOT_READY' || g.status === 'CLOSED' || g.status === 'cancellation_scheduled';
       const isPublished = g.status === 'PUBLISHED' || g.status === 'FULL' || g.status === 'active' || g.status === 'available';
-      return isPublished && !isDraftOrHidden;
+      return isPublished && !isDraftOrHidden && !g.listingRemovedAt;
     });
 
     const result = publishedGroups.map(g => {
@@ -138,6 +139,7 @@ groupsRouter.get('/:id', async (req, res) => {
 
     // Se il gruppo è in DRAFT, PAYOUT_NOT_READY o CLOSED, può vederlo SOLO il Capogruppo proprietario
     const isRestricted = ['DRAFT', 'PAYOUT_NOT_READY', 'CLOSED', 'cancellation_scheduled'].includes(group.status);
+    if (group.listingRemovedAt && req.user?.id !== group.ownerId && !(dataRepository.data.p2pManualRequests || []).some(r => r.groupId === group.id && r.userId === req.user?.id) && !(dataRepository.data.memberships || []).some(m => m.groupId === group.id && m.userId === req.user?.id)) return res.status(404).json({error: 'GROUP_NOT_FOUND'});
     if (isRestricted) {
       if (!req.user || req.user.id !== group.ownerId) {
         return res.status(404).json({ error: 'GROUP_NOT_FOUND', message: 'Gruppo non pubblicato o non disponibile.' });
@@ -280,6 +282,33 @@ groupsRouter.post('/', requireAuth, async (req, res) => {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[CREATE GROUP ERROR]', err);
     return res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Errore interno durante la creazione del gruppo.' });
+  }
+});
+
+// Remove the public listing without destroying existing participation records.
+groupsRouter.post('/:id/remove-listing', requireAuth, async (req, res) => {
+  try {
+    await req.app.locals.p2pManual.exclusive(async () => {
+      const group = await dataRepository.findGroupById(req.params.id);
+      if (!group) return res.status(404).json({error: 'NOT_FOUND'});
+      if (group.ownerId !== req.user.id) return res.status(403).json({error: 'FORBIDDEN'});
+      if (!group.listingRemovedAt) {
+        const previous = {...group};
+        group.listingRemovedAt = new Date().toISOString();
+        group.isPublished = false;
+        group.updatedAt = group.listingRemovedAt;
+        try { await dataRepository.save(); }
+        catch (error) {
+          for (const key of Object.keys(group)) delete group[key];
+          Object.assign(group, previous);
+          throw error;
+        }
+      }
+      return res.json({success: true, message: 'Annuncio eliminato. Chat e partecipazioni esistenti restano disponibili.'});
+    });
+  } catch (error) {
+    console.error('[REMOVE LISTING]', error);
+    if (!res.headersSent) res.status(500).json({error: 'INTERNAL_ERROR', message: 'Non è stato possibile eliminare l’annuncio. Riprova.'});
   }
 });
 

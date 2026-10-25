@@ -192,3 +192,15 @@ test('reservation reminder arrives once before expiry and report preserves the s
  await s.action('m',r.id,'report',null);time('2026-02-04T12:00:00Z');await s.reminders();
  assert.equal(r.status,'reported');await assert.rejects(s.request('other','g',2));
 });
+test('removed listing blocks new entries but preserves accepted payments and chat', async () => {
+  const {service:s,repo}=setup();
+  const r=await s.request('m','g',2); await s.action('o',r.id,'accept');
+  const pending=await s.request('other','g',3);
+  repo.data.groups[0].listingRemovedAt=new Date().toISOString();
+  await assert.rejects(s.request('new','g',3));
+  await assert.rejects(s.action('o',pending.id,'accept'));
+  await s.action('m',r.id,'report'); await s.action('o',r.id,'confirm');
+  assert.equal(r.status,'confirmed');
+  assert.ok(s.chat('m',r.id).length);
+  assert.ok(s.ownedGroups('o')[0].listingRemovedAt);
+});
