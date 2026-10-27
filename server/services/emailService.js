@@ -38,14 +38,15 @@ class EmailService {
         host: smtpHost,
         port: smtpPort,
         secure: smtpSecure,
-        auth: { user: smtpUser, pass: smtpPass }
+        auth: { user: smtpUser, pass: smtpPass },
+        connectionTimeout: 6000, greetingTimeout: 6000, socketTimeout: 8000
       });
     }
 
     return null;
   }
 
-  async sendMail({ to, subject, html, text }) {
+  async sendMail({ to, subject, html, text, idempotencyKey }) {
     if (process.env.NODE_ENV === 'test' || process.env.EMAIL_DELIVERY_DISABLED === 'true') {
       return { status: 'SKIPPED', to, subject };
     }
@@ -95,9 +96,11 @@ class EmailService {
         try {
           const resendRes = await fetch('https://api.resend.com/emails', {
             method: 'POST',
+            signal: AbortSignal.timeout(15000),
             headers: {
               'Authorization': `Bearer ${resendKey}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              ...(idempotencyKey ? {'Idempotency-Key': idempotencyKey} : {})
             },
             body: JSON.stringify({
               from: fromAddress,

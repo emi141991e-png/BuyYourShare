@@ -4,6 +4,8 @@
  */
 
 import express from 'express';
+import { ChatEmails } from './services/chatEmails.js';
+import { emailService } from './services/emailService.js';
 import {backupRouter} from './routes/backup.js';
 import { P2pBank } from './services/p2pBank.js';
 import { P2pGooglePay } from './services/p2pGooglePay.js';
@@ -75,6 +77,8 @@ app.locals.p2pQuota = p2pQuota;
 const manual = new P2pManual(p2pSubscriptions);
 app.locals.p2pManual = manual;
 const pushNotifications = new PushNotifications(p2pSubscriptions);
+const chatEmails = new ChatEmails(p2pSubscriptions, emailService);
+setInterval(() => { void chatEmails.flush().catch(() => console.error('[CHAT EMAIL] Delivery will retry.')); }, 5000).unref();
 let backgroundRunning = false;
 const background = async () => {
   if (backgroundRunning) return;

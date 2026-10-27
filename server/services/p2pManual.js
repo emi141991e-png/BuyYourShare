@@ -168,7 +168,9 @@ export class P2pManual {
     if (clientMessageId) this.repo.data.p2pPrivateMessages.at(-1).clientMessageId = clientMessageId;
     const notificationId=`chat:${randomUUID()}`;
     this.notify(userId === r.userId ? this.group(r.groupId).ownerId : r.userId, notificationId, 'Hai ricevuto un messaggio nella chat privata del gruppo.', r.id);
-    this.repo.data.notifications.find(n=>n.id===notificationId).messageId=this.repo.data.p2pPrivateMessages.at(-1).id;
+    const notification = this.repo.data.notifications.find(n=>n.id===notificationId);
+    notification.messageId=this.repo.data.p2pPrivateMessages.at(-1).id;
+    notification.emailDelivery={status:'pending',attempts:0,nextAttemptAt:this.now()};
     await this.repo.save();
     } catch(error){if(stored)await removeAttachment(stored.id,stored.mime);throw error;}
   }); }
