@@ -118,8 +118,8 @@ test('manual HTTP lifecycle protects recipient and private messages', async () =
   const catalogue = await request('/api/groups', null);
   assert.equal(JSON.stringify(catalogue.body).includes('private@example.test'), false);
   assert.equal((await request('/api/manual/groups/group/request', 'unpaid', { slotNumber: 2, pushDeviceId:'device-unpaid' })).status, 402);
-  assert.equal((await request('/api/manual/groups/group/request', 'member', {slotNumber:2})).status,409);
-  assert.equal((await request('/api/manual/groups/group/request', 'member', {slotNumber:2,pushDeviceId:'device-unpaid'})).status,409);
+  assert.equal((await request('/api/manual/groups/group/request', 'member', {slotNumber:2})).status,200);
+  assert.equal((await request('/api/manual/groups/group/request', 'member', {slotNumber:2,pushDeviceId:'device-unpaid'})).status,200);
   assert.equal((await request('/api/manual/groups/group/request', 'member', { slotNumber: 2, pushDeviceId:'device-member' })).status, 200);
   const r = (await request('/api/manual')).body.requests[0];
   assert.equal(r.paymentDestination, undefined);

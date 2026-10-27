@@ -17,7 +17,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     shell(`<div class="section-heading"><div><h2>Messaggi</h2><p>Le conversazioni dei gruppi a cui partecipi e di quelli che gestisci.</p></div>${link('#notifiche','Notifiche e promemoria')}</div><div class="bys-inbox">${conversations.map(r=>`<a class="billing-card" href="#privata-${esc(r.id)}"><h3>${esc(r.groupName)}</h3><p>${r.ownerId===user.id?'Membro':'Capogruppo'}: ${esc(r.ownerId===user.id?r.memberName||'Membro':r.ownerName||'Capogruppo')}</p><strong>${r.unreadMessages?`${Number(r.unreadMessages)} messaggi da leggere`:'Apri conversazione'} →</strong></a>`).join('')||'<div class="empty-state"><h3>Qui troverai le tue chat</h3><p>Quando richiedi un posto, la conversazione con il capogruppo sarà disponibile qui.</p><a href="#home" class="btn btn-primary">Esplora i gruppi</a></div>'}</div>`);
     return;
   }
-  const labels = { pending: 'In attesa del capogruppo', accepted: 'Posto riservato: pagamento da inviare', reported: 'Pagamento dichiarato: attesa conferma', confirmed: 'Quota confermata dal capogruppo', canceled: 'Richiesta annullata' };
+  const labels = { pending: 'In attesa del capogruppo', accepted: 'Posto riservato: pagamento da inviare', reported: 'Pagamento inviato · in attesa di conferma', confirmed: 'Quota confermata dal capogruppo', canceled: 'Richiesta annullata' };
   const selected = route.startsWith('#privata-') ? requests.find(r => r.id === route.slice(9)) : null;
   if (route.startsWith('#privata-') && !selected) { shell('<div class="empty-state"><h2>Conversazione non disponibile</h2><p>La richiesta non esiste oppure non appartiene al tuo account.</p><a class="btn btn-secondary" href="#miei-abbonamenti">Torna alle partecipazioni</a></div>'); return; }
   const list = requestsForView(requests, route, user.id);
@@ -36,12 +36,12 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       ${d && !owner ? `<div data-payment-details style="background:#eff6ff;padding:16px;border-radius:12px"><strong>Paga direttamente al capogruppo</strong>${d.iban ? `<p>IBAN: ${esc(d.iban)}<br>Intestatario: ${esc(d.accountHolder)}</p>` : ''}${d.paypalEmail ? `<p>Email PayPal: ${esc(d.paypalEmail)}</p>` : ''}<p>Concordate la causale e le modalità in chat. Non è un pagamento a BYS.</p></div>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">${owner && !r.listingRemovedAt && r.status === 'pending' && !['CLOSED','DRAFT'].includes(r.groupStatus) ? button(`accept${i}`, 'Accetta e riserva 48 ore') : ''}
       ${!selected && !owner && !r.leaveAtPeriodEnd && (r.status === 'accepted' || (r.status === 'confirmed' && Date.parse(r.periodEnd) - Date.now() <= 3 * 86400000)) ? button(`report${i}`, 'Ho pagato al capogruppo') : ''}
-      ${owner && r.status === 'reported' && r.receiptMessageId ? button(`receipt${i}`, 'Apri ricevuta') : ''}${!selected && owner && r.status === 'reported' ? button(`confirm${i}`, 'Confermo: quota accreditata') : ''}
+      ${owner && r.status === 'reported' && r.receiptMessageId ? button(`receipt${i}`, 'Apri ricevuta') : ''}${!selected && owner && r.status === 'reported' ? button(`confirm${i}`, 'Pagamento ricevuto') : ''}
       ${['pending','accepted'].includes(r.status) || (r.status === 'confirmed' && Date.parse(r.periodEnd) <= Date.now()) ? button(`cancel${i}`, 'Annulla partecipazione') : ''}
-      ${selected ? "" : link(`#privata-${r.id}`, r.unreadMessages ? 'Chat · ' + r.unreadMessages + ' non letti' : 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${groupShareLink({ id: r.groupId, customServiceName: r.groupName })}${r.periodEnd && Date.parse(r.periodEnd) > Date.now() ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><div id="reportArea${i}"></div><div id="receiptArea${i}"></div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
+      ${selected ? "" : link(`#privata-${r.id}`, r.unreadMessages ? 'Chat · ' + r.unreadMessages + ' non letti' : 'Apri chat privata')}${link(`#gruppo-${r.groupId}`, 'Gruppo')}${!r.listingRemovedAt ? groupShareLink({ id: r.groupId, customServiceName: r.groupName }) : ''}${r.periodEnd && Date.parse(r.periodEnd) > Date.now() ? button(`access${i}`, 'Istruzioni di accesso') : ''}</div><div id="reportArea${i}"></div><div id="receiptArea${i}"></div><pre id="accessText${i}" style="white-space:pre-wrap"></pre></article>`;
     }).join('') || `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">${managing ? '+' : '↗'}</span><h3>${managing ? 'Le richieste arriveranno qui' : 'Trova il tuo prossimo gruppo'}</h3><p>${managing ? 'Crea un gruppo e condividilo su WhatsApp. Potrai accettare i membri e verificare le quote da questa pagina.' : 'Non hai ancora richieste di partecipazione. Esplora il marketplace e scegli un gruppo.'}</p>${link(managing ? '#crea' : '#cerca', managing ? 'Crea un gruppo' : 'Esplora i gruppi')}</div>`}
     ${selected ? '<section class="private-chat"><h3>La vostra conversazione</h3><section id="chatQuota" class="chat-quota" aria-label="Pagamento della quota nella chat"></section><div id="privateMessages" aria-live="polite" role="log" aria-label="Messaggi della chat privata"></div><form id="privateForm"><label>Messaggio privato<textarea name="content" maxlength="2000" style="width:100%"></textarea></label><label class="btn btn-secondary" style="display:block">Allega ricevuta<input id="receiptPhoto" type="file" accept="image/*,.pdf,application/pdf" style="display:block;max-width:100%;margin-top:8px"></label><div id="receiptPreview"></div><p>Foto o PDF privato della ricevuta. Oscura i dati non necessari. L’accredito va comunque verificato dal capogruppo.</p><button class="btn btn-primary">Invia</button></form></section>' : ''}`);
-  const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna stato delle richieste'; refresh.type = 'button';
+  const refresh = document.createElement('button'); refresh.className = 'btn btn-secondary'; refresh.textContent = 'Aggiorna'; refresh.type = 'button';
   container.querySelectorAll('.participation-card').forEach((card,i)=>{
     const r=list[i];simplifyQuota(card,r,user.id,card.querySelector('[style*=flex]'));participationProgress(card,r,{user,api,reload,esc});issueForm(card,{groupId:r.groupId,requestId:r.id,user,api,esc});const url=r.ownerId===user.id?r.memberAvatar:r.ownerAvatar;
     if(url){const img=document.createElement('img');img.src=url;img.alt='Foto profilo';img.width=44;img.height=44;img.style.cssText='border-radius:50%;object-fit:cover;margin:12px 0';card.querySelector('h3').after(img);}
@@ -64,6 +64,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
     };
   }));
   list.forEach((r, i) => ['accept','confirm','cancel'].forEach(action => bind(`${action}${i}`, async () => {
+    if (action === 'cancel' && !window.confirm('Vuoi annullare questa partecipazione? I pagamenti già effettuati non vengono rimborsati automaticamente.')) return;
     if (action === 'confirm' && !window.confirm('Hai verificato l’effettivo accredito sul tuo conto? Confermi un mese di accesso al gruppo.')) return;
     await api(`/api/manual/${encodeURIComponent(r.id)}/${action}`, { periodEnd: r.periodEnd || null }); await reload();
   })));
@@ -80,7 +81,7 @@ export async function renderManual({ container, route, user, api, shell, esc, mo
       const empty=container.querySelector('#quotaEmpty');empty.hidden=visible>0;empty.textContent=value==='reported'?'Nessuna quota da verificare. Ci pensa BYS a ricordare il rinnovo ai membri.':value==='pending'?'Nessuna nuova richiesta.':'Nessuna partecipazione da mostrare.';
     };
     filters.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(b)applyFilter(b.dataset.filter);});
-    applyFilter('reported');
+    applyFilter(list.some(r=>r.status==='reported')?'reported':list.some(r=>r.status==='pending')?'pending':'all');
   }
   list.forEach((r,i) => bind(`access${i}`,async () => {
     const result = await api(`/api/access/${encodeURIComponent(r.groupId)}`);

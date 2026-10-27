@@ -8,7 +8,7 @@ export function renderMarketplaceWelcome(container) {
     <span class="billing-eyebrow">BENVENUTO SU BYS</span>
     <h1>Entra e trova il tuo gruppo.</h1>
     <p>Hai già un account BYS? Usa quello: ritroverai qui i tuoi gruppi e le tue conversazioni.</p>
-    <ol style="line-height:1.7;padding-left:24px"><li><strong>Accedi o registrati su BYS.</strong> La registrazione è gratuita.</li><li><strong>Crea e gestisci i tuoi gruppi gratis. Attiva BYS per partecipare ai gruppi altrui.</strong> Scegli mensile a 0,99 €, trimestrale a 2,69 € o annuale a 9,90 €. Google Pay e Apple Pay, sui dispositivi compatibili, attivano il periodo scelto dopo la conferma del pagamento. Con bonifico serve la verifica dell’incasso da parte di BYS.</li><li><strong>Scegli il tuo gruppo.</strong> Le quote si pagano separatamente e direttamente al capogruppo.</li></ol>
+    <ol style="line-height:1.7;padding-left:24px"><li><strong>Accedi o registrati su BYS.</strong> La registrazione è gratuita.</li><li><strong>Crea e gestisci i tuoi gruppi gratis. Attiva BYS per partecipare ai gruppi altrui.</strong> Scegli mensile a 0,99 €, trimestrale a 2,69 € o annuale a 9,90 €. Sceglierai come pagare nella pagina di attivazione.</li><li><strong>Scegli il tuo gruppo.</strong> Le quote si pagano separatamente e direttamente al capogruppo.</li></ol>
     <a class="btn btn-primary" style="display:flex;margin:20px 0 12px" href="${login}">Accedi con BYS e continua →</a>
     <p>Non hai un account? <a href="${register}"  rel="noopener noreferrer">Registrati gratuitamente su BYS ↗</a>. Dopo la registrazione riprenderai da dove eri rimasto.</p>
     <a class="btn btn-secondary" href="#home">Esplora prima i gruppi</a>
